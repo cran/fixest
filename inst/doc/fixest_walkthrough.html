@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+<title>Simple example using Trade data</title>
+
+<script type="text/javascript">
+window.onload = function() {
+  var imgs = document.getElementsByTagName('img'), i, img;
+  for (i = 0; i < imgs.length; i++) {
+    img = imgs[i];
+    // center an image if it is the only element of its parent
+    if (img.parentElement.childElementCount === 1)
+      img.parentElement.style.textAlign = 'center';
+  }
+};
+</script>
+
+<!-- Styles for R syntax highlighter -->
+<style type="text/css">
+   pre .operator,
+   pre .paren {
+     color: rgb(104, 118, 135)
+   }
+
+   pre .literal {
+     color: #990073
+   }
+
+   pre .number {
+     color: #099;
+   }
+
+   pre .comment {
+     color: #998;
+     font-style: italic
+   }
+
+   pre .keyword {
+     color: #900;
+     font-weight: bold
+   }
+
+   pre .identifier {
+     color: rgb(0, 0, 0);
+   }
+
+   pre .string {
+     color: #d14;
+   }
+</style>
+
+<!-- R syntax highlighter -->
+<script type="text/javascript">
+var hljs=new function(){function m(p){return p.replace(/&/gm,"&amp;").replace(/</gm,"&lt;")}function f(r,q,p){return RegExp(q,"m"+(r.cI?"i":"")+(p?"g":""))}function b(r){for(var p=0;p<r.childNodes.length;p++){var q=r.childNodes[p];if(q.nodeName=="CODE"){return q}if(!(q.nodeType==3&&q.nodeValue.match(/\s+/))){break}}}function h(t,s){var p="";for(var r=0;r<t.childNodes.length;r++){if(t.childNodes[r].nodeType==3){var q=t.childNodes[r].nodeValue;if(s){q=q.replace(/\n/g,"")}p+=q}else{if(t.childNodes[r].nodeName=="BR"){p+="\n"}else{p+=h(t.childNodes[r])}}}if(/MSIE [678]/.test(navigator.userAgent)){p=p.replace(/\r/g,"\n")}return p}function a(s){var r=s.className.split(/\s+/);r=r.concat(s.parentNode.className.split(/\s+/));for(var q=0;q<r.length;q++){var p=r[q].replace(/^language-/,"");if(e[p]){return p}}}function c(q){var p=[];(function(s,t){for(var r=0;r<s.childNodes.length;r++){if(s.childNodes[r].nodeType==3){t+=s.childNodes[r].nodeValue.length}else{if(s.childNodes[r].nodeName=="BR"){t+=1}else{if(s.childNodes[r].nodeType==1){p.push({event:"start",offset:t,node:s.childNodes[r]});t=arguments.callee(s.childNodes[r],t);p.push({event:"stop",offset:t,node:s.childNodes[r]})}}}}return t})(q,0);return p}function k(y,w,x){var q=0;var z="";var s=[];function u(){if(y.length&&w.length){if(y[0].offset!=w[0].offset){return(y[0].offset<w[0].offset)?y:w}else{return w[0].event=="start"?y:w}}else{return y.length?y:w}}function t(D){var A="<"+D.nodeName.toLowerCase();for(var B=0;B<D.attributes.length;B++){var C=D.attributes[B];A+=" "+C.nodeName.toLowerCase();if(C.value!==undefined&&C.value!==false&&C.value!==null){A+='="'+m(C.value)+'"'}}return A+">"}while(y.length||w.length){var v=u().splice(0,1)[0];z+=m(x.substr(q,v.offset-q));q=v.offset;if(v.event=="start"){z+=t(v.node);s.push(v.node)}else{if(v.event=="stop"){var p,r=s.length;do{r--;p=s[r];z+=("</"+p.nodeName.toLowerCase()+">")}while(p!=v.node);s.splice(r,1);while(r<s.length){z+=t(s[r]);r++}}}}return z+m(x.substr(q))}function j(){function q(x,y,v){if(x.compiled){return}var u;var s=[];if(x.k){x.lR=f(y,x.l||hljs.IR,true);for(var w in x.k){if(!x.k.hasOwnProperty(w)){continue}if(x.k[w] instanceof Object){u=x.k[w]}else{u=x.k;w="keyword"}for(var r in u){if(!u.hasOwnProperty(r)){continue}x.k[r]=[w,u[r]];s.push(r)}}}if(!v){if(x.bWK){x.b="\\b("+s.join("|")+")\\s"}x.bR=f(y,x.b?x.b:"\\B|\\b");if(!x.e&&!x.eW){x.e="\\B|\\b"}if(x.e){x.eR=f(y,x.e)}}if(x.i){x.iR=f(y,x.i)}if(x.r===undefined){x.r=1}if(!x.c){x.c=[]}x.compiled=true;for(var t=0;t<x.c.length;t++){if(x.c[t]=="self"){x.c[t]=x}q(x.c[t],y,false)}if(x.starts){q(x.starts,y,false)}}for(var p in e){if(!e.hasOwnProperty(p)){continue}q(e[p].dM,e[p],true)}}function d(B,C){if(!j.called){j();j.called=true}function q(r,M){for(var L=0;L<M.c.length;L++){if((M.c[L].bR.exec(r)||[null])[0]==r){return M.c[L]}}}function v(L,r){if(D[L].e&&D[L].eR.test(r)){return 1}if(D[L].eW){var M=v(L-1,r);return M?M+1:0}return 0}function w(r,L){return L.i&&L.iR.test(r)}function K(N,O){var M=[];for(var L=0;L<N.c.length;L++){M.push(N.c[L].b)}var r=D.length-1;do{if(D[r].e){M.push(D[r].e)}r--}while(D[r+1].eW);if(N.i){M.push(N.i)}return f(O,M.join("|"),true)}function p(M,L){var N=D[D.length-1];if(!N.t){N.t=K(N,E)}N.t.lastIndex=L;var r=N.t.exec(M);return r?[M.substr(L,r.index-L),r[0],false]:[M.substr(L),"",true]}function z(N,r){var L=E.cI?r[0].toLowerCase():r[0];var M=N.k[L];if(M&&M instanceof Array){return M}return false}function F(L,P){L=m(L);if(!P.k){return L}var r="";var O=0;P.lR.lastIndex=0;var M=P.lR.exec(L);while(M){r+=L.substr(O,M.index-O);var N=z(P,M);if(N){x+=N[1];r+='<span class="'+N[0]+'">'+M[0]+"</span>"}else{r+=M[0]}O=P.lR.lastIndex;M=P.lR.exec(L)}return r+L.substr(O,L.length-O)}function J(L,M){if(M.sL&&e[M.sL]){var r=d(M.sL,L);x+=r.keyword_count;return r.value}else{return F(L,M)}}function I(M,r){var L=M.cN?'<span class="'+M.cN+'">':"";if(M.rB){y+=L;M.buffer=""}else{if(M.eB){y+=m(r)+L;M.buffer=""}else{y+=L;M.buffer=r}}D.push(M);A+=M.r}function G(N,M,Q){var R=D[D.length-1];if(Q){y+=J(R.buffer+N,R);return false}var P=q(M,R);if(P){y+=J(R.buffer+N,R);I(P,M);return P.rB}var L=v(D.length-1,M);if(L){var O=R.cN?"</span>":"";if(R.rE){y+=J(R.buffer+N,R)+O}else{if(R.eE){y+=J(R.buffer+N,R)+O+m(M)}else{y+=J(R.buffer+N+M,R)+O}}while(L>1){O=D[D.length-2].cN?"</span>":"";y+=O;L--;D.length--}var r=D[D.length-1];D.length--;D[D.length-1].buffer="";if(r.starts){I(r.starts,"")}return R.rE}if(w(M,R)){throw"Illegal"}}var E=e[B];var D=[E.dM];var A=0;var x=0;var y="";try{var s,u=0;E.dM.buffer="";do{s=p(C,u);var t=G(s[0],s[1],s[2]);u+=s[0].length;if(!t){u+=s[1].length}}while(!s[2]);if(D.length>1){throw"Illegal"}return{r:A,keyword_count:x,value:y}}catch(H){if(H=="Illegal"){return{r:0,keyword_count:0,value:m(C)}}else{throw H}}}function g(t){var p={keyword_count:0,r:0,value:m(t)};var r=p;for(var q in e){if(!e.hasOwnProperty(q)){continue}var s=d(q,t);s.language=q;if(s.keyword_count+s.r>r.keyword_count+r.r){r=s}if(s.keyword_count+s.r>p.keyword_count+p.r){r=p;p=s}}if(r.language){p.second_best=r}return p}function i(r,q,p){if(q){r=r.replace(/^((<[^>]+>|\t)+)/gm,function(t,w,v,u){return w.replace(/\t/g,q)})}if(p){r=r.replace(/\n/g,"<br>")}return r}function n(t,w,r){var x=h(t,r);var v=a(t);var y,s;if(v){y=d(v,x)}else{return}var q=c(t);if(q.length){s=document.createElement("pre");s.innerHTML=y.value;y.value=k(q,c(s),x)}y.value=i(y.value,w,r);var u=t.className;if(!u.match("(\\s|^)(language-)?"+v+"(\\s|$)")){u=u?(u+" "+v):v}if(/MSIE [678]/.test(navigator.userAgent)&&t.tagName=="CODE"&&t.parentNode.tagName=="PRE"){s=t.parentNode;var p=document.createElement("div");p.innerHTML="<pre><code>"+y.value+"</code></pre>";t=p.firstChild.firstChild;p.firstChild.cN=s.cN;s.parentNode.replaceChild(p.firstChild,s)}else{t.innerHTML=y.value}t.className=u;t.result={language:v,kw:y.keyword_count,re:y.r};if(y.second_best){t.second_best={language:y.second_best.language,kw:y.second_best.keyword_count,re:y.second_best.r}}}function o(){if(o.called){return}o.called=true;var r=document.getElementsByTagName("pre");for(var p=0;p<r.length;p++){var q=b(r[p]);if(q){n(q,hljs.tabReplace)}}}function l(){if(window.addEventListener){window.addEventListener("DOMContentLoaded",o,false);window.addEventListener("load",o,false)}else{if(window.attachEvent){window.attachEvent("onload",o)}else{window.onload=o}}}var e={};this.LANGUAGES=e;this.highlight=d;this.highlightAuto=g;this.fixMarkup=i;this.highlightBlock=n;this.initHighlighting=o;this.initHighlightingOnLoad=l;this.IR="[a-zA-Z][a-zA-Z0-9_]*";this.UIR="[a-zA-Z_][a-zA-Z0-9_]*";this.NR="\\b\\d+(\\.\\d+)?";this.CNR="\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)";this.BNR="\\b(0b[01]+)";this.RSR="!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|\\.|-|-=|/|/=|:|;|<|<<|<<=|<=|=|==|===|>|>=|>>|>>=|>>>|>>>=|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~";this.ER="(?![\\s\\S])";this.BE={b:"\\\\.",r:0};this.ASM={cN:"string",b:"'",e:"'",i:"\\n",c:[this.BE],r:0};this.QSM={cN:"string",b:'"',e:'"',i:"\\n",c:[this.BE],r:0};this.CLCM={cN:"comment",b:"//",e:"$"};this.CBLCLM={cN:"comment",b:"/\\*",e:"\\*/"};this.HCM={cN:"comment",b:"#",e:"$"};this.NM={cN:"number",b:this.NR,r:0};this.CNM={cN:"number",b:this.CNR,r:0};this.BNM={cN:"number",b:this.BNR,r:0};this.inherit=function(r,s){var p={};for(var q in r){p[q]=r[q]}if(s){for(var q in s){p[q]=s[q]}}return p}}();hljs.LANGUAGES.cpp=function(){var a={keyword:{"false":1,"int":1,"float":1,"while":1,"private":1,"char":1,"catch":1,"export":1,virtual:1,operator:2,sizeof:2,dynamic_cast:2,typedef:2,const_cast:2,"const":1,struct:1,"for":1,static_cast:2,union:1,namespace:1,unsigned:1,"long":1,"throw":1,"volatile":2,"static":1,"protected":1,bool:1,template:1,mutable:1,"if":1,"public":1,friend:2,"do":1,"return":1,"goto":1,auto:1,"void":2,"enum":1,"else":1,"break":1,"new":1,extern:1,using:1,"true":1,"class":1,asm:1,"case":1,typeid:1,"short":1,reinterpret_cast:2,"default":1,"double":1,register:1,explicit:1,signed:1,typename:1,"try":1,"this":1,"switch":1,"continue":1,wchar_t:1,inline:1,"delete":1,alignof:1,char16_t:1,char32_t:1,constexpr:1,decltype:1,noexcept:1,nullptr:1,static_assert:1,thread_local:1,restrict:1,_Bool:1,complex:1},built_in:{std:1,string:1,cin:1,cout:1,cerr:1,clog:1,stringstream:1,istringstream:1,ostringstream:1,auto_ptr:1,deque:1,list:1,queue:1,stack:1,vector:1,map:1,set:1,bitset:1,multiset:1,multimap:1,unordered_set:1,unordered_map:1,unordered_multiset:1,unordered_multimap:1,array:1,shared_ptr:1}};return{dM:{k:a,i:"</",c:[hljs.CLCM,hljs.CBLCLM,hljs.QSM,{cN:"string",b:"'\\\\?.",e:"'",i:"."},{cN:"number",b:"\\b(\\d+(\\.\\d*)?|\\.\\d+)(u|U|l|L|ul|UL|f|F)"},hljs.CNM,{cN:"preprocessor",b:"#",e:"$"},{cN:"stl_container",b:"\\b(deque|list|queue|stack|vector|map|set|bitset|multiset|multimap|unordered_map|unordered_set|unordered_multiset|unordered_multimap|array)\\s*<",e:">",k:a,r:10,c:["self"]}]}}}();hljs.LANGUAGES.r={dM:{c:[hljs.HCM,{cN:"number",b:"\\b0[xX][0-9a-fA-F]+[Li]?\\b",e:hljs.IMMEDIATE_RE,r:0},{cN:"number",b:"\\b\\d+(?:[eE][+\\-]?\\d*)?L\\b",e:hljs.IMMEDIATE_RE,r:0},{cN:"number",b:"\\b\\d+\\.(?!\\d)(?:i\\b)?",e:hljs.IMMEDIATE_RE,r:1},{cN:"number",b:"\\b\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d*)?i?\\b",e:hljs.IMMEDIATE_RE,r:0},{cN:"number",b:"\\.\\d+(?:[eE][+\\-]?\\d*)?i?\\b",e:hljs.IMMEDIATE_RE,r:1},{cN:"keyword",b:"(?:tryCatch|library|setGeneric|setGroupGeneric)\\b",e:hljs.IMMEDIATE_RE,r:10},{cN:"keyword",b:"\\.\\.\\.",e:hljs.IMMEDIATE_RE,r:10},{cN:"keyword",b:"\\.\\.\\d+(?![\\w.])",e:hljs.IMMEDIATE_RE,r:10},{cN:"keyword",b:"\\b(?:function)",e:hljs.IMMEDIATE_RE,r:2},{cN:"keyword",b:"(?:if|in|break|next|repeat|else|for|return|switch|while|try|stop|warning|require|attach|detach|source|setMethod|setClass)\\b",e:hljs.IMMEDIATE_RE,r:1},{cN:"literal",b:"(?:NA|NA_integer_|NA_real_|NA_character_|NA_complex_)\\b",e:hljs.IMMEDIATE_RE,r:10},{cN:"literal",b:"(?:NULL|TRUE|FALSE|T|F|Inf|NaN)\\b",e:hljs.IMMEDIATE_RE,r:1},{cN:"identifier",b:"[a-zA-Z.][a-zA-Z0-9._]*\\b",e:hljs.IMMEDIATE_RE,r:0},{cN:"operator",b:"<\\-(?!\\s*\\d)",e:hljs.IMMEDIATE_RE,r:2},{cN:"operator",b:"\\->|<\\-",e:hljs.IMMEDIATE_RE,r:1},{cN:"operator",b:"%%|~",e:hljs.IMMEDIATE_RE},{cN:"operator",b:">=|<=|==|!=|\\|\\||&&|=|\\+|\\-|\\*|/|\\^|>|<|!|&|\\||\\$|:",e:hljs.IMMEDIATE_RE,r:0},{cN:"operator",b:"%",e:"%",i:"\\n",r:1},{cN:"identifier",b:"`",e:"`",r:0},{cN:"string",b:'"',e:'"',c:[hljs.BE],r:0},{cN:"string",b:"'",e:"'",c:[hljs.BE],r:0},{cN:"paren",b:"[[({\\])}]",e:hljs.IMMEDIATE_RE,r:0}]}};
+hljs.initHighlightingOnLoad();
+</script>
+
+<!-- MathJax scripts -->
+<script type="text/javascript" src="https://cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+<style type="text/css">
+body, td {
+   font-family: sans-serif;
+   background-color: white;
+   font-size: 13px;
+}
+
+body {
+  max-width: 800px;
+  margin: auto;
+  padding: 1em;
+  line-height: 20px;
+}
+
+tt, code, pre {
+   font-family: 'DejaVu Sans Mono', 'Droid Sans Mono', 'Lucida Console', Consolas, Monaco, monospace;
+}
+
+h1 {
+   font-size:2.2em;
+}
+
+h2 {
+   font-size:1.8em;
+}
+
+h3 {
+   font-size:1.4em;
+}
+
+h4 {
+   font-size:1.0em;
+}
+
+h5 {
+   font-size:0.9em;
+}
+
+h6 {
+   font-size:0.8em;
+}
+
+a:visited {
+   color: rgb(50%, 0%, 50%);
+}
+
+pre, img {
+  max-width: 100%;
+}
+pre {
+  overflow-x: auto;
+}
+pre code {
+   display: block; padding: 0.5em;
+}
+
+code {
+  font-size: 92%;
+  border: 1px solid #ccc;
+}
+
+code[class] {
+  background-color: #F8F8F8;
+}
+
+table, td, th {
+  border: none;
+}
+
+blockquote {
+   color:#666666;
+   margin:0;
+   padding-left: 1em;
+   border-left: 0.5em #EEE solid;
+}
+
+hr {
+   height: 0px;
+   border-bottom: none;
+   border-top-width: thin;
+   border-top-style: dotted;
+   border-top-color: #999999;
+}
+
+@media print {
+   * {
+      background: transparent !important;
+      color: black !important;
+      filter:none !important;
+      -ms-filter: none !important;
+   }
+
+   body {
+      font-size:12pt;
+      max-width:100%;
+   }
+
+   a, a:visited {
+      text-decoration: underline;
+   }
+
+   hr {
+      visibility: hidden;
+      page-break-before: always;
+   }
+
+   pre, blockquote {
+      padding-right: 1em;
+      page-break-inside: avoid;
+   }
+
+   tr, img {
+      page-break-inside: avoid;
+   }
+
+   img {
+      max-width: 100% !important;
+   }
+
+   @page :left {
+      margin: 15mm 20mm 15mm 10mm;
+   }
+
+   @page :right {
+      margin: 15mm 10mm 15mm 20mm;
+   }
+
+   p, h2, h3 {
+      orphans: 3; widows: 3;
+   }
+
+   h2, h3 {
+      page-break-after: avoid;
+   }
+}
+</style>
+
+
+
+</head>
+
+<body>
+<!-- Help on vignette writing here: http://r-pkgs.had.co.nz/vignettes.html. -->
+
+<!-- Ajouter example simple et intuitif fixed-effects  -->
+
+<p>The package <code>fixest</code> provides a family of functions to perform estimations with multiple fixed-effects.
+The two main functions are <code>feols</code> for linear models and <code>feglm</code> for generalized linear models. In addition, the function <code>femlm</code> performs direct maximum likelihood estimation, and <code>feNmlm</code> extends the latter to allow the inclusion of non-linear in parameters right-hand-sides. 
+Each of these functions supports <em>any number</em> of fixed-effects and is implemented with full fledged multi-threading in c++. Functions <code>feols</code> and <code>feglm</code> further support variables with varying slopes.</p>
+
+<p>This package is currently the fastest software available to perform fixed-effects estimations (see the project&#39;s <a href="https://github.com/lrberge/fixest/wiki">homepage</a> for a benchmarking).</p>
+
+<p>The standard-errors of the estimates can be easily and intuitively clustered (up to four-way).</p>
+
+<p>Two specific functions are implemented to seamlessly export the results of multiple estimations into either a data.frame (function <code>esttable</code>), or a Latex table of &ldquo;article-like&rdquo; quality (function <code>esttex</code>).</p>
+
+<p>The main features of the package are illustrated in this vignette. The theory used to obtain the fixed-effects is based on Berge (2018), &ldquo;<em>Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package fixest.</em>&rdquo; CREA Discussion Papers, 13 (<a href="https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13">https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13</a>).</p>
+
+<h1>Simple example using Trade data</h1>
+
+<p>This example deals with international trade, which is a setup that usually requires performing estimations with many fixed-effects. We estimate a very simple gravity model in which we are interested in finding out the negative effect of geographic distance on trade. The sample data consists of European trade extracted from Eurostat. Let&#39;s load the data contained in the package:</p>
+
+<pre><code class="r">library(fixest)
+data(trade)
+</code></pre>
+
+<p>This data is a sample of bilateral importations between EU15 countries from 2007 and 2016. The data is further broken down according to 20 product categories. Here is a sample of the data:</p>
+
+<table><thead>
+<tr>
+<th align="left">Destination</th>
+<th align="left">Origin</th>
+<th align="right">Product</th>
+<th align="right">Year</th>
+<th align="right">dist_km</th>
+<th align="right">Euros</th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="left">LU</td>
+<td align="left">BE</td>
+<td align="right">1</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">2966697</td>
+</tr>
+<tr>
+<td align="left">BE</td>
+<td align="left">LU</td>
+<td align="right">1</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">6755030</td>
+</tr>
+<tr>
+<td align="left">LU</td>
+<td align="left">BE</td>
+<td align="right">2</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">57078782</td>
+</tr>
+<tr>
+<td align="left">BE</td>
+<td align="left">LU</td>
+<td align="right">2</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">7117406</td>
+</tr>
+<tr>
+<td align="left">LU</td>
+<td align="left">BE</td>
+<td align="right">3</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">17379821</td>
+</tr>
+<tr>
+<td align="left">BE</td>
+<td align="left">LU</td>
+<td align="right">3</td>
+<td align="right">2007</td>
+<td align="right">139.5719</td>
+<td align="right">2622254</td>
+</tr>
+</tbody></table>
+
+<p>The dependent variable of the estimation will be the level of trade between two countries while the independent variable is the geographic distance between the two countries. To obtain the elasticity of geographic distance net of the effects of the four clusters, we estimate the following:</p>
+
+<p>\(E\left(Trade_{i,j,p,t}\right)=\gamma_{i}^{Exporter}\times\gamma_{j}^{Importer}\times\gamma_{p}^{Product}\times\gamma_{t}^{Year}\times Distance_{ij}^{\beta}\),</p>
+
+<p>where the subscripts \(i\), \(j\), \(p\) and \(t\) stand respectively for the exporting country, the importing country, the type of product and the year, and the \(\gamma_{v}^{c}\) are fixed-effects for these groups. Here \(\beta\) is the elasticity of interest. </p>
+
+<p>Note that when you use the Poisson/Negative Binomial families, this relationship is in fact linear because the right hand side is exponentialized to avoid negative values for the Poisson parameter. This leads to the equivalent relation:<sup>[Since</sup> the \(\gamma\) are parameters, I omit to put them in logarithmic form.]</p>
+
+<p>\(E\left(Trade_{i,j,p,t}\right)=\exp\left(\gamma_{i}^{Exporter}+\gamma_{j}^{Importer}+\gamma_{p}^{Product}+\gamma_{t}^{Year}+\beta\times \ln Distance_{ij}\right)\).</p>
+
+<h2>Estimation</h2>
+
+<p>The estimation of this model using a Poisson likelihood is as follows:</p>
+
+<pre><code class="r">gravity_results &lt;- feglm(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+</code></pre>
+
+<p>Note that you need not provide the argument <code>family</code> since the Poisson model is the default.</p>
+
+<p>The results can be shown directly with the <code>print</code> method:</p>
+
+<pre><code class="r">print(gravity_results)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Fixed-effects: Origin: 15,  Destination: 15,  Product: 20,  Year: 10
+#&gt; Standard-errors: Clustered (Origin) 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; log(dist_km)  -1.5279   0.115699 -13.206 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -7.025e+11   Adj. Pseudo-R2: 0.76403 
+#&gt;            BIC:  1.405e+12     Squared Cor.: 0.61202
+</code></pre>
+
+<p>The <code>print</code> reports the coefficient estimates and standard-errors as well as some other information. Among the quality of fit information, the squared-correlation corresponds to the correlation between the dependent variable and the expected predictor; it reflects somehow to the idea of R-square in OLS estimations.</p>
+
+<h2>Clustering the standard-errors</h2>
+
+<p>To cluster the standard-errors, we can simply use the argument <code>se</code> of the <code>summary</code> method. Let&#39;s say we want to cluster the standard-errors according to the first two clusters (i.e. the <em>Origin</em> and <em>Destination</em> variables). Then we just have to do:</p>
+
+<pre><code class="r">summary(gravity_results, se = &quot;twoway&quot;)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Fixed-effects: Origin: 15,  Destination: 15,  Product: 20,  Year: 10
+#&gt; Standard-errors: Two-way (Origin &amp; Destination) 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; log(dist_km)  -1.5279   0.132276 -11.551 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -7.025e+11   Adj. Pseudo-R2: 0.76403 
+#&gt;            BIC:  1.405e+12     Squared Cor.: 0.61202
+</code></pre>
+
+<p>The clustering can be done on one (<code>se=&quot;cluster&quot;</code>), two (<code>se=&quot;twoway&quot;</code>), three (<code>se=&quot;threeway&quot;</code>) or up to four (<code>se=&quot;fourway&quot;</code>) variables. If the estimation includes fixed-effects, then by default the clustering will be done using these fixed-effects, in the original order. This is why the <em>Origin</em> and <em>Destination</em> variables were used for the two-way clustering in the previous example. If, instead, you wanted to perform one-way clustering on the <em>Product</em> variable, you need to use the argument <code>cluster</code>: </p>
+
+<pre><code class="r"># Equivalent ways of clustering the SEs:
+# One-way clustering is deduced from the arguent &#39;cluster&#39;
+# - using the vector:
+summary(gravity_results, cluster = trade$Product)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Fixed-effects: Origin: 15,  Destination: 15,  Product: 20,  Year: 10
+#&gt; Standard-errors: Clustered 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; log(dist_km)  -1.5279   0.098318  -15.54 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -7.025e+11   Adj. Pseudo-R2: 0.76403 
+#&gt;            BIC:  1.405e+12     Squared Cor.: 0.61202
+# - by reference:
+summary(gravity_results, cluster = &quot;Product&quot;)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Fixed-effects: Origin: 15,  Destination: 15,  Product: 20,  Year: 10
+#&gt; Standard-errors: Clustered (Product) 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; log(dist_km)  -1.5279   0.098318  -15.54 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -7.025e+11   Adj. Pseudo-R2: 0.76403 
+#&gt;            BIC:  1.405e+12     Squared Cor.: 0.61202
+# - with a formula:
+summary(gravity_results, cluster = ~Product)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Fixed-effects: Origin: 15,  Destination: 15,  Product: 20,  Year: 10
+#&gt; Standard-errors: Clustered (Product) 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; log(dist_km)  -1.5279   0.098318  -15.54 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -7.025e+11   Adj. Pseudo-R2: 0.76403 
+#&gt;            BIC:  1.405e+12     Squared Cor.: 0.61202
+</code></pre>
+
+<p>Note that you can always cluster the standard-errors, even when the estimation contained no fixed-effect. Buth then you must use the argument <code>cluster</code>:</p>
+
+<pre><code class="r">gravity_simple = feglm(Euros ~ log(dist_km), trade)
+# Two way clustering is deduced from the argument &#39;cluster&#39;
+# Using data:
+summary(gravity_simple, cluster = trade[, c(&quot;Origin&quot;, &quot;Destination&quot;)])
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Standard-errors: Two-way 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; (Intercept)    24.709    1.15980 21.3040 &lt; 2.2e-16 ***
+#&gt; log(dist_km)   -1.029    0.16316 -6.3064  2.86e-10 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -2.426e+12   Adj. Pseudo-R2: 0.18502 
+#&gt;            BIC:  4.852e+12     Squared Cor.: 0.05511
+# Using a formula (note that the values of the variables are 
+#  fetched directly in the original database):
+summary(gravity_simple, cluster = ~Origin+Destination)
+#&gt; GLM estimation, family = poisson, Dep. Var.: Euros
+#&gt; Observations: 38,325 
+#&gt; Standard-errors: Two-way (Origin &amp; Destination) 
+#&gt;              Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; (Intercept)    24.709    1.15980 21.3040 &lt; 2.2e-16 ***
+#&gt; log(dist_km)   -1.029    0.16316 -6.3064  2.86e-10 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -2.426e+12   Adj. Pseudo-R2: 0.18502 
+#&gt;            BIC:  4.852e+12     Squared Cor.: 0.05511
+</code></pre>
+
+<h2>Other estimation functions</h2>
+
+<p>Now we estimate the same relationship by OLS. We need to put the left hand side in logarithm (since the right-hand-side is not exponentialized):</p>
+
+<pre><code class="r">gravity_results_ols &lt;- feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+</code></pre>
+
+<p>Of course you can use different families in <code>feglm</code>, exactly as in <code>glm</code>. </p>
+
+<p>To get the estimation for the fixed-effects Negative Binomial:</p>
+
+<pre><code class="r">gravity_results_negbin &lt;- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+</code></pre>
+
+<h2>Viewing the results in R</h2>
+
+<p>Now let&#39;s say that we want a compact overview of the results of several estimations. The best way is to use the function <code>esttable</code>. This function summarizes the results of several <code>fixest</code> estimations into a data.frame. To see the fixed-effects results with the three different likelihoods, we just have to type:</p>
+
+<pre><code class="r">esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = &quot;twoway&quot;, titles = c(&quot;Poisson&quot;, &quot;Negative Binomial&quot;, &quot;Gaussian&quot;))
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="left"></th>
+<th align="left">Poisson</th>
+<th align="left">Negative Binomial</th>
+<th align="left">Gaussian</th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="left">Dependent Var.:</td>
+<td align="left">Euros</td>
+<td align="left">Euros</td>
+<td align="left">log(Euros)</td>
+</tr>
+<tr>
+<td align="left">log(dist_km)</td>
+<td align="left">-1.5279*** (0.1323)</td>
+<td align="left">-1.7108*** (0.1797)</td>
+<td align="left">-2.1699*** (0.1739)</td>
+</tr>
+<tr>
+<td align="left">Overdispersion:</td>
+<td align="left"></td>
+<td align="left">0.548774</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">Fixed-Effects:</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+</tr>
+<tr>
+<td align="left">Origin</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Destination</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Product</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Year</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+</tr>
+<tr>
+<td align="left">Family:</td>
+<td align="left">Poisson</td>
+<td align="left">Neg. Bin.</td>
+<td align="left">OLS</td>
+</tr>
+<tr>
+<td align="left">Observations</td>
+<td align="left">38,325</td>
+<td align="left">38,325</td>
+<td align="left">38,325</td>
+</tr>
+<tr>
+<td align="left">Squared-Corr.</td>
+<td align="left">0.612</td>
+<td align="left">0.438</td>
+<td align="left">0.706</td>
+</tr>
+<tr>
+<td align="left">Adj-pseudo R2</td>
+<td align="left">0.76403</td>
+<td align="left">0.03464</td>
+<td align="left">0.23583</td>
+</tr>
+<tr>
+<td align="left">BIC</td>
+<td align="left">1.405e+12</td>
+<td align="left">1,294,419.32</td>
+<td align="left">152,589.34</td>
+</tr>
+</tbody></table>
+
+<p>We added the argument <code>se=&quot;twoway&quot;</code> to cluster the standard-errors for all estimations. As can be seen this function gives an overview of the estimates and standard-errors, as well as some quality of fit measures. The argument <code>titles</code> is used to add information on each estimation column.</p>
+
+<p>In the previous example, we directly added the estimation results as arguments of the function <code>esttable</code>. But the function also accepts lists of estimations.
+Let&#39;s give an example. Say you want to see the influence of the introduction of fixed-effects on the estimate of the elasticity of distance. You can do it with the following code where we use the argument <code>fixef</code> to include fixed-effects (instead of inserting them directly in the formula):</p>
+
+<pre><code class="r">gravity_subcluster = list()
+all_clusters = c(&quot;Year&quot;, &quot;Destination&quot;, &quot;Origin&quot;, &quot;Product&quot;)
+for(i in 1:4){
+    gravity_subcluster[[i]] = feglm(Euros ~ log(dist_km), trade, fixef = all_clusters[1:i])
+}
+</code></pre>
+
+<p>The previous code performs 4 estimations with an increasing number of fixed-effects and store their results into the list named <code>gravity_subcluster</code>. To show the results of all 4 estimations, it&#39;s easy:</p>
+
+<pre><code class="r">esttable(gravity_subcluster, cluster = ~Origin+Destination)
+</code></pre>
+
+<table><thead>
+<tr>
+<th align="left"></th>
+<th align="left">model 1</th>
+<th align="left">model 2</th>
+<th align="left">model 3</th>
+<th align="left">model 4</th>
+</tr>
+</thead><tbody>
+<tr>
+<td align="left">log(dist_km)</td>
+<td align="left">-1.0293*** (0.1632)</td>
+<td align="left">-1.2257*** (0.2084)</td>
+<td align="left">-1.5176*** (0.1297)</td>
+<td align="left">-1.5279*** (0.1323)</td>
+</tr>
+<tr>
+<td align="left">Fixed-Effects:</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+<td align="left">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</td>
+</tr>
+<tr>
+<td align="left">Year</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Destination</td>
+<td align="left">No</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Origin</td>
+<td align="left">No</td>
+<td align="left">No</td>
+<td align="left">Yes</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">Product</td>
+<td align="left">No</td>
+<td align="left">No</td>
+<td align="left">No</td>
+<td align="left">Yes</td>
+</tr>
+<tr>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+<td align="left">___________________</td>
+</tr>
+<tr>
+<td align="left">Observations</td>
+<td align="left">38,325</td>
+<td align="left">38,325</td>
+<td align="left">38,325</td>
+<td align="left">38,325</td>
+</tr>
+<tr>
+<td align="left">Squared-Corr.</td>
+<td align="left">0.057</td>
+<td align="left">0.164</td>
+<td align="left">0.385</td>
+<td align="left">0.612</td>
+</tr>
+<tr>
+<td align="left">Adj-pseudo R2</td>
+<td align="left">0.18833</td>
+<td align="left">0.35826</td>
+<td align="left">0.59312</td>
+<td align="left">0.76403</td>
+</tr>
+<tr>
+<td align="left">BIC</td>
+<td align="left">4.833e+12</td>
+<td align="left">3.821e+12</td>
+<td align="left">2.423e+12</td>
+<td align="left">1.405e+12</td>
+</tr>
+</tbody></table>
+
+<p>We have a view of the 4 estimations, all reporting two-way clustered standard-errors thanks to the use of the argument <code>cluster</code>.</p>
+
+<h2>Exporting the results to Latex</h2>
+
+<p>So far we have seen how to report the results of multiple estimations on the R console. Now, with the function <code>esttex</code>, we can export the results to high quality Latex tables.
+The function <code>esttex</code> works exactly as the function <code>esttable</code>, it takes any number of <code>fixest</code> estimations. By default, it reports Latex code on the R console:</p>
+
+<pre><code class="r"># with two-way clustered SEs
+esttex(gravity_subcluster, cluster = ~Origin+Destination)
+#&gt; \global\long\def\sym#1{\ifmmode^{#1}\else\ensuremath{^{#1}}\fi}
+#&gt; \begin{table}[htbp]\centering
+#&gt; \caption{no title}
+#&gt; \begin{tabular}{lcccc}
+#&gt;  &amp; &amp; &amp; &amp; \tabularnewline
+#&gt; \hline
+#&gt; \hline
+#&gt; Dependent Variable:&amp;\multicolumn{4}{c}{Euros}\\
+#&gt; Model:&amp;(1)&amp;(2)&amp;(3)&amp;(4)\\
+#&gt; \hline
+#&gt; \emph{Variables}\tabularnewline
+#&gt; log(dist_km)&amp;-1\sym{***}&amp;-1\sym{***}&amp;-2\sym{***}&amp;-2\sym{***}\\
+#&gt;   &amp;(0.1632)&amp;(0.2084)&amp;(0.1297)&amp;(0.1323)\\
+#&gt; \hline
+#&gt; \emph{Fixed-Effects}&amp;  &amp; &amp; &amp; \\
+#&gt; Year&amp;Yes&amp;Yes&amp;Yes&amp;Yes\\
+#&gt; Destination&amp;No&amp;Yes&amp;Yes&amp;Yes\\
+#&gt; Origin&amp;No&amp;No&amp;Yes&amp;Yes\\
+#&gt; Product&amp;No&amp;No&amp;No&amp;Yes\\
+#&gt; \hline
+#&gt; \emph{Fit statistics}&amp;  &amp; &amp; &amp; \\
+#&gt; Observations&amp; 38,325&amp;38,325&amp;38,325&amp;38,325\\
+#&gt; Adj-pseudo $R^2$ &amp;0.18833&amp;0.35826&amp;0.59312&amp;0.76403\\
+#&gt; BIC &amp; $4.833\times 10^{12}$&amp;$3.821\times 10^{12}$&amp;$2.423\times 10^{12}$&amp;$1.405\times 10^{12}$\\
+#&gt; \hline
+#&gt; \hline
+#&gt; \multicolumn{5}{l}{\emph{Two-way (Origin &amp; Destination) standard-errors in parenthesis. Signif Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+#&gt; \end{tabular}
+#&gt; \end{table}
+</code></pre>
+
+<p>This function has many optional arguments. The user can export the Latex table directly into a file (argument <code>file</code>), add a title (arg. <code>title</code>) and a label to the table (arg. <code>label</code>). </p>
+
+<p>The coefficients can be renamed easily (arg. <code>dict</code>), some can be dropped (arg. <code>drop</code>) and they can be easily reordered with regular expressions (arg. <code>order</code>). </p>
+
+<p>The significance codes can easily be changed (arg. <code>signifCode</code>) and all quality of fit information can be customized. Among others, the number of fixed-effect per cluster can also be displayed using the argument <code>showClusterSize</code>.</p>
+
+<h3>An elaborate example</h3>
+
+<p>Consider the following example of the exportation of two tables:</p>
+
+<pre><code class="r"># we set the dictionary once and for all
+myDict = c(&quot;log(dist_km)&quot; = &quot;$\\ln (Distance)$&quot;, &quot;(Intercept)&quot; = &quot;Constant&quot;)
+# 1st export: we change the signif code and drop the intercept
+esttex(gravity_subcluster, signifCode = c(&quot;a&quot; = 0.01, &quot;b&quot; = 0.05), drop = &quot;Int&quot;, dict = myDict, file = &quot;Estimation Table.tex&quot;, replace = TRUE, title = &quot;First export -- normal Standard-errors&quot;)
+# 2nd export: clustered S-E + distance as the first coefficient
+esttex(gravity_subcluster, se = &quot;cluster&quot;, cluster = ~Product, order = &quot;dist&quot;, dict = myDict, file = &quot;Estimation Table.tex&quot;, title = &quot;Second export -- clustered standard-errors (on Product variable)&quot;)
+
+</code></pre>
+
+<p>In this example, two tables containing the results of the 5 estimations are directly exported in the file &ldquo;Estimation Table.tex&rdquo;. The file is re-created in the first exportation thanks to the argument <code>replace = TRUE</code>. </p>
+
+<p>To change the variable names in the Latex table, we use the argument <code>dict</code>. The variable <code>myDict</code> is the dictionary we use to rename the variables, it is simply a named vector. The original name of the variables correspond to the names of <code>myDict</code> while the new names of the variables are the values of this vector. Any variable that matches the names of <code>myDict</code> will be replaced by its value. Thus we do not care of the order of appearance of the variables in the estimation results. </p>
+
+<p>In the first export, the coefficient of the intercept is dropped by using <code>drop = &quot;Int&quot;</code> (could be anything such that <code>grepl(drop[1], &quot;(Intercept)&quot;)</code> is TRUE). In the second, the coefficient of the distance is put before the intercept (which is kept). Note that the actions performed by the arguments <code>drop</code> or <code>order</code> are performed <strong>before</strong> the renaming takes place with the argument <code>dict</code>.</p>
+
+<h2>Extracting the fixed-effects</h2>
+
+<p>To obtain the fixed-effects of the estimation, the function <code>fixef</code> must be performed on the results. This function returns a list containing the fixed-effects coefficients for each dimension. The <code>summary</code> method helps to have a quick overview:</p>
+
+<pre><code class="r">fixedEffects &lt;- fixef(gravity_results)
+summary(fixedEffects)
+#&gt; Fixed_effects coefficients
+#&gt;                         Origin Destination Product   Year
+#&gt; Number of fixed-effects     15          15      20     10
+#&gt; Number of references         0           1       1      1
+#&gt; Mean                      23.3        3.09  0.0129  0.157
+#&gt; Variance                  1.63        1.23    1.86 0.0129
+#&gt; 
+#&gt; COEFFICIENTS:
+#&gt;   Origin:    BE    LU    NL    DE    GB                 
+#&gt;           23.56 20.23 24.43 24.71 23.75 ... 10 remaining
+#&gt; -----
+#&gt;   Destination: LU    BE    NL    DE    IE                 
+#&gt;                 0 2.696 3.231 4.323 2.589 ... 10 remaining
+#&gt; -----
+#&gt;   Product: 1     2      3     4      5                 
+#&gt;            0 1.414 0.6562 1.449 -1.521 ... 15 remaining
+#&gt; -----
+#&gt;   Year: 2007    2008     2009    2010  2011                
+#&gt;            0 0.06912 0.005225 0.07331 0.163 ... 5 remaining
+</code></pre>
+
+<p>We can see that the fixed-effects are balanced across the dimensions. Indeed, apart from the first dimension, only one coefficient per fixed-effect needs to be set as reference (i.e. fixed to 0) to avoid collinearity across the fixed-effects of the different clusters. This ensures that the fixed-effects coefficients can be compared within cluster. Had there be strictly more than one reference per cluster, their interpretation would have not been possible at all. If this was the case though, a warning message would have been prompted. Note that the mean values are meaningless per se, but give a reference points to which compare the fixed-effects within a cluster.
+Let&#39;s look specifically at the <code>Year</code> fixed-effects: </p>
+
+<pre><code class="r">fixedEffects$Year
+#&gt;        2007        2008        2009        2010        2011        2012 
+#&gt; 0.000000000 0.069122284 0.005225473 0.073308208 0.163013386 0.192605170 
+#&gt;        2013        2014        2015        2016 
+#&gt; 0.230629376 0.242605404 0.282800683 0.310325692
+</code></pre>
+
+<p>Finally, the <code>plot</code> method helps to distinguish the most notable fixed-effects:</p>
+
+<pre><code class="r">plot(fixedEffects)
+</code></pre>
+
+<p><img src="data:image/png;base64,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" alt="plot of chunk unnamed-chunk-19"/></p>
+
+<p>For each cluster, the fixed-effects are first centered, then sorted, and finally the most notable (i.e. highest and lowest) are reported. The exponential of the coefficient is reported in the right hand side to simplify the interpretation for models with log-link (as the Poisson model). As we can see from the country of destination cluster, trade involving France (FR), Italy (IT) and Germany (DE) as destination countries is more than 2.7 times higher than the EU15 average. Further, the highest heterogeneity come from the product category, where trade in product 4 (dairy products) is roughly 2.7 times the average while product 14 (vegetable plaiting materials) represents a negligible fraction of the average. </p>
+
+<p>Note however that the interpretation of the fixed-effects must be taken with extra care. In particular, here the fixed-effects can be interpreted only because they are perfectly balanced. </p>
+
+<h1>Additional features</h1>
+
+<p>Now we present some other features of the package. First the possibility to add variables with varying slopes. Second how to combine several fixed-effects. Third, in the case of difference-in-difference analysis, the estimation and graph of the yearly average treatment effects. Fourth the lag.formula utility to lag variables easily. Fifth the possibility for non-linear in parameter estimation. Finally the use of parallelism to accelerate the estimation. </p>
+
+<h2>Varying slopes</h2>
+
+<p>You can introduce variables with varying slopes directly in the fixed-effects part of the formula using square brackets. Let&#39;s go through a simple example using <code>iris</code> data:</p>
+
+<pre><code class="r">base_vs = iris
+names(base_vs) = c(paste0(&quot;x&quot;, 1:4), &quot;species&quot;)
+</code></pre>
+
+<p>We want to estimate <code>x1</code> as a function of <code>x2</code> and the variable <code>x3</code> with slopes varying according to <code>species</code>. We also want the <code>species</code> fixed-effect. We just have to do:</p>
+
+<pre><code class="r">est_vs = feols(x1 ~ x2 | species[x3], base_vs)
+est_vs
+#&gt; OLS estimation, Dep. Var.: x1
+#&gt; Observations: 150 
+#&gt; Fixed-effects: species: 3
+#&gt; Varying slopes: x3 (species: 3)
+#&gt; Standard-errors: Clustered (species) 
+#&gt;    Estimate Std. Error z value Pr(&gt;|z|)    
+#&gt; x2 0.450006   0.157823  2.8513 0.004354 ** 
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -31.59   Adj. R2: 0.86351 
+#&gt;                        R2-Within: 0.17894
+</code></pre>
+
+<p>If you want to see the slopes for <code>x3</code>, just use the function <code>fixef</code>:</p>
+
+<pre><code class="r">summary(fixef(est_vs))
+#&gt; Fixed-effects/Slope coefficients
+#&gt;                                species x3 (slopes: species)
+#&gt; Number of fixed-effects/slopes       3                    3
+#&gt; Number of references                 0                    0
+#&gt; Mean                               1.7                0.639
+#&gt; Variance                          1.74                0.069
+#&gt; 
+#&gt; COEFFICIENTS:
+#&gt;   species: setosa versicolor virginica
+#&gt;             2.927      1.879    0.3036
+#&gt; -----
+#&gt;   x3 (slopes: species): setosa versicolor virginica
+#&gt;                         0.3667     0.6599    0.8909
+</code></pre>
+
+<h2>Combining several fixed-effects</h2>
+
+<p>Let&#39;s use the data we created in the previous section, and add a new variable:</p>
+
+<pre><code class="r"># we create another &quot;fixed-effect&quot;
+base_vs$fe = rep(1:5, 30)
+head(base_vs)
+#&gt;    x1  x2  x3  x4 species fe
+#&gt; 1 5.1 3.5 1.4 0.2  setosa  1
+#&gt; 2 4.9 3.0 1.4 0.2  setosa  2
+#&gt; 3 4.7 3.2 1.3 0.2  setosa  3
+#&gt; 4 4.6 3.1 1.5 0.2  setosa  4
+#&gt; 5 5.0 3.6 1.4 0.2  setosa  5
+#&gt; 6 5.4 3.9 1.7 0.4  setosa  1
+</code></pre>
+
+<p>Say we want to &ldquo;combine&rdquo; the variable <code>species</code> with the variable <code>fe</code> and create a brand new fixed-effect variable. We can do it simply using <code>^</code>:</p>
+
+<pre><code class="r">est_comb = feols(x1 ~ x2 | species^fe, base_vs)
+est_comb
+#&gt; OLS estimation, Dep. Var.: x1
+#&gt; Observations: 150 
+#&gt; Fixed-effects: species^fe: 15
+#&gt; Standard-errors: Clustered (species^fe) 
+#&gt;    Estimate Std. Error z value Pr(&gt;|z|)    
+#&gt; x2 0.782815   0.125551   6.235 4.52e-10 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -77.92   Adj. R2: 0.72986 
+#&gt;                        R2-Within: 0.28023
+</code></pre>
+
+<p>The function <code>^</code> does the same as <code>paste0(species, &quot;_&quot;, fe)</code> but is more convenient (and faster for large data sets). You can still extract the fixed-effects the same way:</p>
+
+<pre><code class="r">fixef(est_comb)[[1]]
+#&gt;     setosa_1     setosa_2     setosa_3     setosa_4     setosa_5 
+#&gt;     2.443630     2.384084     2.164943     2.296256     2.323630 
+#&gt; versicolor_1 versicolor_2 versicolor_3 versicolor_4 versicolor_5 
+#&gt;     3.713320     3.800694     4.003367     3.745539     3.575086 
+#&gt;  virginica_1  virginica_2  virginica_3  virginica_4  virginica_5 
+#&gt;     4.513272     3.986351     4.423725     4.216804     4.159382
+</code></pre>
+
+<h2>Yearly treatment effect</h2>
+
+<p>In some difference-in-difference analyses, it is often useful not only to have the total treatment effect but to trace the evolution of the treatment. Package <code>fixest</code> offers a simple tool to do just that. 
+Let&#39;s take an example:</p>
+
+<pre><code class="r"># Sample data illustrating the DiD
+data(base_did)
+head(base_did)
+#&gt;             y         x1 id period post treat
+#&gt; 1  2.87530627  0.5365377  1      1    0     1
+#&gt; 2  1.86065272 -3.0431894  1      2    0     1
+#&gt; 3  0.09416524  5.5768439  1      3    0     1
+#&gt; 4  3.78147485 -2.8300587  1      4    0     1
+#&gt; 5 -2.55819959 -5.0443544  1      5    0     1
+#&gt; 6  1.72873240 -0.6363849  1      6    1     1
+# Estimation of yearly effect (they are automatically added)
+# We also add individual/time fixed-effects:
+est_did = did_estimate_yearly_effects(y ~ x1 | id + period, base_did,
+                                      treat_time = ~treat+period, reference = 5)
+est_did
+#&gt; OLS estimation, Dep. Var.: y
+#&gt; Observations: 1,080 
+#&gt; Fixed-effects: id: 108,  period: 10
+#&gt; Standard-errors: Clustered (id) 
+#&gt;           Estimate Std. Error   z value  Pr(&gt;|z|)    
+#&gt; x1        0.973490   0.048174 20.208000 &lt; 2.2e-16 ***
+#&gt; treat_1  -1.403000   1.170900 -1.198200   0.23083    
+#&gt; treat_2  -1.247500   1.152900 -1.082100  0.279216    
+#&gt; treat_3  -0.273206   1.167400 -0.234025  0.814966    
+#&gt; treat_4  -1.795700   1.147400 -1.565000  0.117583    
+#&gt; treat_6   0.784452   1.084600  0.723274  0.469512    
+#&gt; treat_7   3.598900   1.161800  3.097800   0.00195 ** 
+#&gt; treat_8   3.811800   1.315700  2.897200  0.003765 ** 
+#&gt; treat_9   4.731400   1.157100  4.089200   4.3e-05 ***
+#&gt; treat_10  6.606200   1.181700  5.590300  2.27e-08 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -2,984.58   Adj. R2: 0.48783 
+#&gt;                           R2-Within: 0.38963
+</code></pre>
+
+<p>In the example above, we must provide the treatment and time identifiers in argument <code>treat_time</code>, we also must provide a reference period (in this case 5). A treatment variable is added for each period (but the reference), and then a regular OLS estimation is performed with <code>feols</code>. You can change the estimation method with the argument <code>estfun</code>.</p>
+
+<p>Now to display the yearly treatment effects on a graph:</p>
+
+<pre><code class="r">did_plot_yearly_effects(est_did)
+</code></pre>
+
+<p><img src="data:image/png;base64,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" alt="plot of chunk unnamed-chunk-27"/></p>
+
+<h2>Lagging variables</h2>
+
+<p>To lag variables in a panel setting, a simple and fast method has been implemented: <code>lag.formula</code>. Let&#39;s give an example with the previous data set:</p>
+
+<pre><code class="r">base_lag = base_did
+# we create a lagged value of the variable x1
+base_lag$x1.l1 = lag(x1~id+period, 1, base_lag)
+head(base_lag)
+#&gt;             y         x1 id period post treat      x1.l1
+#&gt; 1  2.87530627  0.5365377  1      1    0     1         NA
+#&gt; 2  1.86065272 -3.0431894  1      2    0     1  0.5365377
+#&gt; 3  0.09416524  5.5768439  1      3    0     1 -3.0431894
+#&gt; 4  3.78147485 -2.8300587  1      4    0     1  5.5768439
+#&gt; 5 -2.55819959 -5.0443544  1      5    0     1 -2.8300587
+#&gt; 6  1.72873240 -0.6363849  1      6    1     1 -5.0443544
+</code></pre>
+
+<p>The first two arguments are mandatory. The formula informs on the variable to be lagged (on the left hand side), and the two panel identifiers. Note that the time index <strong>must</strong> appear second. The second argument tells how much lags we want. Using negative values gives leads. Finally the last argument informs on where to find the variables.</p>
+
+<p>In case you use the popular package <code>data.table</code>, you can create lagged variables very simply:</p>
+
+<pre><code class="r">library(data.table)
+base_lag_dt = as.data.table(base_did)
+# we create a lagged value of the variable x1
+base_lag_dt[, x1.l1 := lag(x1~id+period, 1)]
+</code></pre>
+
+<h2>Non-linear in parameters example</h2>
+
+<p>The function <code>feNmlm</code> is similar to <code>femlm</code> but allows to have non-linear in parameters right-hand-sides (RHS). First an example without fixed-effects, the one with fixed-effects is given later. 
+Let&#39;s say we want to estimate the following relation with a Poisson model:</p>
+
+<p>\(E\left(z_i\right) = a\times x_i + b\times y_i\).</p>
+
+<p>In fact, this type of model is non-linear in the context of a Poisson model because the sum is embedded within the log:</p>
+
+<p>\(E\left(z_i\right) = \exp\left(\log\left(a\times x_i + b\times y_i\right)\right)\).</p>
+
+<p>So let&#39;s estimate such a relation. (Note that you can estimate this relation with GLM and identity link, but I carry on for the example.) First we generate the data:</p>
+
+<pre><code class="r"># Generating data:
+n = 1000
+# x and y: two positive random variables
+x = rnorm(n, 1, 5)**2
+y = rnorm(n, -1, 5)**2
+# E(z) = 2*x + 3*y and some noise
+z = rpois(n, 2*x + 3*y) + rpois(n, 1)
+base = data.frame(x, y, z)
+</code></pre>
+
+<p>To estimate the non-linear relationship, we need to use the argument <code>NL.fml</code> where we put the non-linear part. We also have to provide starting values with the argument <code>NL.start</code>. Finally, to ensure the RHS can be evaluated in any situation, we add lower bounds for the parameters with the argument <code>lower</code>.</p>
+
+<pre><code class="r">result_NL = feNmlm(z~0, base, NL.fml = ~ log(a*x + b*y), NL.start = list(a=1, b=1), lower = list(a=0, b=0))
+</code></pre>
+
+<p>Note that the arguments <code>NL.start</code> and <code>lower</code> are named lists. Setting <code>lower = list(a=0, b=0)</code> means that the optimization algorithm will never explore parameters for \(a\) and \(b\) that are lower than 0.
+The results obtained can be interpreted similarly to results with linear RHS. We can see them with a print:</p>
+
+<pre><code class="r">print(result_NL)
+#&gt; Non-linear ML estimation, family = Poisson, Dep. Var.: z
+#&gt; Observations: 1,000 
+#&gt; Standard-errors: Standard 
+#&gt;   Estimate Std. Error z value  Pr(&gt;|z|)    
+#&gt; a   2.0191   0.011310  178.53 &lt; 2.2e-16 ***
+#&gt; b   3.0310   0.012901  234.95 &lt; 2.2e-16 ***
+#&gt; ---
+#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+#&gt; Log-likelihood: -3,585.47   Adj. Pseudo-R2: 0.93605 
+#&gt;            BIC:  7,198.58     Squared Cor.: 0.99183
+</code></pre>
+
+<p>We can see that we obtain coefficients close to the generating values.</p>
+
+<h3>Adding fixed-effects to non-linear in parameters models</h3>
+
+<p>Adding fixed-effects is identical to the linear case. The user must only be well aware of the functional form. Indeed, the fixed-effects must enter the estimation <strong>linearly</strong>. This means that the previous equation with one set of fixed-effects writes:</p>
+
+<p>\(E\left(z_i\right) = \gamma_{id_i} \left( a\times x_i + b\times y_i \right)\),</p>
+
+<p>where \(id_i\) is the class of observation \(i\) and \(\gamma\) is the vector of fixed-effects. Here the fixed-effects are in fact linear because in the context of the Poisson model we estimate:</p>
+
+<p>\(E\left(z_i\right) = \exp\left(\gamma_{id_i}+\log\left(a\times x_i + b\times y_i\right)\right)\).</p>
+
+<p>Further, remark that there exists an infinity of values of \(\gamma^{\prime}\), \(a^{\prime}\) and \(b^{\prime}\) such that:</p>
+
+<p>\(\gamma_{k} \left( a\times x_i + b\times y_i \right) = \gamma_{k}^{\prime} \left(a^{\prime}\times x_i + b^{\prime}\times y_i \right),\forall i,k\).</p>
+
+<p>An example is \(\gamma^{\prime}_{k} = 2\times \gamma_k\), \(a^{\prime} = a/2\) and \(b^{\prime} = b/2\). Thus estimating this relation directly will lead to a problem to uniquely identify the coefficients. To circumvent this problem, we just have to fix one of the coefficient, this will ensure that we uniquely identify them. </p>
+
+<p>Let&#39;s generate this relation:</p>
+
+<pre><code class="r"># the class of each observation
+id = sample(20, n, replace = TRUE)
+base$id = id
+# the vector of fixed-effects
+gamma = rnorm(20)**2
+# the new vector z_bis
+z_bis = rpois(n, gamma[id] * (2*x + 3*y)) + rpois(n, 1)
+base$z_bis = z_bis
+</code></pre>
+
+<p>Now we estimate it with the fixed-effects while fixing one of the coefficients (we fix \(a\) to its true value but it could be any value):</p>
+
+<pre><code class="r"># we add the fixed-effect in the formula
+result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = list(b=1), lower = list(b=0))
+# The coef should be around 3
+coef(result_NL_fe)
+#&gt;        b 
+#&gt; 2.974424
+# the gamma and the exponential of the fixed-effects should be similar
+rbind(gamma, exp(fixef(result_NL_fe)$id))
+#&gt;              1         2          3            4        5          6
+#&gt; gamma 1.063205 0.6212867 0.03030776 0.0001126447 8.865416 0.02832676
+#&gt;       1.082886 0.6304011 0.03634219 0.0090703554 8.867718 0.03735205
+#&gt;                  7        8        9        10        11         12
+#&gt; gamma 0.0006074364 1.212355 1.168497 0.9396372 0.9029108 0.08714379
+#&gt;       0.0097639737 1.226406 1.188194 0.9499744 0.8964905 0.10092413
+#&gt;                 13       14       15        16       17        18
+#&gt; gamma 0.0006863727 2.939419 1.140648 0.1597491 2.002553 0.9600531
+#&gt;       0.0082627972 2.922887 1.142449 0.1669002 2.005809 0.9547676
+#&gt;               19        20
+#&gt; gamma 0.06787238 0.1078972
+#&gt;       0.07389553 0.1183967
+</code></pre>
+
+<p>As we can see, we obtain the &ldquo;right&rdquo; estimates. </p>
+
+<h2>Using multi-cores</h2>
+
+<p>The package fixest integrates multi-platform parallelism to hasten the estimation process. By default it makes use of all the available threads minus 2. To change the number of threads used, just use the argument <code>nthreads</code>:</p>
+
+<pre><code class="r"># Sample of results:
+# 1 nthreads: 3.13s
+system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 1))
+# 2 nthreads: 1.82s
+system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 2))
+# 4 nthreads: 1.17s
+system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 4))
+</code></pre>
+
+<p>As you can see, the efficiency of increasing the number of cores is not 1 to 1. Two cores do not divide the computing time by 2, nor four cores by 4. However it still reduces significantly the computing time, which might be valuable for large sample estimations.</p>
+
+<p>You can permanently set the number of cores used by <code>fixest</code> using <code>setFixest_nthreads(nthreads)</code>.</p>
+
+<h2>Collineartiy</h2>
+
+<p>The user ought to estimate the coefficient of variables that are <strong>not</strong> collinear: neither among each other, neither with the fixed-effects. Estimation with collinear variables leads to a non invertible Hessian (leading to the absence of Variance-Covariance matrix for the coefficients). In such cases, the estimating functions will raise a warning and suggest to use the function <code>collinearity</code> to spot the problem.</p>
+
+<p>Let&#39;s take an example in which we want to estimate the coefficient of a variable which is constant. Of course it makes no sense (this variable is perfectly collinear with the fixed-effects), so a warning will be raised suggesting to use the function <code>collinearity</code> to figure out what is wrong.</p>
+
+<pre><code class="r">base_coll = trade
+base_coll$constant_variable = 1
+res &lt;- femlm(Euros ~ log(dist_km) + constant_variable|Origin+Destination+Product+Year, base_coll)
+#&gt; Warning: [femlm]: The optimization algorithm did not converge, the
+#&gt; results are not reliable. The information matrix is singular: presence of
+#&gt; collinearity. Use function collinearity() to pinpoint the problems.
+collinearity(res)
+#&gt; [1] &quot;Variable constant_variable is constant, thus collinear with the fixed-effects.&quot;
+</code></pre>
+
+<p>As we can see, the function <code>collinearity</code> spots the collinear variables and name them. Even in elaborate cases of collinearity, the algorithm tries to find out the culprit and informs the user accordingly. </p>
+
+</body>
+
+</html>
