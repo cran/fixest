@@ -598,7 +598,9 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     assign("nb_sh", 0, env)
     on.exit(warn_step_halving(env))
 
-    if(init.type == "coef" && verbose >= 1) cat("Deviance at initializat.  = ", numberFormatNormal(devold), "\n", sep = "")
+    if((init.type == "coef" && verbose >= 1) || verbose >= 4) {
+        cat("Deviance at initializat.  = ", numberFormatNormal(devold), "\n", sep = "")
+    }
 
     #
     # The main loop
@@ -682,14 +684,25 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
                 assign("nb_sh", nb_sh + 1, env)
             }
 
-
             eta_new = wols$fitted.values
             eta_old = wols_old$fitted.values
 
             iter_sh = 0
             do_exit = FALSE
             while(!is.finite(dev) || dev_evol > 0 || !valideta(eta_new) || !validmu(mu)){
-                if(iter_sh == glm.iter){
+
+                if(iter == 1 && (is.finite(dev) && valideta(eta_new) && validmu(mu)) && iter_sh >= 2){
+                    # BEWARE FIRST ITERATION:
+                    # at first iteration, the deviance can be higher than the init, and SH may not help
+                    # we need to make sure we get out of SH before it's messed up
+                    break
+                } else if(iter_sh == glm.iter){
+
+                    # if first iteration => means algo did not find viable solution
+                    if(iter == 1){
+                        stop("Algorithm failed at first iteration. Step-halving could not find a valid set of parameters.")
+                    }
+
                     # message
                     msg = ifelse(!is.finite(dev), "non-finite deviance", ifelse(dev_evol > 0, "no reduction in deviance", "no valid eta/mu"))
 
@@ -707,7 +720,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
                 dev = dev.resids(y, mu, eta_new + offset, wt = weights)
                 dev_evol = dev - devold
 
-                if(verbose >= 3) cat("Step-halving: iter =", iter_sh, "--  dev:", numberFormatNormal(dev), "-- evol:", numberFormatNormal(dev_evol), "\n")
+                if(verbose >= 3) cat("Step-halving: iter =", iter_sh, "-- dev:", numberFormatNormal(dev), "-- evol:", numberFormatNormal(dev_evol), "\n")
             }
 
             if(do_exit) break
@@ -870,22 +883,6 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
             res$sumFE = res$sumFE - offset
         }
 
-        # if(TRUE && !onlyFixef){
-        #
-        #     # At the moment => it almost double computational time! I can't find intersting starting values
-        #     #   working in all cases
-        #
-        #     browser()
-        #
-        #     system.time(model_only_fe <- feglm_fe_only(y, env, eta = res$sumFE, offset = 0, weights, family_equiv, mu.eta, variance, linkfun, linkinv, dev.resids, family, glm.iter, glm.tol = 1e-2, fixef.tol = 1e-1, fixef.iter, nthreads, verbose)) # 6.5s
-        #
-        #     system.time(test_offset <- feglm_fe_only(y, env, eta = 0, offset = res$sumFE, weights, family_equiv, mu.eta, variance, linkfun, linkinv, dev.resids, family, glm.iter, glm.tol = 1e-2, fixef.tol = 1e-1, fixef.iter, nthreads, verbose)) # 3.36s
-        #
-        #     system.time(test <- feglm_fe_only(y, env, eta = eta, offset = 0, weights, family_equiv, mu.eta, variance, linkfun, linkinv, dev.resids, family, glm.iter, glm.tol = 1e-2, fixef.tol = 1e-1, fixef.iter, nthreads, verbose)) # 0.8s
-        #
-        #     system.time(test_none <- feglm_fe_only(y, env, eta = 0, offset = 0, weights, family_equiv, mu.eta, variance, linkfun, linkinv, dev.resids, family, glm.iter, glm.tol = 1e-2, fixef.tol = 1e-1, fixef.iter, nthreads, verbose)) # 1.99
-        # }
-
     }
 
     # other
@@ -981,6 +978,11 @@ fenegbin = function(fml, data, theta.init, start = 0, fixef, offset, na_inf.rm =
                     fixef.tol = 1e-5, fixef.iter = 1000, nthreads = getFixest_nthreads(),
                     verbose = 0, warn = TRUE, notes = getFixest_notes(), combine.quick, ...){
 
+    # We control for the problematic argument family
+    if("family" %in% names(match.call())){
+        stop("Function fenegbin does not accept the argument 'family'.")
+    }
+
     # This is just an alias
 
     res = try(feNmlm(fml = fml, data=data, family = "negbin", theta.init = theta.init, start = start, fixef = fixef, offset = offset, na_inf.rm = na_inf.rm, fixef.tol = fixef.tol, fixef.iter = fixef.iter, nthreads = nthreads, verbose = verbose, warn = warn, notes = notes, combine.quick = combine.quick, origin = "fenegbin", mc_origin_bis = match.call(), ...), silent = TRUE)
@@ -997,6 +999,11 @@ fepois = function(fml, data, offset, weights, start = NULL, etastart = NULL, mus
                   fixef, fixef.tol = 1e-6, fixef.iter = 1000, glm.iter = 25, glm.tol = 1e-8,
                   na_inf.rm = getFixest_na_inf.rm(), nthreads = getFixest_nthreads(),
                   warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, ...){
+
+    # We control for the problematic argument family
+    if("family" %in% names(match.call())){
+        stop("Function fepois does not accept the argument 'family'.")
+    }
 
     # This is just an alias
 
@@ -1556,7 +1563,7 @@ format_error_msg = function(x, origin){
 
     if(grepl("^Error in (fe|fixest)[^\n]+\n", x)){
         res = gsub("^Error in (fe|fixest)[^\n]+\n *(.+)", "\\2", x)
-    } else if(grepl("object '.+' not found", x)) {
+    } else if(grepl("[Oo]bject '.+' not found", x)) {
         res = x
     } else {
        res = paste0(x, "\nThis error was unforeseen by the author of the function ", origin, ". If you think your call to the function is legitimate, could you report?")

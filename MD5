@@ -1,8 +1,8 @@
-38d1888fc4a6d42c02eb6954b5d4543f *DESCRIPTION
+a4c8875305b92e4457deaf768afb1d06 *DESCRIPTION
 b83a29b9abdd2181e0b38949b313d204 *NAMESPACE
-8df4cd3eb7eca3d1c9cd41be1fd831b9 *R/ESTIMATION_FUNS.R
+c442bcb195908c316c34de49087c3f72 *R/ESTIMATION_FUNS.R
 9ca4c2bc396ac5e3a1d5146c4903e326 *R/ML_Families.R
-636be82d709015870ffcb51561b1205d *R/MiscFuns.R
+c46ea2cd8bd474ff89d2a6c2e1f420ba *R/MiscFuns.R
 949c78fe2f1db388477e91916037ef5c *R/RcppExports.R
 f7427ad180e43a8d8b0205cf6fc4d9d0 *R/femlm.R
 69bf803b6ca67f4a01c672b72b90c71a *R/fixest.R
@@ -16,10 +16,10 @@ b86a0921b83d84ce8e09ecda40e13933 *data/trade.RData
 ccf16785c29ed52fd598e1604a6e7001 *demo/00Index
 40fadb5b077978622ed1ec5684626b05 *demo/femlm.R
 1e800484b95bb181b0151cc61ec4648c *inst/CITATION
-e7aebb9fee6a1e08743a2eb937171ff3 *inst/NEWS.Rd
+7f572e1cdd2fb720130466a27eb6c6c1 *inst/NEWS.Rd
 39dc825860fd0bcefd0a5e78651afb12 *inst/doc/fixest_walkthrough.R
-c93629a0fba5cd67548ea707eedcfee0 *inst/doc/fixest_walkthrough.Rmd
-e3314288c132cf7fa89ae32d24cd14c8 *inst/doc/fixest_walkthrough.html
+1e460dc5fbe0dfc48d93d3b3a0616a3a *inst/doc/fixest_walkthrough.Rmd
+5c166bb419c8e143b6133efd3f5d6c69 *inst/doc/fixest_walkthrough.html
 b1904e3436d3a4eda5553154b540c807 *man/AIC.fixest.Rd
 08336c2fca5917bf902f235359a26bcd *man/BIC.fixest.Rd
 4b678655d4e1d964afddab79862bcef0 *man/base_did.Rd
@@ -31,7 +31,7 @@ c1bea45db057f7e1777054ed2208ded0 *man/did_plot_yearly_effects.Rd
 111517de09416e0f7b6337c9db75883c *man/errbar.Rd
 7638c9cd8de3bd08165d8367fa96b120 *man/esttable.Rd
 0752a695e4fa482c8354d3e0970d3a04 *man/esttex.Rd
-704cbd8e42baea8b9d4254a366bdbefa *man/feNmlm.Rd
+9ff72b4fe96aa427abd67de8e4685e39 *man/feNmlm.Rd
 0fe7dcbbb5c6091ad10d045e017e0710 *man/feglm.Rd
 78e7863f900c5ad0b75a1ced5672bc3d *man/femlm.Rd
 fcd6d2b4d6970dafda7d9ecb533e27f2 *man/feols.Rd
@@ -69,4 +69,4 @@ b662a580b46b2bb049c66259142d5588 *src/demeaning.cpp
 1ba04444ca4d394ca7fa97f3b41d87b4 *src/misc_funs.cpp
 095490ac5e14afa4ca46203689346c10 *src/omp_utilities.cpp
 f1db929be30a55e9455203fd68ca332e *src/parallel_funs.cpp
-c93629a0fba5cd67548ea707eedcfee0 *vignettes/fixest_walkthrough.Rmd
+1e460dc5fbe0dfc48d93d3b3a0616a3a *vignettes/fixest_walkthrough.Rmd

@@ -426,9 +426,9 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	#
 
 	# Starting the table
-	myTitle = ifelse(!missing(title), title, "no title")
-	if(!missing(label)) myTitle = paste0("\\label{", label, "} ", myTitle)
-	start_table = paste0("\\begin{table}[htbp]\\centering\n\\caption{",  .cleanPCT(myTitle), "}\n")
+	myTitle = ifelse(!missing(title), .escapeChars(title), "no title")
+	if(!missing(label)) myTitle = paste0("\\label{", .escapeChars(label, TRUE), "} ", myTitle)
+	start_table = paste0("\\begin{table}[htbp]\\centering\n\\caption{",  myTitle, "}\n")
 	end_table = "\\end{table}"
 
 	# intro and outro Latex tabular
@@ -440,16 +440,18 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 
 	outro_latex <- "\\end{tabular}\n"
 
+	# check the dictionnary
+    if(!is.null(dict) && (!is.character(dict) || is.null(names(dict)))){
+        stop("The argument 'dict' must be a named character vector.")
+    }
+
 	# 1st lines => dep vars
-	# first_line <- paste0("Variables&", paste0(depvar_list, collapse="&"), "\\\\\n\\hline\n\\hline\n")
 	depvar_list = c(depvar_list, recursive = TRUE)
-	if(!missing(dict)){
-		if(!is.character(dict)|| is.null(names(dict))) stop("the arg. 'dict' must be a named character vector.")
-		depvar_list = c(depvar_list, recursive = TRUE)
-		qui = which(depvar_list%in%names(dict))
-		who = depvar_list[qui]
-		depvar_list[qui] = dict[who]
-	}
+
+	qui = depvar_list %in% names(dict)
+	who = depvar_list[qui]
+	depvar_list[qui] = dict[who]
+	depvar_list = .escapeChars(depvar_list)
 
 	# We write the dependent variables properly, with multicolumn when necessary
 	# to do that, we count the number of occurences of each variable (& we respect the order provided by the user)
@@ -513,15 +515,10 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	aliasVars = all_vars
 	names(aliasVars) = all_vars
 
-	if(!missing(dict)){
-		if(!is.character(dict)|| is.null(names(dict))){
-			stop("the arg. 'dict' must be a named character vector.")
-		}
-	}
-
 	qui = all_vars %in% names(dict)
 	who = aliasVars[qui]
-	aliasVars[qui] = .cleanPCT(dict[who])
+	aliasVars[qui] = dict[who]
+	aliasVars = .escapeChars(aliasVars)
 
 	coef_mat <- all_vars
 	for(m in 1:n_models) coef_mat <- cbind(coef_mat, coef_list[[m]][all_vars])
@@ -568,6 +565,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 		if(length(qui) > 0) {
 			factorNames[qui] = dict[factorNames[qui]]
 		}
+		factorNames = .escapeChars(factorNames)
 
 		allFactors = cbind(factorNames, allFactors)
 		factor_lines <- paste0(paste0(apply(allFactors, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
@@ -594,6 +592,12 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	        quoi[is.na(quoi)] = yesNoFixef[2]
 	        slope_flag_list[[m]] = quoi
 	    }
+
+	    # Changing the slope names
+	    qui = slope_names %in% names(dict)
+	    who = slope_names[qui]
+	    slope_names[qui] = dict[who]
+	    slope_names = .escapeChars(slope_names)
 
 	    # Matrix with yes/no information
 	    all_slopes = matrix(c(slope_flag_list, recursive = TRUE), nrow = length(slope_names))
@@ -653,6 +657,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 			se_cluster = strsplit(gsub("(^.+\\()|(\\))", "", my_se), " & ")[[1]]
 			qui = se_cluster %in% names(dict)
 			se_cluster[qui] = dict[se_cluster[qui]]
+			se_cluster = .escapeChars(se_cluster)
 			new_se = gsub("\\(.+", "", my_se)
 			my_se = paste0(new_se, "(", paste0(se_cluster, collapse = " & "), ")")
 		}
@@ -2139,7 +2144,7 @@ collinearity = function(x, verbose){
 
 	if(is.null(data)){
 		dataName = x$call$data
-		stop("To apply 'diagnostic', we fetch the original database in the parent.frame -- but it doesn't seem to be there anymore (btw it was ", deparse_long(dataName), ").")
+		stop("To apply function 'collinearity', we fetch the original database in the parent.frame -- but it doesn't seem to be there anymore (btw it was ", deparse_long(dataName), ").")
 	}
 
 	if(!is.null(x$obsRemoved)){
@@ -2659,18 +2664,18 @@ did_estimate_yearly_effects = function(fml, data, treat_time, reference, returnD
 	if(missing(reference)) stop("You must provide argument 'reference' (currently it is missing).")
 	if(!length(reference) == 1 || !isVector(reference)) stop("Argument reference must be a numeric scalar.")
 	if(!reference %in% all_periods){
-		stop("The 'reference' must be a value of the time variable (currenlty ", reference, " does not belong to the time variable).")
+		stop("The 'reference' must be a value of the time variable (currenlty ", reference, " does not belong to the time variable [", time_var, "]).")
 	}
 
 	# creating the yearly treatment effects variables
 	select_periods = all_periods[all_periods != reference]
-	for(period in select_periods){
-		data_small[[paste0("treat_", period)]] = treat * (time == period)
+	treat_periods = gsub(" |-", "_", paste0("treat_", select_periods))
+	for(i in seq_along(select_periods)){
+		data_small[[treat_periods[i]]] = treat * (time == select_periods[i])
 	}
 
 	# creating the formula + estimation
 	FML = Formula::Formula(fml)
-	treat_periods = gsub(" ", "_", paste0("treat_", select_periods))
 	fml_fe = add2fml(FML, treat_periods)
 
 	res = estfun(fml_fe, data_small, ...)
@@ -3915,10 +3920,29 @@ shade_area <- function(y1, y2, x, xmin, xmax, col="grey", ...){
 #### Small Utilities ####
 ####
 
-.cleanPCT = function(x){
+.escapeChars = function(x, onlyPCT = FALSE){
+    # Escapes the % and _ for latex
+
+    if(all(!grepl("%|_", x))){
+        return(x)
+    }
+
 	# changes % into \% => to escape that character in Latex
-	gsub("%", "\\%", x, fixed = TRUE)
-	gsub("\\\\%", "\\%", x, fixed = TRUE) # if the user escaped: not done twice
+	res = gsub("%", "\\%", x, fixed = TRUE)
+	res = gsub("\\\\%", "\\%", res, fixed = TRUE) # if the user escaped: not done twice
+
+	if(onlyPCT){
+	    return(res)
+	}
+
+	# Escapes the underscore, but only NOT in equations
+	qui = !grepl("\\$", res)
+	if(any(qui)){
+	    res[qui] = gsub("_", "\\_", res[qui], fixed = TRUE)
+	    res[qui] = gsub("\\\\_", "\\_", res[qui], fixed = TRUE) # if the user escaped: not done twice
+	}
+
+	res
 }
 
 formatBicLL = function(bic, ll){
@@ -4051,7 +4075,7 @@ coefFormatLatex = function(x, digits = 4, power = 5){
 		if(abs(exponent) >= power){
 			left_value = round(x*10**-exponent, 3)
 			res = paste0("$", left_value, "\\times 10^{", exponent, "}$")
-		} else if(x > 10**(-digits)){
+		} else if(abs(x) > 10**(-digits)){
 			res = sprintf("%.*f", digits, x)
 		} else {
 			res = sprintf("%.*f", abs(exponent), x)
@@ -5374,7 +5398,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 
 		if(!forceCovariance){
 			# warning("Standard errors are NA because of likely presence of collinearity. You can use option 'forceCovariance' to try to force the computation of the vcov matrix (to see what's wrong).", call. = FALSE)
-			warning("Standard errors are NA because of likely presence of collinearity. Use function diagnostic() to detect collinearity problems.", call. = FALSE)
+			warning("Standard errors are NA because of likely presence of collinearity. Use function collinearity() to detect collinearity problems.", call. = FALSE)
 			return(VCOV_raw)
 		} else {
 			VCOV_raw_forced = MASS::ginv(object$hessian)
@@ -6025,7 +6049,7 @@ update.fixest = function(object, fml.update, nframes = 1, ...){
 
 	# new call: call_clear
 	call_clear = call_old
-	for(arg in setdiff(names(call_new)[-1], "fml.update")){
+	for(arg in setdiff(names(call_new)[-1], c("fml.update", "nframes"))){
 		call_clear[[arg]] = call_new[[arg]]
 	}
 
@@ -6033,7 +6057,7 @@ update.fixest = function(object, fml.update, nframes = 1, ...){
 
 	if(useInit){
 		# we can use the initialisation of parameters
-		if(object$method %in% c("femlm", "feNmlm", "fepois", "fenegbin")){
+		if(object$method %in% c("femlm", "feNmlm", "fenegbin")){
 			if(object$family == "negbin"){
 				if(is.null(dots$theta.init)){
 					theta.init = object$theta.init
@@ -6384,7 +6408,7 @@ setFixest_dict = function(dict){
 	td = table(dict_names)
 	if(any(td > 1)){
 		qui = which(dict_names %in% names(td)[td > 1])
-		name_dup = names(dict)[qui]
+		name_dup = unique(names(dict)[qui])
 		stop("Argument 'dict' contains duplicated names: ", enumerate_items(name_dup, endVerb = "no"))
 	}
 
