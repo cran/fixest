@@ -6,6 +6,8 @@
 using namespace Rcpp;
 using namespace std;
 
+// [[Rcpp::plugins(cpp11)]]
+
 // [[Rcpp::export]]
 NumericVector cpp_lgamma(NumericVector x){
 	// simple function to compute lgamma of a vector
@@ -922,9 +924,9 @@ IntegerVector cpp_lag_obs(IntegerVector id, IntegerVector time, int nlag){
         }
     } else if(nlag < 0){
         /* NOTA:I could have tweaked the previous if() to get rid of the condition
-        //      but the code would have lost in clarity.
-        // For the lead: opposite to what is done before */
-        int nlead = -nlag;
+         //      but the code would have lost in clarity.
+         // For the lead: opposite to what is done before */
+         int nlead = -nlag;
         i = nobs;
         while(i >= 0){
             // R_CheckUserInterrupt(); // this is (too) costly
@@ -963,17 +965,6 @@ IntegerVector cpp_lag_obs(IntegerVector id, IntegerVector time, int nlag){
 
     return(res);
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

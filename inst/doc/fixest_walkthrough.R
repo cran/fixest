@@ -49,7 +49,8 @@ gravity_results_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Produ
 
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
+#  esttable(gravity_results, gravity_results_negbin, gravity_results_ols,
+#           se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
 
 ## ---- echo=FALSE, results='asis'-----------------------------------------
 tab = esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
@@ -78,9 +79,13 @@ esttex(gravity_subcluster, cluster = ~Origin+Destination)
 #  # we set the dictionary once and for all
 #  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 #  # 1st export: we change the signif code and drop the intercept
-#  esttex(gravity_subcluster, signifCode = c("a" = 0.01, "b" = 0.05), drop = "Int", dict = myDict, file = "Estimation Table.tex", replace = TRUE, title = "First export -- normal Standard-errors")
+#  esttex(gravity_subcluster, signifCode = c("a" = 0.01, "b" = 0.05),
+#         drop = "Int", dict = myDict, file = "Estimation Table.tex",
+#         replace = TRUE, title = "First export -- normal Standard-errors")
 #  # 2nd export: clustered S-E + distance as the first coefficient
-#  esttex(gravity_subcluster, se = "cluster", cluster = ~Product, order = "dist", dict = myDict, file = "Estimation Table.tex", title = "Second export -- clustered standard-errors (on Product variable)")
+#  esttex(gravity_subcluster, se = "cluster", cluster = ~Product, order = "dist",
+#         dict = myDict, file = "Estimation Table.tex",
+#         title = "Second export -- clustered standard-errors (on Product variable)")
 #  
 
 ## ------------------------------------------------------------------------

@@ -31,7 +31,7 @@ The package `fixest` provides a family of functions to perform estimations with 
 The two main functions are `feols` for linear models and `feglm` for generalized linear models. In addition, the function `femlm` performs direct maximum likelihood estimation, and `feNmlm` extends the latter to allow the inclusion of non-linear in parameters right-hand-sides. 
 Each of these functions supports *any number* of fixed-effects and is implemented with full fledged multi-threading in c++. Functions `feols` and `feglm` further support variables with varying slopes.
 
-This package is currently the fastest software available to perform fixed-effects estimations (see the project's [homepage](https://github.com/lrberge/fixest/wiki) for a benchmarking).
+This package is currently (Nov. 2019) the fastest software available to perform fixed-effects estimations (see the project's [homepage](https://github.com/lrberge/fixest/wiki) for a benchmarking).
 
 The standard-errors of the estimates can be easily and intuitively clustered (up to four-way).
 
@@ -141,7 +141,8 @@ gravity_results_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Produ
 Now let's say that we want a compact overview of the results of several estimations. The best way is to use the function `esttable`. This function summarizes the results of several `fixest` estimations into a data.frame. To see the fixed-effects results with the three different likelihoods, we just have to type:
 
 ```{r, eval=FALSE}
-esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
+esttable(gravity_results, gravity_results_negbin, gravity_results_ols,
+         se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
 ```
 ```{r, echo=FALSE, results='asis'}
 tab = esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
@@ -199,9 +200,13 @@ Consider the following example of the exportation of two tables:
 # we set the dictionary once and for all
 myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 # 1st export: we change the signif code and drop the intercept
-esttex(gravity_subcluster, signifCode = c("a" = 0.01, "b" = 0.05), drop = "Int", dict = myDict, file = "Estimation Table.tex", replace = TRUE, title = "First export -- normal Standard-errors")
+esttex(gravity_subcluster, signifCode = c("a" = 0.01, "b" = 0.05),
+       drop = "Int", dict = myDict, file = "Estimation Table.tex", 
+       replace = TRUE, title = "First export -- normal Standard-errors")
 # 2nd export: clustered S-E + distance as the first coefficient
-esttex(gravity_subcluster, se = "cluster", cluster = ~Product, order = "dist", dict = myDict, file = "Estimation Table.tex", title = "Second export -- clustered standard-errors (on Product variable)")
+esttex(gravity_subcluster, se = "cluster", cluster = ~Product, order = "dist", 
+       dict = myDict, file = "Estimation Table.tex", 
+       title = "Second export -- clustered standard-errors (on Product variable)")
 
 ```
 

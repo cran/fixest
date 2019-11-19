@@ -324,7 +324,7 @@ summary.fixest <- function(object, se, cluster, dof = TRUE, exact_dof = FALSE, f
 #'
 #' @param ... Used to capture different \code{fixest} objects (obtained with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). Note that any other type of element is discarded. Note that you can give a list of \code{fixest} objects.
 #' @param digits Integer, default is 4. The number of digits to be displayed.
-#' @param pseudo Logical, default is \code{TRUE}. Should the pseudo R2 be displayed?
+#' @param fitstat A character vector or a one sided formula. A vector listing which fit statistics to display. The valid types are 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). The default value depends on the models to display. Example of use: \code{fitstat=c('sq.cor', 'ar2', 'war2')}, or \code{fitstat=~sq.cor+ar2+war2} using a formula.
 #' @param title Character scalar. The title of the Latex table.
 #' @param sdBelow Logical, default is \code{TRUE}. Should the standard-errors be displayed below the coefficients?
 #' @param drop Character vector. This element is used if some variables are not to be displayed. This should be a regular expression (see \code{\link[base]{regex}} help for more info). There can be more than one regular expression. Each variable satisfying the regular expression will be discarded.
@@ -335,13 +335,9 @@ summary.fixest <- function(object, se, cluster, dof = TRUE, exact_dof = FALSE, f
 #' @param convergence Logical, default is missing. Should the convergence state of the algorithm be displayed? By default, convergence information is displayed if at least one model did not converge.
 #' @param signifCode Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)}.
 #' @param label Character scalar. The label of the Latex table.
-#' @param aic Logical, default is \code{FALSE}. Should the AIC be displayed?
-#' @param sqCor Logical, default is \code{FALSE}. Should the squared correlation be displayed?
 #' @param subtitles Character vector of the same length as the number of models to be displayed. If provided, subtitles are added underneath the dependent variable name.
 #' @param fixef_sizes Logical, default is \code{FALSE}. If \code{TRUE} and fixed-effects were used in the models, then the number "individuals" per fixed-effect dimension is also displayed.
 #' @param keepFactors Logical, default is \code{TRUE}. If \code{FALSE}, then factor variables are displayed as fixed-effects and no coefficient is shown.
-#' @param bic Logical, default is \code{TRUE}.Should the BIC be reported?
-#' @param loglik Logical, default is \code{TRUE}. Should the log-likelihood be reported?
 #' @param yesNoFixef A character vector of length 2. Default is \code{c("Yes", "No")}. This is the message displayed when a given cluster is (or is not) included in a regression.
 #' @param family A logical, default is missing. Whether to display the families of the models. By default this line is displayed when at least two models are from different families.
 #' @param powerBelow Integer, default is -5. A coefficient whose value is below \code{10**(powerBelow+1)} is written with a power in Latex. For example \code{0.0000456} would be written \code{4.56$\\times 10^{-5}$} by default. Setting \code{powerBelow = -6} would lead to \code{0.00004} in Latex.
@@ -370,7 +366,7 @@ summary.fixest <- function(object, se, cluster, dof = TRUE, exact_dof = FALSE, f
 #' esttex(res1, res2, dict = c(Sepal.Length = "The sepal length", Sepal.Width = "SW"),
 #'         signifCode = c("**" = 0.1, "*" = 0.2, "n.s."=1))
 #'
-esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = TRUE, cluster, digits=4, pseudo=TRUE, title, sdBelow=TRUE, drop, order, dict = getFixest_dict(), file, replace=FALSE, convergence, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, aic=FALSE, sqCor = FALSE, subtitles, fixef_sizes = FALSE, bic = TRUE, loglik = FALSE, yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family, powerBelow = -5){
+esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = TRUE, cluster, digits=4, fitstat, title, sdBelow=TRUE, drop, order, dict = getFixest_dict(), file, replace=FALSE, convergence, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, subtitles, fixef_sizes = FALSE, yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family, powerBelow = -5){
 	# drop: a vector of regular expressions
 	# order: a vector of regular expressions
 	# dict: a 'named' vector
@@ -390,7 +386,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	# to get the model names
 	dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-	info = results2formattedList(..., se=se, dof=dof, cluster=cluster, digits=digits, sdBelow=sdBelow, signifCode=signifCode, subtitles=subtitles, yesNoFixef=yesNoFixef, keepFactors=keepFactors, isTex = TRUE, useSummary=useSummary, dots_call=dots_call, powerBelow=powerBelow, dict=dict)
+	info = results2formattedList(..., se=se, dof=dof, fitstat=fitstat, cluster=cluster, digits=digits, sdBelow=sdBelow, signifCode=signifCode, subtitles=subtitles, yesNoFixef=yesNoFixef, keepFactors=keepFactors, isTex = TRUE, useSummary=useSummary, dots_call=dots_call, powerBelow=powerBelow, dict=dict)
 
 	n_models = length(info$depvar_list)
 	# Getting the information
@@ -401,12 +397,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	sd_below = info$sd_below
 	depvar_list = info$depvar_list
 	obs_list = info$obs_list
-	r2_list = info$r2_list
-	aic_list = info$aic_list
-	bic_list = info$bic_list
-	loglik_list = info$loglik_list
 	convergence_list = info$convergence_list
-	sqCor_list = info$sqCor_list
 	factorNames = info$factorNames
 	isFactor = info$isFactor
 	nbFactor = info$nbFactor
@@ -414,6 +405,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	slope_flag_list = info$slope_flag_list
 	family_list = info$family_list
 	theta_list = info$theta_list
+	fitstat_list = info$fitstat_list
 
 	if(!missing(subtitles)){
 		isSubtitles = TRUE
@@ -616,17 +608,6 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 		info_subtitles = ""
 	}
 
-	# Fit statistics
-	fit_part <- paste0("\\hline\n\\emph{Fit statistics}& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
-	# Misc
-	info_aic <- paste0("AIC & ", paste(numberFormatLatex(aic_list), collapse="&"), "\\\\\n")
-	info_loglik <- paste0("Log-Likelihood & ", paste(numberFormatLatex(loglik_list), collapse="&"), "\\\\\n")
-	info_bic <- paste0("BIC & ", paste(numberFormatLatex(bic_list), collapse="&"), "\\\\\n")
-
-	info_obs <- paste0("Observations& ", paste(addCommas(obs_list), collapse="&"), "\\\\\n")
-	info_r2 <- paste0("Adj-pseudo $R^2$ &", paste(r2_list, collapse="&"), "\\\\\n")
-	info_sqCor <- paste0("$R^2$ &", paste(sqCor_list, collapse="&"), "\\\\\n")
-
 	# Convergence information
 	info_convergence = ""
 	if((missing(convergence) && any(convergence_list == FALSE)) || (!missing(convergence) && convergence)){
@@ -663,7 +644,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 		}
 
 		nb_col = length(obs_list) + 1
-		info_SD = paste0("\\hline\n\\hline\n\\multicolumn{", nb_col, "}{l}{\\emph{", my_se, " standard-errors in parenthesis. Signif Codes: ", paste(names(signifCode), signifCode, sep=": ", collapse = ", "), "}}\\\\\n")
+		info_SD = paste0("\\hline\n\\hline\n\\multicolumn{", nb_col, "}{l}{\\emph{", my_se, " standard-errors in parentheses. Signif Codes: ", paste(names(signifCode), signifCode, sep=": ", collapse = ", "), "}}\\\\\n")
 		info_muli_se = ""
 	} else {
 		info_muli_se = paste0("Standard-Error type& ", paste(se_type_list, collapse="&"), "\\\\\n")
@@ -672,47 +653,55 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 
 	# Information on number of items
 
-	supplemental_info = "\\global\\long\\def\\sym#1{\\ifmmode^{#1}\\else\\ensuremath{^{#1}}\\fi}\n"
+	# supplemental_info = "\\global\\long\\def\\sym#1{\\ifmmode^{#1}\\else\\ensuremath{^{#1}}\\fi}\n"
+	supplemental_info = ""
 
-	if(!pseudo) info_r2 <- ""
-	if(!sqCor) info_sqCor <- ""
-	if(!aic) info_aic = ""
-	if(!bic) info_bic = ""
-	if(!loglik) info_loglik = ""
 	if(!fixef_sizes) nb_factor_lines = ""
 	if(all(theta_list == "")) info_theta = ""
 
-	if(!missing(file)) sink(file = file, append = !replace)
+	#
+	# Fit statistics
+	#
 
-	cat(paste0(supplemental_info,
-				  start_table,
-				  intro_latex,
-				  first_line,
-				  info_subtitles,
-				  model_line,
-				  info_family,
-				  variable_line,
-				  coef_lines,
-				  info_theta,
-				  dumIntro,
-				  factor_lines,
-				  slope_intro,
-				  slope_lines,
-				  fit_part,
-				  info_obs,
-				  nb_factor_lines,
-				  info_convergence,
-				  info_muli_se,
-				  info_r2,
-				  info_sqCor,
-				  info_aic,
-				  info_loglik,
-				  info_bic,
-				  info_SD,
-				  outro_latex,
-				  end_table))
+	fit_info = paste0("\\hline\n\\emph{Fit statistics}& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+	fit_info = paste0(fit_info, "Observations& ", paste(addCommas(obs_list), collapse="&"), "\\\\\n")
+	fit_info = paste0(fit_info, nb_factor_lines, info_convergence, info_muli_se)
+	if(!identical(fitstat_list, NA)){
 
-	if(!missing(file)) sink()
+	    fit_names = attr(fitstat_list, "format_names")
+	    nb = length(fit_names)
+	    for(fit_id in 1:nb){
+	        fit = sapply(fitstat_list, function(x) x[[fit_id]])
+	        fit[is.na(fit)] = "--"
+	        fit_info = paste0(fit_info, fit_names[fit_id], " & ", paste0(fit, collapse = "&"), "\\\\\n")
+	    }
+	}
+
+
+	# # Fit statistics
+	# # fit_part <- paste0("\\hline\n\\emph{Fit statistics}& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+	# # Misc
+	# info_aic <- paste0("AIC & ", paste(numberFormatLatex(aic_list), collapse="&"), "\\\\\n")
+	# info_loglik <- paste0("Log-Likelihood & ", paste(numberFormatLatex(loglik_list), collapse="&"), "\\\\\n")
+	# info_bic <- paste0("BIC & ", paste(numberFormatLatex(bic_list), collapse="&"), "\\\\\n")
+	#
+	# info_obs <- paste0("Observations& ", paste(addCommas(obs_list), collapse="&"), "\\\\\n")
+	# info_r2 <- paste0("Adj-pseudo $R^2$ &", paste(r2_list, collapse="&"), "\\\\\n")
+	# info_sqCor <- paste0("$R^2$ &", paste(sqCor_list, collapse="&"), "\\\\\n")
+
+	if(!missing(file)){
+	    sink(file = file, append = !replace)
+	    on.exit(sink())
+	}
+
+	# cat(paste0(supplemental_info, start_table, intro_latex, first_line, info_subtitles, model_line,
+	# 			  info_family, variable_line, coef_lines, info_theta, dumIntro, factor_lines,
+	# 			  slope_intro, slope_lines, fit_part, info_obs, nb_factor_lines, info_convergence,
+	# 			  info_muli_se, info_r2, info_sqCor, info_aic, info_loglik, info_bic, info_SD,
+	# 			  outro_latex, end_table))
+	cat(paste0(supplemental_info, start_table, intro_latex, first_line, info_subtitles, model_line,
+				  info_family, variable_line, coef_lines, info_theta, dumIntro, factor_lines,
+				  slope_intro, slope_lines, fit_info, info_SD, outro_latex, end_table))
 
 }
 
@@ -758,7 +747,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 #'
 #'
 #'
-esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = TRUE, cluster, depvar, drop, order, digits=4, pseudo=TRUE, convergence, signifCode = c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10), titles, keepFactors = FALSE, family, bic = TRUE, loglik = FALSE){
+esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = TRUE, cluster, depvar, drop, order, digits=4, fitstat, convergence, signifCode = c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10), titles, keepFactors = FALSE, family){
 
 	# Need to check for the presence of the se
     useSummary = TRUE
@@ -775,7 +764,7 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 	# to get the model names
 	dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-	info = results2formattedList(..., se=se, dof = dof, cluster=cluster, digits=digits, signifCode=signifCode, titles=titles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call)
+	info = results2formattedList(..., se=se, dof = dof, cluster=cluster, digits=digits, signifCode=signifCode, titles=titles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call, fitstat=fitstat)
 
 	n_models = length(info$depvar_list)
 	# Getting the information
@@ -786,12 +775,7 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 	sd_below = info$sd_below
 	depvar_list = info$depvar_list
 	obs_list = info$obs_list
-	r2_list = info$r2_list
-	aic_list = info$aic_list
-	bic_list = info$bic_list
-	loglik_list = info$loglik_list
 	convergence_list = info$convergence_list
-	sqCor_list = info$sqCor_list
 	factorNames = info$factorNames
 	isFactor = info$isFactor
 	nbFactor = info$nbFactor
@@ -802,6 +786,7 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 	model_names = info$model_names
 	family_list = info$family_list
 	theta_list = info$theta_list
+	fitstat_list = info$fitstat_list
 
 
 	if(!missing(titles)){
@@ -839,9 +824,18 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 		res = rbind(res, theta_line)
 	}
 
+	# The line with the dependent variable => defined here to get the width
+	preamble = c()
+	dep_width = 0
+	if((missing(depvar) && length(unique(unlist(depvar_list))) > 1) || (!missing(depvar) && depvar)){
+	    preamble = rbind(c("Dependent Var.:", unlist(depvar_list)), preamble)
+	    dep_width = nchar(as.vector(preamble))
+	}
+
 	# Used to draw a line
 	myLine = "______________________________________"
 	longueur = apply(res, 2, function(x) max(nchar(as.character(x))))
+	longueur = pmax(dep_width, longueur)
 	theLine = sapply(longueur, function(x) sprintf("%.*s", x, myLine))
 	theLine[1] = sprintf("%.*s", max(nchar(theLine[1]), 19), myLine)
 
@@ -886,12 +880,8 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 
 	}
 
-	# The line with the dependent variable
-	preamble = c()
-	if((missing(depvar) && length(unique(unlist(depvar_list))) > 1) || (!missing(depvar) && depvar)){
-		preamble = rbind(c("Dependent Var.:", unlist(depvar_list)), preamble)
-	}
 
+    # preamble created before because used to set the width
 	if(length(preamble) > 0){
 		# preamble = rbind(preamble, c("  ", theLine[-1]))
 		preamble = rbind(preamble, rep("   ", length(theLine)))
@@ -909,7 +899,8 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 	res <- rbind(res, c("Observations", addCommas(obs_list)))
 	if(!useSummary){
 		se_type_format = c()
-		for(m in 1:n_models) se_type_format[m] = charShorten(se_type_list[[m]], longueur[[1+m]])
+		# for(m in 1:n_models) se_type_format[m] = charShorten(se_type_list[[m]], longueur[[1+m]])
+		for(m in 1:n_models) se_type_format[m] = format_se_type(se_type_list[[m]], longueur[[1+m]])
 		res <- rbind(res, c("S.E. type", c(se_type_format, recursive = TRUE)))
 	}
 
@@ -918,11 +909,20 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 		res <- rbind(res, c("Convergence", c(convergence_list, recursive = TRUE)))
 	}
 
-	res <- rbind(res, c("Squared-Corr.", c(sqCor_list, recursive = TRUE)))
-	res <- rbind(res, c("Adj-pseudo R2", c(r2_list, recursive = TRUE)))
-	# res <- rbind(res, c("AIC", c(aic_list, recursive = TRUE)))
-	if(loglik) res <- rbind(res, c("Log-Likelihood", numberFormatNormal(loglik_list)))
-	if(bic) res <- rbind(res, c("BIC", numberFormatNormal(bic_list)))
+	#
+	# Fit statistics
+	#
+
+	if(!identical(fitstat_list, NA)){
+
+	    fit_names = attr(fitstat_list, "format_names")
+	    nb = length(fit_names)
+	    for(fit_id in 1:nb){
+	        fit = sapply(fitstat_list, function(x) x[[fit_id]])
+	        fit[is.na(fit)] = "--"
+	        res <- rbind(res, c(fit_names[fit_id], fit))
+	    }
+	}
 
 	# if titles
 	if(isTitles){
@@ -956,6 +956,9 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 #'
 #' @param x A \code{fixest} object, e.g. obtained with function \code{\link[fixest]{feglm}} or \code{\link[fixest]{feols}}.
 #' @param type A character vector representing the R2 to compute. The R2 codes are of the form: "wapr2" with letters "w" (within), "a" (adjusted) and "p" (pseudo) possibly missing. E.g. to get the regular R2: use \code{type = "r2"}, the within adjusted R2: use \code{type = "war2"}, the pseudo R2: use \code{type = "pr2"}, etc. Use \code{"sq.cor"} for the squared correlation. By default, all R2s are computed.
+#'
+#' @details
+#' For R2s with no theoretical justification, like e.g. regular R2s for maximum likelihood models -- or within R2s for models without fixed-effects, NA is returned. The single measure to possibly compare all kinds of models is the squared correlation between the dependent variable and the expected predictor.
 #'
 #' @return
 #' Returns a named vector.
@@ -1012,15 +1015,26 @@ r2 = function(x, type = "all"){
 		}
 	}
 
+	is_ols = deparse(x$call[[1]]) == "feols"
 	isCluster = "fixef_vars" %in% names(x)
 	n = nobs(x)
 
-	res = c()
+	res = rep(NA, length(type_all))
 	for(i in seq_along(type_all)){
 		myType = type_all[i]
 
 		if(myType == "sq.cor"){
 		    res[i] = x$sq.cor
+		    next
+		}
+
+		if(!grepl("p", myType) && !is_ols){
+		    # non pseudo R2 not valid for non ols
+		    next
+		}
+
+		if(grepl("w", myType) && !isCluster){
+		    # within R2 not valid for models without FE
 		    next
 		}
 
@@ -1247,7 +1261,7 @@ lag.formula = function(x, k, data, time.step = "unitary", fill = NA, duplicate.m
             time_new = tryCatch(as.numeric(time), warning = function(x) x)
 
             if(!is.numeric(time_new)){
-                stop("To use the 'unitary' time.step, the time variable must be numeric or at least convertible to numeric. So far the conversion has failed (time variable's class is currently ", enumerate_items(class(time), endVerb = FALSE), ").")
+                stop("To use the 'unitary' time.step, the time variable must be numeric or at least convertible to numeric. So far the conversion has failed (time variable's class is currently ", enumerate_items(class(time), verb = FALSE), ").")
             }
 
             time = time_new
@@ -1259,12 +1273,12 @@ lag.formula = function(x, k, data, time.step = "unitary", fill = NA, duplicate.m
 
     } else if(time.step != "consecutive"){
         if(!is.numeric(time)){
-            stop("If 'time.step' is a number, then the time variable must also be a number (this is not the cases: its class is currently ", enumerate_items(class(time), endVerb = FALSE), ").")
+            stop("If 'time.step' is a number, then the time variable must also be a number (this is not the cases: its class is currently ", enumerate_items(class(time), verb = FALSE), ").")
         }
 
         # if(any(time %% time.step != 0)){
         #     pblm = unique(head(time[time %% time.step != 0], 3))
-        #     stop("If 'time.step' is a number, then it must be an exact divisor of all the values in the time variable. This is currently not the case: ", time.step, " is not a divisor of ", enumerate_items(pblm, or = TRUE, endVerb = FALSE), ".")
+        #     stop("If 'time.step' is a number, then it must be an exact divisor of all the values in the time variable. This is currently not the case: ", time.step, " is not a divisor of ", enumerate_items(pblm, or = TRUE, verb = FALSE), ".")
         # }
     }
 
@@ -1574,14 +1588,16 @@ fixef.fixest = function(object, notes = getFixest_notes(), ...){
 
 	    if(is.null(data)){
 	        # We try to provide an informative error message
-	        stop("To get the coefficients for the variables with varying slopes, we need to fetch these variables (i.e. ", enumerate_items(slope_vars_unik, endVerb = FALSE), ") in the original dataset in the parent.frame -- but the data doesn't seem to be there anymore (btw it was ", deparse_long(dataName), ")")
+	        stop("To get the coefficients for the variables with varying slopes, we need to fetch these variables (i.e. ", enumerate_items(slope_vars_unik, verb = FALSE), ") in the original dataset in the parent.frame -- but the data doesn't seem to be there anymore (btw it was ", deparse_long(dataName), ")")
 	    }
 
 	    data = as.data.frame(data)
 
 	    # we check the variables are there
-	    if(any(!slope_vars_unik %in% names(data))){
-	        var_pblm = setdiff(slope_vars_unik, names(data))
+	    slope_vars_unik_raw = unique(sapply(slope_vars_unik, function(x) all.vars(parse(text = x))))
+
+	    if(any(!slope_vars_unik_raw %in% names(data))){
+	        var_pblm = setdiff(slope_vars_unik_raw, names(data))
 	        stop("To get the coefficients for the variables with varying slopes, we need to fetch these variables in the original dataset (", deparse_long(dataName), "). However, the variable", enumerate_items(var_pblm, addS = TRUE), " not present in the original dataset any more.")
 	    }
 
@@ -1591,14 +1607,13 @@ fixef.fixest = function(object, notes = getFixest_notes(), ...){
 	    }
 
 	    if(length(object$obsRemoved)){
-	        data = data[-object$obsRemoved, slope_vars_unik, drop = FALSE]
+	        data = data[-object$obsRemoved, slope_vars_unik_raw, drop = FALSE]
 	    } else {
-	        data = data[, slope_vars_unik, drop = FALSE]
+	        data = data[, slope_vars_unik_raw, drop = FALSE]
 	    }
 
 	    slope_var_list = list()
 	    for(i in 1:length(slope_vars_unik)){
-	        variable = all.vars(parse(text = slope_vars_unik[i]))
 
 	        # as.numeric => we'll use cpp so required
 	        svar = as.numeric(as.vector(eval(parse(text = slope_vars_unik[i]), data)))
@@ -1656,10 +1671,10 @@ fixef.fixest = function(object, notes = getFixest_notes(), ...){
 
 	        nbCluster = sapply(my_dum, max)
 
-	        fixef_values <- cpp_get_fe_gnl(Q_fe, N, rep(1, N), dumMat, nbCluster, orderCluster)
+	        fixef_values_tmp <- cpp_get_fe_gnl(Q_fe, N, rep(1, N), dumMat, nbCluster, orderCluster)
 
 	        # the information on the references
-	        nb_ref_fe = fixef_values[[Q+1]]
+	        nb_ref_fe = fixef_values_tmp[[Q_fe+1]]
 	    } else {
 	        nb_ref_fe = integer(Q_fe)
 	    }
@@ -2657,7 +2672,7 @@ did_estimate_yearly_effects = function(fml, data, treat_time, reference, returnD
 
 	if(!is.numeric(treat) || any(!treat %in% c(0, 1))){
 	    obs = head(which(!treat %in% c(0, 1)), 3)
-		stop("The treatment variable must be 0/1, with 1 repersenting the treated. The variable that you gave, ", treat_var, ", is not (e.g. observation", enumerate_items(obs, addS = TRUE, endVerb = FALSE), ".")
+		stop("The treatment variable must be 0/1, with 1 repersenting the treated. The variable that you gave, ", treat_var, ", is not (e.g. observation", enumerate_items(obs, addS = TRUE, verb = FALSE), ".")
 	}
 
 	all_periods = sort(unique(time[!is.na(time)]))
@@ -2711,7 +2726,7 @@ did_estimate_yearly_effects = function(fml, data, treat_time, reference, returnD
 #'
 #' @param object An object returned by the function \code{\link[fixest]{did_estimate_yearly_effects}}.
 #' @param ... Any other argument to be passed to \code{summary} or to \code{plot}.
-#' @param style One of \code{"interval"} (default), \code{"bar"} or \code{"tube"}. The style of the plot.
+#' @param style One of \code{"bar"} (default), \code{"interval"} or \code{"tube"}. The style of the plot.
 #'
 #' @author
 #' Laurent Berge
@@ -2844,7 +2859,7 @@ did_plot_yearly_effects = function(object, x.shift = 0, w = 0.1, ci_level = 0.95
 	dots$sd = base2show$sd
 	dots$x = base2show$x
 	if(is.null(dots$xlab)) dots$xlab = time_variable
-	if(is.null(dots$ylab)) dots$ylab = "Estimate of Yearly Treatment"
+	if(is.null(dots$ylab)) dots$ylab = paste0("Estimate of Yearly Treatment on ", deparse(object$fml[[2]]))
 
 	# Now the plot
 	mc = match.call(expand.dots = FALSE)
@@ -3084,22 +3099,560 @@ errbar <- function(estimate, sd, ci_low, ci_top, x, x.shift = 0, w=0.1, ci_level
 	return(invisible(res))
 }
 
+#' Treated and control sample descriptives
+#'
+#' This function shows the means and standard-deviations of several variables conditional on whether they are from the treated or the control group. The groups can further be split according to a pre/post variable. Results can be seamlessly be exported to Latex.
+#'
+#' @inheritParams esttex
+#'
+#' @param fml Either a formula of the type \code{var1 + ... + var[N] ~ treat} or \code{var1 + ... + var[N] ~ treat | post}. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: \code{. ~ treat}.
+#' @param base A data base containing all the variables in the formula \code{fml}.
+#' @param treat_var Only if argument \code{fml} is *not* a formula. The vector identifying the treated and the control observations (the vector can be of any type but must contain only two possible values). Must be of the same length as the data.
+#' @param post_var Only if argument \code{fml} is *not* a formula. The vector identifying the periods (pre/post) of the observations (the vector can be of any type but must contain only two possible values). The first value (in the sorted sense) of the vector is taken as the pre period. Must be of the same length as the data.
+#' @param treat_first Which value of the 'treatment' vector should appear on the left? By default the max value appears first (e.g. if the treatment variable is a 0/1 vector, 1 appears first).
+#' @param tex Should the result be displayed in Latex? Default is \code{FALSE}. Automatically set to \code{TRUE} if the table is to be saved in a file using the argument \code{file}.
+#' @param treat_dict A character vector of length two. What are the names of the treated and the control? This should be a dictionnary: e.g. \code{c("1"="Treated", "0" = "Control")}.
+#' @param dict A named character vector. A dictionnary between the variables names and an alias. For instance \code{dict=c("x"="Inflation Rate")} would replace the variable name \code{x} by \dQuote{Inflation Rate}.
+#' @param file A file path. If given, the table is written in Latex into this file.
+#' @param replace Default is \code{TRUE}, which means that when the table is exported, the existing file is not erased.
+#' @param title Character string giving the Latex title of the table. (Only if exported.)
+#' @param label Character string giving the Latex label of the table. (Only if exported.)
+#' @param raw Logical, default is \code{FALSE}. If \code{TRUE}, it returns the information without formatting.
+#' @param indiv Either the variable name of individual identifiers, a one sided formula, or a vector. If the data is that of a panel, this can be used to track the number of individuals per group.
+#' @param prepostnames Only if there is a 'post' variable. The names of the pre and post periods to be displayed in Latex. Default is \code{c("Before", "After")}.
+#' @param diff.inv Logical, default to \code{FALSE}. Whether to inverse the difference.
+#'
+#' @details
+#' By default, when the user tries to apply this function to nun-numeric variables, an error is raised. The exception is when the all variables are selected with the dot (like in \code{. ~ treat}. In this case, non-numeric variables are automatically omitted (with a message).
+#'
+#' NAs are removed automatically: if the data contains NAs an information message will be prompted. First all observations containing NAs relating to the treatment or post variables are removed. Then if there are still NAs for the variables, they are excluded separately for each variable, and a new message detailing the NA breakup is prompted.
+#'
+#' @return
+#' It returns a data.frame or a Latex table with the conditional means and statistical differences between the groups.
+#'
+#' @examples
+#'
+#' # Playing around with the DiD data
+#' data(base_did)
+#'
+#' # means of treat/control
+#' did_means(y+x1+period~treat, base_did)
+#'
+#' # same but inverting the difference
+#' did_means(y+x1+period~treat, base_did, diff.inv = TRUE)
+#'
+#' # now treat/control, before/after
+#' did_means(y+x1+period~treat|post, base_did)
+#'
+#' # same but with a new line giving the number of unique "indiv" for each case
+#' did_means(y+x1+period~treat|post, base_did, indiv = "id")
+#'
+#' # same but with the treat case "0" coming first
+#' did_means(y+x1+period~treat|post, base_did, indiv = ~id, treat_first = 0)
+#'
+#' # Selecting all the variables with "."
+#' did_means(.~treat|post, base_did, indiv = "id")
+#'
+#'
+did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, dict = getFixest_dict(), file, replace = FALSE, title, label, raw = FALSE, indiv, treat_first, prepostnames = c("Before", "After"), diff.inv = FALSE){
+    # x is a data.frame
+    # treat_vector is a list of IDs
+    # treat_first: the treated-value to appear first
+
+    # Ajouter protection quand un des groupes vaut 0!!!
+    # ie un des treat-post n'a pas d'observation
+
+    fml_in = fml
+
+    #
+    # Nber of units of observations (I do it before the main data)
+    #
+
+    IS_INDIV = FALSE
+    if(!missing(indiv)){
+        IS_INDIV = TRUE
+        if("formula" %in% class(indiv)){
+
+            check_arg(indiv, "osf")
+            indiv_varname = attr(terms(indiv), "term.labels")
+
+            if(missing(base)){
+                stop("To use 'indiv' as a formula, you must provide the argument 'base'.")
+            }
+
+            if(length(indiv_varname) > 1){
+                stop("The argument 'indiv' must refer to only one variable.")
+            }
+
+            if(!all(all.vars(indiv) %in% names(base))){
+                pblm = setdiff(all.vars(indiv), names(base))
+                stop("In argument 'indiv': the variable", enumerate_items(pblm, addS=TRUE)," not in the data set.")
+            }
+
+            indiv_var = try(eval(parse(text = indiv_varname), base), silent = TRUE)
+            if("try-error" %in% class(indiv_var)){
+                stop("Evaluation of 'indiv' raises and error:\n", indiv_var)
+            }
+        } else if(length(indiv) == 1 && is.character(indiv)){
+            indiv_varname = indiv
+
+            if(missing(base) || !indiv %in% names(base)){
+                stop("To use 'indiv' as a 'character string' you must provide the argument 'base'.")
+            } else {
+                indiv_var = base[[indiv]]
+            }
+        } else {
+            if(!missing(base) && length(indiv) != NROW(base)){
+                stop("The length of 'indiv' must be the same as the data.")
+            } else if(missing(base) && length(indiv) != NROW(fml)){
+                stop("The length of 'indiv' must be the same as the data.")
+            }
+            indiv_var = indiv
+        }
+    } else {
+        indiv_var = NULL
+    }
+
+    #
+    # Extracting the information
+    #
+
+    usePost = FALSE
+    if("formula" %in% class(fml_in)){
+        if(missing(base) || !is.data.frame(base)){
+            stop("If you provide a formula, a data.frame must be given in argument 'base'.")
+        }
+
+        # Creation of x and the condition
+        if(!length(fml_in) == 3){
+            stop("The formula must be of the type 'var1 + ... + var[N] ~ treat' or 'var1 + ... + var[N] ~ treat | post'.")
+        }
+
+        fml = extract_pipe(fml_in)$fml
+        pipe = extract_pipe(fml_in)$pipe
+
+        #
+        # Treat & post
+        #
+
+        if(!(all(all.vars(fml[[3]]) %in% names(base)))){
+            pblm = setdiff(all.vars(fml[[3]]), names(base))
+            stop("In the evaluation of the treatment variable: ", enumerate_items(pblm), " not in the data set.")
+        }
+
+        treat_var = try(eval(fml[[3]], base), silent = TRUE)
+        if("try-error" %in% class(treat_var)){
+            stop("Evaluation of the 'treatment' variable raises and error: \n", treat_var)
+        }
+
+        if(!is.null(pipe)){
+            if(!(all(all.vars(pipe) %in% names(base)))){
+                pblm = setdiff(all.vars(pipe), names(base))
+                stop("In the evaluation of the 'post' variable: ", enumerate_items(pblm), " not in the data set.")
+            }
+
+            post_var = try(eval(pipe, base), silent = TRUE)
+            if("try-error" %in% class(post_var)){
+                stop("Evaluation of the 'post' variable raises and error: \n", treat_var)
+            }
+
+            usePost = TRUE
+        }
+
+        #
+        # The variables
+        #
+
+        # special case: the point
+        if(deparse(fml[[2]])[1] == "."){
+            all_vars = setdiff(names(base), deparse(fml[[3]])[1])
+            if(usePost) all_vars = setdiff(all_vars, as.character(pipe))
+            if(IS_INDIV) all_vars = setdiff(all_vars, indiv_varname)
+
+            if("data.table" %in% class(base)){
+                mat_vars = as.data.frame(base[, all_vars, with = FALSE])
+            } else {
+                mat_vars = base[, all_vars, FALSE]
+            }
+
+            # we drop non-numeric info + note
+            base_small = head(mat_vars, 10)
+            is_num = sapply(base_small, function(x) is.numeric(x) || is.logical(x))
+            pblm = all_vars[!is_num]
+
+            if(all(!is_num)){
+                stop("Function cannot be performed: not any numeric variable.")
+            } else if(length(pblm) > 0){
+                message("NOTE: The variable", enumerate_items(pblm, addS=TRUE), " removed because they are non-numeric.")
+            }
+
+            mat_vars = as.matrix(mat_vars[, is_num, FALSE])
+        } else {
+            # we swap the formula to use model.frame
+            fml_x = as.formula(paste0("1~", deparse_long(fml[[2]]), "-1"))
+
+            # Variables control:
+            all_vars = all.vars(fml_x)
+            pblm = setdiff(all_vars, names(base))
+            if(length(pblm) > 0){
+                stop("The variable", enumerate_items(pblm, addS = TRUE), " not in the data set (", deparse(substitute(base)), ").")
+            }
+
+            # Evaluation control
+            base_small = head(base, 10)
+            var2eval = attr(terms(fml_x), "term.labels")
+            var2eval = gsub(":", "*", var2eval)
+            for(i in seq_along(var2eval)){
+                var = var2eval[i]
+                x_small = try(eval(parse(text=var), base_small), silent = TRUE)
+                if("try-error" %in% class(x_small)){
+                    stop("Evaluation of the variable '", var, "' raises and error:\n", x_small)
+                }
+
+                if(!is.numeric(x_small) && !is.logical(x_small)){
+                    stop("The variable ", var, " is not numeric, please provide only numeric variables.")
+                }
+            }
+
+            mat_vars = prepare_matrix(fml_x, base)
+        }
+
+        if(is.logical(mat_vars)){
+            mat_vars = as.numeric(mat_vars)
+        }
+
+        # other info
+        x_name = colnames(mat_vars)
+    } else {
+        if(missing(treat_var)){
+            stop("If argument 'fml' is not a formula, you must provide the argument 'treat_var'.")
+        } else {
+            mat_vars = fml_in
+
+            if(NROW(mat_vars) != length(treat_var)){
+                stop("The arguments 'x' and 'treat_var' must be of the same length.")
+            }
+
+            if(!missing(post_var) && !is.null(post_var)){
+                if(NROW(mat_vars) != length(post_var)){
+                    stop("If provided, the argument 'post_var' must be of the same length of 'x'.")
+                }
+                usePost = TRUE
+            }
+
+            # We exclude non numeric variables
+            if("data.frame" %in% class(mat_vars)){
+                is_num = sapply(mat_vars, function(x) is.numeric(x) || is.logical(x))
+                if(any(!is_num)){
+                    pblm = names(mat_vars)[!is_num]
+                    stop("This function works only for numeric variables. Variable", enumerate_items(pblm, addS=TRUE), " not numeric.")
+                }
+                mat_vars = as.matrix(mat_vars)
+            } else if(!is.matrix(mat_vars)){
+                stop("If not a formula, argument 'fml' must be a data.frame or a matrix. Currently it is of class ", class(mat_vars)[1], ".")
+            } else if(!is.numeric(mat_vars) && !is.logical(mat_vars)){
+                stop("If not a formula, argument 'fml' must be a data.frame or a matrix with numeric variables. Currenlty its is not numeric.")
+            }
+
+            if(is.logical(mat_vars)) mat_vars = as.numeric(mat_vars)
+
+            # other info
+            x_name = colnames(mat_vars)
+        }
+    }
+
+    #
+    # NA control
+    #
+
+    # Treat & post
+    ANY_NA = FALSE
+    if(anyNA(treat_var) || (usePost && anyNA(post_var))){
+        ANY_NA = TRUE
+        qui_NA = is.na(treat_var)
+        if(usePost) qui_NA = qui_NA | is.na(post_var)
+
+        if(all(qui_NA)){
+            msg = "treatment variable."
+            if(usePost && anyNA(post_var)){
+                if(anyNA(treat_var)){
+                    msg = "'treatment' and 'post' variables."
+                } else {
+                    msg = "'post' variable."
+                }
+            }
+            stop("All observation contain NA values for the ", msg)
+        }
+
+        mat_vars = mat_vars[!qui_NA, ]
+        treat_var = treat_var[!qui_NA]
+        if(usePost) post_var = post_var[!qui_NA]
+
+        if(IS_INDIV) indiv_var = indiv_var[!qui_NA]
+
+        msg = ifelse(usePost, "/post variables.", " variable.")
+        message("NOTE: ", sum(qui_NA), " observations removed because of NA values in the treatment", msg)
+
+    }
+
+
+
+    # Treatment / post controls
+    if(length(unique(treat_var)) != 2){
+        n = length(unique(treat_var))
+        msg = ifelse(n == 1, "only one value.", paste0(n, " values."))
+        stop("This function supports only 2 conditional values for the treatment variable. Currently, it contains ", msg)
+    }
+
+    if(usePost && length(unique(post_var)) != 2){
+        n = length(unique(post_var))
+        msg = ifelse(n == 1, "only one value.", paste0(n, " values."))
+        stop("This function supports only 2 conditional values for the 'post' variable. Currently, it contains ", msg)
+    }
+
+    if(usePost){
+        check_arg(prepostnames, "characterVector", "Argument 'prepostnames' must be a character vector of length 2. REASON")
+        if(length(prepostnames) != 2){
+            stop("Argument 'prepostnames' must be a character vector of length 2. It is currenlty of length ", length(prepostnames), ".")
+        }
+    }
+
+    treat_cases = sort(unique(treat_var), decreasing = TRUE)
+    if(!missing(treat_dict) && !is.null(treat_dict)){
+
+        if(!isVector(treat_dict) || is.null(names(treat_dict))){
+            stop("The argument 'treat_dict' must be a named character vector.")
+        }
+
+        pblm = setdiff(treat_cases, names(treat_dict))
+        if(length(pblm) > 0){
+            stop("The value", enumerate_items(pblm, addS = TRUE), " not in 'treat_dict'.")
+        }
+    } else {
+        treat_dict = paste0("cond: ", treat_cases)
+        names(treat_dict) = treat_cases
+    }
+
+    #
+    # The main function
+    #
+
+    if(!missing(treat_first) && !is.null(treat_first)){
+        if(!treat_first %in% treat_cases){
+            stop("Argument 'treat_first' must be an element of the treated variable.")
+        } else if(treat_first != treat_cases[1]){
+            treat_cases = rev(treat_cases)
+        }
+    }
+
+    if(!usePost){
+        # the simple case
+        res = .meanDiffTable(mat_vars, treat_var, treat_cases, indiv_var, raw = raw, diff.inv = diff.inv)
+
+        if(any(attr(res, "na"))){
+            nb_na = attr(res, "na")
+            var_with_na = x_name[nb_na > 0]
+            message("NA values were omitted for the variable", enumerate_items(paste0(var_with_na, " (", nb_na[nb_na > 0], ")"), addS=TRUE, verb=FALSE), ".")
+        }
+
+        attr(res, "na") = NULL
+
+
+    } else {
+        # the more complex case
+        post_values = sort(unique(post_var))
+
+        qui_pre = which(post_var == post_values[1])
+        res_pre = .meanDiffTable(mat_vars[qui_pre, ], treat_var[qui_pre], treat_cases, indiv_var[qui_pre], raw = raw, diff.inv = diff.inv)
+
+        qui_post = which(post_var == post_values[2])
+        res_post = .meanDiffTable(mat_vars[qui_post, ], treat_var[qui_post], treat_cases, indiv_var[qui_post], raw = raw, diff.inv = diff.inv)
+
+        nb_na = attr(res_pre, "na") + attr(res_post, "na")
+
+        res = cbind(res_pre, res_post[, -1])
+
+        if(any(nb_na)){
+            var_with_na = x_name[nb_na > 0]
+            message("NA values were omitted for the variable", enumerate_items(paste0(var_with_na, " (", nb_na[nb_na > 0], ")"), addS=TRUE, verb=FALSE), ".")
+        }
+
+        attr(res, "na") = NULL
+    }
+
+    #
+    # Tex exportation
+    #
+
+    if(tex || !missing(file)){
+        # we sink!
+        if(!missing(file)){
+            sink(file = file, append = (replace == FALSE))
+            on.exit(sink())
+        }
+
+        if(!missing(title)){
+            # if there is the title, then we create a "table" environment
+            myTitle = title
+            if(!missing(label)) myTitle = paste0("\\label{", label, "} ", myTitle)
+            cat("\\begin{table}[htbp]\\centering\n\\caption{",  myTitle, "}\n")
+        }
+
+        #
+        # we write the tex code
+        #
+
+        treat_text = paste0(treat_dict[as.character(treat_cases)], collapse = " & ")
+
+        if(!usePost){
+            # The simple case
+            cat("\\begin{tabular}{lcccc}\n")
+            cat(" &  &  &  & \\tabularnewline\n\\hline\n\\hline\n")
+
+            cat(" & ", treat_text,  "\\tabularnewline\n")
+
+            # the variables "line"
+            cat("Variables & mean (s.e.) & mean (s.e.) & Diff. & t-stat \\tabularnewline\n")
+            cat("\\hline\n")
+        } else {
+            # The case with pre and post
+            cat("\\begin{tabular}{lcccccccc}\n")
+            cat(" &  &  &  &  &  &  &  & \\tabularnewline\n\\hline\n\\hline\n")
+
+            # the treat post line
+            cat(" & ", "\\multicolumn{4}{c}{", prepostnames[1], "} & \\multicolumn{4}{c}{", prepostnames[2], "}\\tabularnewline\n")
+
+            # the 'treated' line
+            cat(" & ", treat_text, " &  &  & ", treat_text, "\\tabularnewline\n")
+
+            # the variables "line"
+            cat("Variables & mean (s.e.) & mean (s.e.) & Diff. & t-stat & mean (s.e.) & mean (s.e.) & Diff. & t-stat \\tabularnewline\n")
+            cat("\\hline\n")
+        }
+
+
+        # Changing the names of the variables
+        if(!missnull(dict)){
+            qui = which(res$vars %in% names(dict))
+            for(i in qui) res$vars[i] = .escapeChars(dict[res$vars[i]])
+        }
+
+        # The data
+        for(i in 1:nrow(res)){
+            cat(paste0(res[i,], collapse = " & "), "\\tabularnewline\n")
+        }
+
+        cat("\\hline\n\\hline\n &  &  &  & \\tabularnewline\n")
+        cat("\\end{tabular}\n")
+
+        if(!missing(title)) cat("\\end{table}\n")
+
+        return(invisible(res))
+    }
+
+    res
+}
+
+.meanDiffTable = function(mat_vars, treat_var, treat_cases, indiv_var, raw, diff.inv = FALSE){
+    # This function is the workhorse of did_means
+
+    x_name = colnames(mat_vars)
+
+    treat_01 = 1 * (treat_var == treat_cases[2])
+
+    nthreads = getFixest_nthreads()
+    info = cpppar_cond_means(mat_vars, treat_01, nthreads)
+
+    means = info$means
+    sds = info$sd
+    ns = info$n
+    n_01 = info$n_01
+
+    name_1 = as.character(treat_cases[1])
+    name_2 = as.character(treat_cases[2])
+
+    means_1 = means[, 1]
+    means_2 = means[, 2]
+
+    sds_1 = sds[, 1]
+    sds_2 = sds[, 2]
+
+    n_1 = ns[, 1]
+    n_2 = ns[, 2]
+
+    format_1 = paste0(mysignif(means_1, 2), " (", mysignif(sds_1, 2), ")")
+    format_2 = paste0(mysignif(means_2, 2), " (", mysignif(sds_2, 2), ")")
+
+    if(diff.inv){
+        D = (means_2 - means_1)
+    } else {
+        D = (means_1 - means_2)
+    }
+
+    sd_D = sqrt(sds_1**2/n_1 + sds_2**2/n_2)
+
+    t_stat = signif(D/sd_D, 3)
+
+    #
+    # Formatting
+    #
+
+    if(raw){
+        res = data.frame(vars = x_name, stringsAsFactors = FALSE)
+        res[[paste0("Mean: ", treat_cases[1])]] = c(means_1, recursive = TRUE)
+        res[[paste0("Mean: ", treat_cases[2])]] = c(means_2, recursive = TRUE)
+        res[[paste0("se: ", treat_cases[1])]] = c(sds_1, recursive = TRUE)
+        res[[paste0("se: ", treat_cases[2])]] = c(sds_2, recursive = TRUE)
+        res[["Difference"]] = c(D, recursive=TRUE)
+        res[["t-stat"]] = c(as.character(t_stat), recursive=TRUE)
+    } else {
+        res = data.frame(vars = x_name, stringsAsFactors = FALSE)
+        res[[paste0("cond: ", treat_cases[1])]] = format_1
+        res[[paste0("cond: ", treat_cases[2])]] = format_2
+        res[["Difference"]] = c(mysignif(D, 3), recursive = TRUE)
+        res[["t-stat"]] = c(as.character(t_stat), recursive = TRUE)
+
+        res[nrow(res) + 1, ] = c("Observations", addCommas(n_01[1]), addCommas(n_01[2]), "", "")
+        # Le nombre d'individus
+        if(!missing(indiv_var) && !is.null(indiv_var)){
+            nb_indiv =  tapply(indiv_var, treat_var, function(x) length(unique(x)))
+            res[nrow(res) + 1, ] = c("# Individuals", addCommas(nb_indiv[name_1]), addCommas(nb_indiv[name_2]), "", "")
+        }
+    }
+
+    attr(res, "na") = info$na
+
+    res
+}
 
 
 #### ................. ####
-#### Internal Funs ####
+#### Internal Funs     ####
 ####
 
-results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo=TRUE, sdBelow=TRUE, dict = NULL, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, subtitles, titles, yesNoFixef = c("Yes", "No"), keepFactors = FALSE, isTex = FALSE, useSummary, dots_call, powerBelow){
+results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, fitstat, sdBelow=TRUE, dict = NULL, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, subtitles, titles, yesNoFixef = c("Yes", "No"), keepFactors = FALSE, isTex = FALSE, useSummary, dots_call, powerBelow){
     # This function is the core of the functions esttable and esttex
 
+    # for error handling => refers to the right function
+    my_call = deparse(sys.calls()[[sys.nframe()-1]])[1] # call can have svl lines
+    nmax = 40
+    if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax-1), "...")
+    my_call = paste0("error in ", my_call, ":\n")
+
+
+    check_arg(signifCode, "numericVectorGE0LE1", call_depth = 1)
+    if(is.null(names(signifCode))){
+        stop(my_call, "The argument 'signifCode' must be a NAMED vector. It currently has no names.", call. = FALSE)
+    }
     signifCode = sort(signifCode)
-    if(any(signifCode<0) | any(signifCode>1)) stop("The argument 'signifCode' must lie between 0 and 1.")
 
-    if(length(yesNoFixef) != 2) stop("The argument 'yesNoFixef' must be of length 2.")
+    check_arg(yesNoFixef, "characterVector", message = "The argument 'yesNoFixef' must be a character vector of length 2. REASON", call_depth = 1)
+    if(length(yesNoFixef) != 2){
+        stop(my_call, "The argument 'yesNoFixef' must be of length 2.", call. = FALSE)
+    }
 
-    # To take care of old verions:
-    allowed_types = c("fixest", "femlm", "feNmlm")
+    # at the moment: only fixest allowed
+    allowed_types = "fixest"
 
     # We get all the models
     dots <- list(...)
@@ -3157,7 +3710,7 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
 
     }
 
-    if(length(all_models)==0) stop("Not any proper model (fixest) as argument!")
+    if(length(all_models)==0) stop(my_call, "Not any proper model (fixest) as argument!", call. = FALSE)
 
     n_models <- length(all_models)
 
@@ -3170,7 +3723,7 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
     se_type_list = list()
 
     var_list <- coef_list <- coef_below <- sd_below <- list()
-    depvar_list <- obs_list <- list()
+    depvar_list <- obs_list <- fitstat_list <- list()
     r2_list <- aic_list <- bic_list <- loglik_list <- convergence_list <- list()
     sqCor_list = family_list = theta_list = list()
 
@@ -3185,7 +3738,7 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
     # if there are subtitles
     if(!missing(subtitles)){
         if(length(subtitles) != n_models){
-            stop("If argument 'subtitles' is provided, it must be of the same length as the number of models.")
+            stop(my_call, "If argument 'subtitles' is provided, it must be of the same length as the number of models. Current lengths: ", length(subtitles), " vs ", n_models, " .", call. = FALSE)
         } else {
             isSubtitles = TRUE
         }
@@ -3196,13 +3749,62 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
     # if there are titles
     if(!missing(titles)){
         if(length(titles) != n_models){
-            stop("If argument 'titles' is provided, it must be of the same length as the number of models.")
+            stop(my_call, "If argument 'titles' is provided, it must be of the same length as the number of models. Current lengths: ", length(titles), " vs ", n_models, " .", call. = FALSE)
         } else {
             isTitles = TRUE
         }
     } else {
         isTitles = FALSE
     }
+
+    #
+    # fitstat: which R2 to display?
+    #
+
+    if(missing(fitstat)){
+        # Default values:
+        #   - if all OLS: typical R2
+        #   - if any non-OLS: pseudo R2 + squared cor.
+        is_ols = sapply(all_models, function(x) deparse(x$call[[1]]) == "feols")
+
+        if(all(is_ols)){
+            if(any(sapply(all_models, function(x) "fixef_vars" %in% names(x)))){
+                # means any FE model
+                fitstat = c("r2", "wr2")
+            } else {
+                fitstat = c("r2", "ar2")
+            }
+        } else {
+            fitstat = c("sq.cor", "pr2", "bic")
+        }
+
+
+    } else if(isFALSE(fitstat) || (length(fitstat) == 1 && fitstat == "")){
+        fitstat = NULL
+    } else if("formula" %in% class(fitstat)){
+        check_arg(fitstat, "osf", "Argument 'fitstat' must be a one sided formula (or a character vector) containing 'aic', 'bic', 'll', or valid r2 types names (see function r2). REASON", call_depth = 1)
+        fitstat = attr(terms(fitstat), "term.labels")
+    } else {
+        check_arg(fitstat, "characterVector", "Argument 'fitstat' must be a character vector (or a one sided formula) containing 'aic', 'bic', 'll', or valid r2 types names (see function r2). REASON", call_depth = 1)
+    }
+
+    # checking the types
+    fitstat_type_allowed = c("sq.cor", "r2", "ar2", "pr2", "apr2", "wr2", "war2", "wpr2", "wapr2", "ll", "aic", "bic")
+    fitstat = unique(fitstat)
+
+    pblm = setdiff(fitstat, fitstat_type_allowed)
+    if(length(pblm) > 0){
+        stop(my_call, "Argument 'fitstat' must be a character vector (or a one sided formula) containing 'aic', 'bic', 'll', or valid r2 types names. ", enumerate_items(pblm, quote=TRUE), " not valid (see function r2).", call. = FALSE)
+    }
+
+    fitstat_dict_tex = c("sq.cor"="Squared Correlation", r2="R$^2$", ar2="Adjusted R$^2$", pr2="Pseudo R$^2$", apr2="Adjusted Pseudo R$^2$", wr2="Within R$^2$", war2="Within Adjusted R$^2$", wpr2="Within Pseudo R$^2$", wapr2="Whithin Adjusted Pseudo R$^2$", aic = "AIC", bic = "BIC", ll = "Log-Likelihood")
+
+    fitstat_dict_R = c("sq.cor"="Squared Corr.", r2="R2", ar2="Adjusted R2", pr2="Pseudo R2", apr2="Adj. Pseudo R2", wr2="Within R2", war2="Within Adj. R2", wpr2="Within Pseudo R2", wapr2="Whithin Adj. Pseudo R2", aic = "AIC", bic = "BIC", ll = "Log-Likelihood")
+
+    fitstat_dict = fitstat_dict_R
+    if(isTex) fitstat_dict = fitstat_dict_tex
+
+    # end: fitstat
 
     for(m in 1:n_models){
 
@@ -3372,7 +3974,8 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
         }
 
         if(isTex){
-            pval = cut(a[, 4], breaks = c(-1, signifCode, 100), labels = c(paste0("\\sym{",names(signifCode),"}"), ""))
+            # pval = cut(a[, 4], breaks = c(-1, signifCode, 100), labels = c(paste0("\\sym{",names(signifCode),"}"), ""))
+            pval = cut(a[, 4], breaks = c(-1, signifCode, 100), labels = c(tex_star(names(signifCode)), ""))
         } else {
             pval = cut(a[, 4], breaks = c(-1, signifCode, 100), labels = c(names(signifCode), ""))
         }
@@ -3400,23 +4003,49 @@ results2formattedList = function(..., se, dof = FALSE, cluster, digits=4, pseudo
         # La depvar
         depvar_list[[m]] <- depvar
 
-        # statistics
+        #
+        #  Fit statistics
+        #
+
         # Pseudo-R2 // AIC // BIC // N
         n <- nobs(x)
         obs_list[[m]] <- n
         convergence_list[[m]] = ifelse(is.null(x$convStatus), TRUE, x$convStatus)
 
         K <- x$nparams
-        ll <- logLik(x)
-        bic_list[[m]] <- round(BIC(x), 3)
-        aic_list[[m]] <- round(AIC(x), 3)
-        loglik_list[[m]] <- round(logLik(x), 3)
-        r2_list[[m]] <- round(as.vector(r2(x, "apr2")), 5)
-        sqCor_list[[m]] <- round(as.vector(r2(x, "sq.cor")), 3)
+
+        if(length(fitstat) == 0){
+            fitstat_list[[m]] = NA
+        } else {
+            fistat_format = list()
+
+            fun_format = ifelse(isTex, numberFormatLatex, numberFormatNormal)
+
+            if("aic" %in% fitstat) fistat_format[["aic"]] = fun_format(round(AIC(x), 3))
+            if("bic" %in% fitstat) fistat_format[["bic"]] = fun_format(round(BIC(x), 3))
+            if("ll" %in% fitstat) fistat_format[["ll"]] = fun_format(logLik(x))
+
+            # regular r2s
+            r2_type_allowed = c("sq.cor", "r2", "ar2", "pr2", "apr2", "wr2", "war2", "wpr2", "wapr2")
+            if(any(fitstat %in% r2_type_allowed)){
+                all_r2 = r2(x, intersect(fitstat, r2_type_allowed))
+                for(r2_val in names(all_r2)){
+                    nb = 5 - (r2_val == "sq.cor") * 2
+                    fistat_format[[r2_val]] = round(as.vector(all_r2[r2_val]), nb)
+                }
+            }
+
+            fitstat_list[[m]] = fistat_format[fitstat]
+        }
 
     }
 
-    res = list(se_type_list=se_type_list, var_list=var_list, coef_list=coef_list, coef_below=coef_below, sd_below=sd_below, depvar_list=depvar_list, obs_list=obs_list, r2_list=r2_list, aic_list=aic_list, bic_list=bic_list, loglik_list=loglik_list, convergence_list=convergence_list, sqCor_list=sqCor_list, factorNames=factorNames, isFactor=isFactor, nbFactor=nbFactor, slope_flag_list = slope_flag_list, slope_names=slope_names, useSummary=useSummary, model_names=model_names, family_list=family_list, theta_list=theta_list)
+    if(length(fitstat) > 0){
+        attr(fitstat_list, "format_names") = fitstat_dict[fitstat]
+    }
+
+
+    res = list(se_type_list=se_type_list, var_list=var_list, coef_list=coef_list, coef_below=coef_below, sd_below=sd_below, depvar_list=depvar_list, obs_list=obs_list, convergence_list=convergence_list, factorNames=factorNames, isFactor=isFactor, nbFactor=nbFactor, slope_flag_list = slope_flag_list, slope_names=slope_names, useSummary=useSummary, model_names=model_names, family_list=family_list, theta_list=theta_list, fitstat_list=fitstat_list)
 
     return(res)
 }
@@ -3543,6 +4172,8 @@ vcovClust <- function (cluster, myBread, scores, dof=FALSE, K, do.unclass=TRUE){
     # - myBread: original vcov
     # - scores
     # Note: if length(unique(cluster)) == n (i.e. White correction), then the dof are such that vcovClust is equivalent to vcovHC(res, type="HC1")
+    # Source: http://cameron.econ.ucdavis.edu/research/Cameron_Miller_JHR_2015_February.pdf
+    #         Cameron & Miller -- A Practitioner’s Guide to Cluster-Robust Inference
 
     n <- NROW(scores)
     if(missing(K)) K <- NCOL(scores)
@@ -3648,7 +4279,7 @@ terms_fixef = function(fml){
             qui = !grepl("\\]\\]$", var2check_double) | !grepl("\\[\\[", var2check_double) | lengths(strsplit(var2check_double, "\\[")) != 3
             if(any(qui)){
                 item_pblm = var2check_double[qui]
-                msg = paste0("Square bracket are special characters use **only** to designate varying slopes (see help). They are currenlty misused (it concerns ", enumerate_items(item_pblm, endVerb = FALSE), ").")
+                msg = paste0("Square bracket are special characters use **only** to designate varying slopes (see help). They are currenlty misused (it concerns ", enumerate_items(item_pblm, verb = FALSE), ").")
                 class(msg) = "try-error"
                 return(msg)
             }
@@ -3658,7 +4289,7 @@ terms_fixef = function(fml){
             qui = !grepl("\\]$", var2check_single) | lengths(strsplit(var2check_single, "\\[")) != 2
             if(any(qui)){
                 item_pblm = var2check_single[qui]
-                msg = paste0("Square bracket are special characters use **only** to designate varying slopes (see help). They are currenlty misused (it concerns ", enumerate_items(item_pblm, endVerb = FALSE), ").")
+                msg = paste0("Square bracket are special characters use **only** to designate varying slopes (see help). They are currenlty misused (it concerns ", enumerate_items(item_pblm, verb = FALSE), ").")
                 class(msg) = "try-error"
                 return(msg)
             }
@@ -4125,32 +4756,20 @@ numberFormatNormal = function(x){
 	sapply(x, numberFormat_single)
 }
 
-enumerate_items = function (x, endVerb = "is", addS = FALSE, past = FALSE, or = FALSE){
-	# function that enumerates items and add verbs
-	endVerb = match.arg(as.character(endVerb), c("is", "has", "no", "contain", "FALSE"))
-	if(endVerb == "FALSE") endVerb = "no"
-	n = length(x)
+mysignif = function (x, d = 2, r = 1){
 
-	if(past){
-		endWord = switch(endVerb, is = ifelse(n == 1, " was", " were"), no = "", contain = "contained", has="had")
-	} else {
-		endWord = switch(endVerb, is = ifelse(n == 1, " is", " are"), no = "", contain = ifelse(n == 1, " contains", " contain"), has = ifelse(n == 1, " has", " have"))
-	}
+    mysignif_single = function(x, d, r) {
+        if (is.na(x)) {
+            return(NA)
+        }
 
-	if (addS) {
-		startWord = ifelse(n == 1, " ", "s ")
-	} else {
-		startWord = ""
-	}
-
-	if (n == 1) {
-		res = paste0(startWord, x, endWord)
-	} else {
-	    and_or = ifelse(or, " or ", " and ")
-		res = paste0(startWord, paste0(x[-n], collapse = ", "), and_or, x[n], endWord)
-	}
-
-	res
+        if (abs(x) >= 10^(d - 1)){
+            return(round(x, r))
+        } else {
+            return(signif(x, d))
+        }
+    }
+    sapply(x, mysignif_single, d = d, r = r)
 }
 
 n_times = function(n){
@@ -4249,17 +4868,37 @@ quickUnclassFactor = function(x, addItem = FALSE){
 		return(res)
 	}
 
-	myOrder = order(x)
-	x_sorted = x[myOrder]
-	x_quf_sorted = cpp_unclassFactor(x_sorted)
-	x_quf = x_quf_sorted[order(myOrder)]
+    res = cpp_quf_gnl(x)
 
-	if(addItem){
-		res = list(x = x_quf, items = cpp_unik(x_sorted, tail(x_quf_sorted, 1)))
-		return(res)
-	} else {
-		return(x_quf)
-	}
+    if(addItem){
+        names(res) = c("x", "items")
+        return(res)
+    } else {
+        return(res$x_uf)
+    }
+
+
+
+#     if(is_little_endian()){
+#         res = cpp_quf_gnl(x)
+#         x_quf = res$x_uf
+#         items = res$x_unik
+#     } else {
+#         myOrder = order(x)
+#         x_sorted = x[myOrder]
+#         x_quf_sorted = cpp_unclassFactor(x_sorted)
+#         # x_quf = x_quf_sorted[order(myOrder)]
+#         x_quf = integer(length(x_sorted))
+#         x_quf[myOrder] = x_quf_sorted
+#         if(addItem) items = cpp_unik(x_sorted, tail(x_quf_sorted, 1))
+#     }
+#
+# 	if(addItem){
+# 		res = list(x = x_quf, items = items)
+# 		return(res)
+# 	} else {
+# 		return(x_quf)
+# 	}
 }
 
 
@@ -4276,30 +4915,6 @@ getItems = function(x){
 	}
 
 	return(res)
-}
-
-isVector = function(x){
-	# it seems that when you subselect in data.table
-	# sometimes it does not yield a vector
-	# so i cannot use is.vecyor to check the consistency
-
-	if(is.vector(x)){
-		return(TRUE)
-	} else {
-		# if(class(x) %in% c("integer", "numeric", "character", "factor", "Date", "DateTime") && is.null(dim(x))){
-		if(is.null(dim(x)) && !is.list(x)){
-			return(TRUE)
-		}
-	}
-	return(FALSE)
-}
-
-ifsingle = function(x, yes, no){
-	if(length(x) == 1){
-		return(yes)
-	} else {
-		return(no)
-	}
 }
 
 missnull = function(x){
@@ -4391,7 +5006,7 @@ check_dots_args = function(mc, dots_args = c(), suggest_args = c()){
                 suggest = paste0(" (fyi, another of its main arguments is ", suggest_info, ".)")
             }
         } else if(length(suggest_info) >= 2){
-            suggest = paste0(" (fyi, some of its main arguments are ", enumerate_items(suggest_info, endVerb = "no"), ".)")
+            suggest = paste0(" (fyi, some of its main arguments are ", enumerate_items(suggest_info, verb = "no"), ".)")
         }
 
         msg = paste0(enumerate_items(args_invalid), " not ", ifsingle(args_invalid, "a valid argument", "valid arguments"), " for function ", fun_name, ".", suggest)
@@ -4441,116 +5056,79 @@ extract_fe_slope = function(t){
     list(fixef_vars=fixef_vars, slope_vars=slope_vars, slope_fe=slope_fe, slope_terms=slope_terms, fe_all=fe_all)
 }
 
-check_arg = function(x, type, message, mustBeThere = TRUE){
-    # function that makes it easy to check arguments:
-    #  provides precise and meaningful error messages
+format_se_type = function(x, width){
+    # we make 'nice' se types
 
-    type = tolower(type)
-
-    stop_now = function(...){
-        # message is a global
-
-        reason = paste0(...)
-
-        print(reason)
-
-        # The original call
-        my_call = deparse(sys.calls()[[sys.nframe()-2]])[1] # call can have svl lines
-        nmax = 40
-        if(nchar(my_call) > nmax) my_call = paste0(substr(my_call, 1, nmax-1), "...")
-
-        # The formatted message
-        msg_split = strsplit(message, " ?REASON ?")[[1]]
-
-        msg_new = c(msg_split[1], reason, msg_split[-1])
-        msg_new = paste(msg_new, collapse = " ")
-
-        stop("error in ", my_call, ":\n", msg_new, call. = FALSE)
+    if(!grepl("\\(", x)){
+        # means not clustered
+        return(x)
     }
 
-    if(missing(x)){
-        if(mustBeThere){
-            stop_now("But it is missing.")
-        } else {
-            return(NULL)
+    # Now the FEs
+    all_fe = gsub(".+\\((.+)\\)", "\\1", x)
+
+    all_fe_split = gsub(" ", "", strsplit(all_fe, "&")[[1]])
+    n_fe = length(all_fe_split)
+    n_char = nchar(all_fe_split)
+
+    if(n_fe == 1 && !grepl("\\^", all_fe_split[1])){
+        se_formatted = paste0("1-way: ", all_fe_split[1])
+        if(nchar(se_formatted) > width){
+            se_formatted = paste0(substr(se_formatted, 1, width - 2), "..")
+        }
+        return(se_formatted)
+    }
+
+    if(width < 6 + sum(n_char) + (n_fe-1) * 3){
+        qui = n_char > 5
+        for(i in which(qui)){
+            if(grepl("\\^", all_fe_split[i])){
+                single_split = strsplit(all_fe_split[i], "\\^")[[1]]
+                qui_bis = nchar(single_split) > 4
+                single_split[qui_bis] = paste0(substr(single_split[qui_bis], 1, 3), ".")
+                all_fe_split[i] = paste(single_split, collapse = "^")
+            } else {
+                all_fe_split[i] = paste0(substr(all_fe_split[i], 1, 4), ".")
+            }
         }
     }
 
-    isSingle = FALSE
-    if(grepl("single|scalar", type)){
-        isSingle = TRUE
-        if(length(x) == 0){
-            stop_now("But it is of length 0.")
-        } else if(length(x) != 1){
-            stop_now("But it is of length ", length(x), ".")
-        }
+    se_formatted = paste0(n_fe, "-way: ", paste(all_fe_split, collapse = " & "))
+
+    # if still too large, we trim right
+    if(nchar(se_formatted) > width){
+        # se_formatted = gsub("-way: ", "way: ", se_formatted)
+        se_formatted = paste0(substr(se_formatted, 1, width - 2), "..")
     }
 
-    if(grepl("character", type) && !is.character(x)){
-        stop_now("But it is not of type character.")
-    }
-
-    if(grepl("logical", type) && !is.logical(x)){
-        stop_now("But it is not logical.")
-    }
-
-    if(grepl("numeric|integer", type) && !is.numeric(x)){
-        stop_now("But it is not numeric.")
-    }
-
-    if(!grepl("naok", type) && anyNA(x)){
-        if(isSingle){
-            stop_now("But it is equal to NA.")
-        } else {
-            stop_now("But it contains NAs.")
-        }
-    }
-
-    if(grepl("integer", type) && !all(x %% 1 == 0)){
-        stop_now("But it is not integer (although numeric).")
-    }
-
-    # Greater than, lower than
-    myExtract = function(expr, trim=2){
-        # type is global
-        start = gregexpr(expr, type)[[1]] + trim
-        length = attr(start, "match.length") - trim
-        res = substr(type, start, start + length - 1)
-        as.numeric(res)
-    }
-
-    if(grepl(expr <- "ge[[:digit:]]+", type)){
-        n = myExtract(expr)
-        if( any(x < n) ) stop_now("But it is lower than ", n, ".")
-    }
-
-    if(grepl(expr <- "gt[[:digit:]]+", type)){
-        n = myExtract(expr)
-        if( any(x == n) ) stop_now("But it is equal to ", n, " (while it should be *striclty* greater).")
-        if( any(x < n) ) stop_now("But it is lower than ", n, ".")
-    }
-
-    if(grepl(expr <- "le[[:digit:]]+", type)){
-        n = myExtract(expr)
-        if( !any(x > n) ) stop_now("But it is greater than ", n, ".")
-    }
-
-    if(grepl(expr <- "lt[[:digit:]]+", type)){
-        n = myExtract(expr)
-        if( any(x == n) ) stop_now("But it is equal to ", n, " (while it should be *striclty* lower).")
-        if( any(x > n) ) stop_now("But it is greater than ", n, ".")
-    }
-
+    se_formatted
 }
 
-# Avoids the problem of multiple lines deparse
-deparse_long = function(x){
-    dep_x = deparse(x)
-    if(length(dep_x) == 1){
-        return(dep_x)
+tex_star = function(x){
+    qui = nchar(x) > 0
+    x[qui] = paste0("$^{", x[qui], "}$")
+    x
+}
+
+
+extract_pipe = function(fml){
+    # We extract the elements after the pipe
+
+    FML = Formula::Formula(fml)
+    n_fml = length(FML)
+    n_rhs = n_fml[2]
+
+    if(n_rhs == 1){
+        fml_new = formula(FML, lhs = n_fml[1], rhs = 1)
+        pipe = NULL
+    } else if(n_rhs == 2){
+        fml_new = formula(FML, lhs = 1, rhs = 1)
+        pipe = as.expression(formula(FML, lhs = 0, rhs = 2)[[2]])
     } else {
-        return(paste(gsub("^ +", "", dep_x), collapse = ""))
+        stop("fml must be at *most* a two part formula (currently it is ", n_rhs, " parts).")
     }
+
+    list(fml=fml_new, pipe=pipe)
 }
 
 #### ................. ####
@@ -5472,7 +6050,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 				all_var_names = fml2varnames(cluster)
 
 				if(length(all_var_names) != nway){
-					stop("Asked for ", nway, "-way clustering but evaluating argument cluster leads to ", length(all_var_names), " clusters (", enumerate_items(all_var_names, endVerb = "no"), "). Please provide exactly ", nway, " clusters.")
+					stop("Asked for ", nway, "-way clustering but evaluating argument cluster leads to ", length(all_var_names), " clusters (", enumerate_items(all_var_names, verb = "no"), "). Please provide exactly ", nway, " clusters.")
 				}
 
 				cluster = all_var_names # Now a regular character vector
@@ -5549,7 +6127,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 
 						# we check length consistency
 						if(NROW(data) != (object$nobs + length(object$obsRemoved))){
-							stop("To evaluate argument 'cluster', we fetched the variable", enumerate_items(var2fetch, addS = TRUE, endVerb = "no"), " in the original dataset (", deparse_long(dataName), "), yet the dataset doesn't have the same number of observations as was used in the estimation (", NROW(data), " instead of ", object$nobs + length(object$obsRemoved), ").", suffix)
+							stop("To evaluate argument 'cluster', we fetched the variable", enumerate_items(var2fetch, addS = TRUE, verb = "no"), " in the original dataset (", deparse_long(dataName), "), yet the dataset doesn't have the same number of observations as was used in the estimation (", NROW(data), " instead of ", object$nobs + length(object$obsRemoved), ").", suffix)
 						}
 
 						if(length(object$obsRemoved)){
@@ -5562,7 +6140,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 						if(anyNA(data)){
 							varsNA = sapply(data, anyNA)
 							varsNA = names(varsNA)[varsNA]
-							stop("To evaluate argument 'cluster', we fetched the variable", enumerate_items(varsNA, addS = TRUE, endVerb = "no"), " in the original dataset (", deparse_long(dataName), "). But ", ifsingle(varsNA, "this variable", "these variables"), " contain", ifsingle(varsNA, "s", ""), " NAs", msgRemoved, ". This is not allowed.", suffix)
+							stop("To evaluate argument 'cluster', we fetched the variable", enumerate_items(varsNA, addS = TRUE, verb = "no"), " in the original dataset (", deparse_long(dataName), "). But ", ifsingle(varsNA, "this variable", "these variables"), " contain", ifsingle(varsNA, "s", ""), " NAs", msgRemoved, ". This is not allowed.", suffix)
 						}
 
 						# We create the cluster list
@@ -5629,7 +6207,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 					cluster = list(cluster)
 
 				} else if(! (is.list(cluster) && length(cluster) == 1)){
-					stop("For one way clustering, the argument 'cluster' must be either the name of a cluster variable (e.g. \"dum_1\"), a vector (e.g. data$dum_1), a list containing the vector of clusters (e.g. list(data$dum_1)), or a one-sided formula (e.g. ~dum_1). Currently the class of cluster is ", enumerate_items(class(cluster), endVerb = "no"), ".", suffix)
+					stop("For one way clustering, the argument 'cluster' must be either the name of a cluster variable (e.g. \"dum_1\"), a vector (e.g. data$dum_1), a list containing the vector of clusters (e.g. list(data$dum_1)), or a one-sided formula (e.g. ~dum_1). Currently the class of cluster is ", enumerate_items(class(cluster), verb = "no"), ".", suffix)
 
 				}
 			} else if(length(cluster) != nway){
@@ -5639,7 +6217,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 				stop(nway, "-way clustering is asked for, but the length of argument 'cluster' is ", length(cluster), " (it should be ", nway, "). Alternatively, you can use ", msgList, " or a one-sided formula.", suffix)
 
 			} else if(!is.list(cluster)){
-				stop("For ", nway, "-way clustering, the argument 'cluster' must be either a vector of cluster variables (e.g. c(\"", paste0("dum_", 1:nway, collapse = "\", \""), "\")), a list containing the vector of clusters (e.g. data[, c(\"", paste0("dum_", 1:nway, collapse = "\", \""), "\")]), or a one-sided formula (e.g. ~", paste0("dum_", 1:nway, collapse = "+"), "). Currently the class of cluster is: ", enumerate_items(class(cluster), endVerb = "no"), ".", suffix)
+				stop("For ", nway, "-way clustering, the argument 'cluster' must be either a vector of cluster variables (e.g. c(\"", paste0("dum_", 1:nway, collapse = "\", \""), "\")), a list containing the vector of clusters (e.g. data[, c(\"", paste0("dum_", 1:nway, collapse = "\", \""), "\")]), or a one-sided formula (e.g. ~", paste0("dum_", 1:nway, collapse = "+"), "). Currently the class of cluster is: ", enumerate_items(class(cluster), verb = "no"), ".", suffix)
 			}
 
 			cluster = as.list(cluster)
@@ -5648,7 +6226,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 		# now we check the lengths:
 		n_per_cluster = sapply(cluster, length)
 		if(!all(diff(n_per_cluster) == 0)){
-			stop("The vectors of the argument 'cluster' must be of the same length. Currently the lengths are: ", enumerate_items(n_per_cluster, endVerb = "no"), ".")
+			stop("The vectors of the argument 'cluster' must be of the same length. Currently the lengths are: ", enumerate_items(n_per_cluster, verb = "no"), ".")
 		}
 
 		# Either they are of the same length of the data
@@ -5668,7 +6246,7 @@ vcov.fixest = function(object, se, cluster, dof = TRUE, exact_dof = FALSE, force
 		if(any(varsNA)){
 			varsNA = which(varsNA)
 			nb_name = c("1st", "2nd", "3rd", "4th")
-			stop("In argument cluster, the ", enumerate_items(nb_name[varsNA], endVerb = "no"), " cluster variable", ifsingle(varsNA, " contains", "s contain"), " NAs", msgRemoved, ". This is not allowed.")
+			stop("In argument cluster, the ", enumerate_items(nb_name[varsNA], verb = "no"), " cluster variable", ifsingle(varsNA, " contains", "s contain"), " NAs", msgRemoved, ". This is not allowed.")
 		}
 
 
@@ -6359,7 +6937,7 @@ getFixest_nthreads = function(){
 
 #' Sets/gets the dictionary used in \code{esttex}
 #'
-#' Sets/gets the default dictionnay used in the function \code{\link[fixest]{esttex}}. The dictionaries are used to relabel variables (usually towards a fancier, more explicit formatting) when exporting them into a Latex table. By setting the dictionary with \code{setFixest_dict}, you can avoid providing the argument \code{dict} in function \code{\link[fixest]{esttex}}.
+#' Sets/gets the default dictionary used in the function \code{\link[fixest]{esttex}}. The dictionaries are used to relabel variables (usually towards a fancier, more explicit formatting) when exporting them into a Latex table. By setting the dictionary with \code{setFixest_dict}, you can avoid providing the argument \code{dict} in function \code{\link[fixest]{esttex}}.
 #'
 #'
 #' @param dict A named character vector. E.g. to change my variable named "a" and "b" to (resp.) "$log(a)$" and "$bonus^3$", then use \code{dict = c(a="$log(a)$", b3="$bonus^3$")}.
@@ -6410,7 +6988,7 @@ setFixest_dict = function(dict){
 	if(any(td > 1)){
 		qui = which(dict_names %in% names(td)[td > 1])
 		name_dup = unique(names(dict)[qui])
-		stop("Argument 'dict' contains duplicated names: ", enumerate_items(name_dup, endVerb = "no"))
+		stop("Argument 'dict' contains duplicated names: ", enumerate_items(name_dup, verb = "no"))
 	}
 
 	options("fixest_dict" = dict)
