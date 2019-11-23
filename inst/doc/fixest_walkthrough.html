@@ -12,7 +12,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2019-11-19" />
+<meta name="date" content="2019-11-22" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -1512,7 +1512,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2019-11-19</h4>
+<h4 class="date">2019-11-22</h4>
 
 </div>
 
@@ -1977,11 +1977,11 @@ summary(fixedEffects)
 #&gt; Variance                  1.63        1.23    1.86 0.0129
 #&gt; 
 #&gt; COEFFICIENTS:
-#&gt;   Origin:    BE    LU    NL    DE    GB                 
-#&gt;           23.56 20.23 24.43 24.71 23.75 ... 10 remaining
+#&gt;   Origin:    SE    PT    NL    LU    IT                 
+#&gt;           23.25 22.44 24.43 20.23 24.33 ... 10 remaining
 #&gt; -----
-#&gt;   Destination: LU    BE    NL    DE    IE                 
-#&gt;                 0 2.696 3.231 4.323 2.589 ... 10 remaining
+#&gt;   Destination:   SE    PT    NL LU    IT                 
+#&gt;                3.57 2.552 3.231  0 4.218 ... 10 remaining
 #&gt; -----
 #&gt;   Product: 1     2      3     4      5                 
 #&gt;            0 1.414 0.6562 1.449 -1.521 ... 15 remaining
@@ -2033,11 +2033,11 @@ est_vs
 #&gt; Variance                          1.74                0.069
 #&gt; 
 #&gt; COEFFICIENTS:
-#&gt;   species: setosa versicolor virginica
-#&gt;             2.927      1.879    0.3036
+#&gt;   species: versicolor virginica setosa
+#&gt;                 1.879    0.3036  2.927
 #&gt; -----
-#&gt;   x3 (slopes: species): setosa versicolor virginica
-#&gt;                         0.3667     0.6599    0.8909</code></pre>
+#&gt;   x3 (slopes: species): versicolor virginica setosa
+#&gt;                             0.6599    0.8909 0.3667</code></pre>
 </div>
 <div id="combining-several-fixed-effects" class="section level2">
 <h2><span class="header-section-number">2.2</span> Combining several fixed-effects</h2>
@@ -2160,12 +2160,12 @@ base = data.frame(x, y, z)</code></pre>
 #&gt; Observations: 1,000 
 #&gt; Standard-errors: Standard 
 #&gt;   Estimate Std. Error z value  Pr(&gt;|z|)    
-#&gt; a   2.0254   0.011243  180.14 &lt; 2.2e-16 ***
-#&gt; b   3.0071   0.012519  240.20 &lt; 2.2e-16 ***
+#&gt; a   2.0319   0.011298  179.84 &lt; 2.2e-16 ***
+#&gt; b   3.0157   0.012959  232.72 &lt; 2.2e-16 ***
 #&gt; ---
 #&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-#&gt; Log-likelihood: -3,547.91   Adj. Pseudo-R2: 0.94268 
-#&gt;            BIC:  7,123.45     Squared Cor.: 0.99345</code></pre>
+#&gt; Log-likelihood: -3,626.84   Adj. Pseudo-R2: 0.9367 
+#&gt;            BIC:  7,281.31     Squared Cor.: 0.99159</code></pre>
 <p>We can see that we obtain coefficients close to the generating values.</p>
 <div id="adding-fixed-effects-to-non-linear-in-parameters-models" class="section level3">
 <h3><span class="header-section-number">2.5.1</span> Adding fixed-effects to non-linear in parameters models</h3>
@@ -2190,22 +2190,22 @@ base$z_bis = z_bis</code></pre>
 result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = list(b=1), lower = list(b=0))
 # The coef should be around 3
 coef(result_NL_fe)
-#&gt;        b 
-#&gt; 2.963777
+#&gt;       b 
+#&gt; 3.00565
 # the gamma and the exponential of the fixed-effects should be similar
 rbind(gamma, exp(fixef(result_NL_fe)$id))
-#&gt;               14         18         11        9          2         5
-#&gt; gamma 0.20216178 0.01557846 0.01388859 4.069591 2.14674729 0.6914022
-#&gt;       0.01424967 0.01229903 1.81152536 1.454826 0.02380399 2.1675089
-#&gt;                 4        13        10        1       20         8       19
-#&gt; gamma 0.001561091 0.7641319 1.4544435 0.332535 1.782739 0.2532424 0.603729
-#&gt;       4.119423049 0.6148463 0.3382854 0.203003 2.442986 0.7841932 2.828939
-#&gt;                15          3        12        17          16         6
-#&gt; gamma 0.007909147 0.08556873 1.8088030 0.4416922 0.008826495 2.7993348
-#&gt;       0.092638487 0.02050719 0.2565906 0.4520485 1.821192911 0.7122348
-#&gt;                 7
-#&gt; gamma 2.392885928
-#&gt;       0.007593506</code></pre>
+#&gt;                2         17           20         4           7          5
+#&gt; gamma 2.79492534 0.08872863 0.0008413015 0.2259703 0.002133664 1.00874978
+#&gt;       0.09334733 0.75513419 1.2657439756 0.2345213 0.947952628 0.01072864
+#&gt;               6         12        13           3        16         14
+#&gt; gamma 0.9428807 0.05975179 0.7352481 1.746031537 0.1058210 0.02670944
+#&gt;       1.0118936 0.03349028 1.4687853 0.008358586 0.3603113 1.61192121
+#&gt;                8         9         18        11        10         1
+#&gt; gamma 1.46179126 1.6094976 0.03813667 0.3518205 0.7450913 0.7069153
+#&gt;       0.06603475 0.7411054 0.71242931 0.1140938 1.7626529 2.8267866
+#&gt;               19         15
+#&gt; gamma 0.02223765 1.26242843
+#&gt;       0.03169395 0.04452463</code></pre>
 <p>As we can see, we obtain the “right” estimates.</p>
 </div>
 </div>
