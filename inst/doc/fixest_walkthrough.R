@@ -14,23 +14,23 @@ tab = head(trade)
 knitr::kable(tab)
 
 ## ------------------------------------------------------------------------
-gravity_results <- feglm(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+gravity_pois <- feglm(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
 ## ------------------------------------------------------------------------
-print(gravity_results)
+print(gravity_pois)
 
 ## ------------------------------------------------------------------------
-summary(gravity_results, se = "twoway")
+summary(gravity_pois, se = "twoway")
 
 ## ------------------------------------------------------------------------
 # Equivalent ways of clustering the SEs:
 # One-way clustering is deduced from the arguent 'cluster'
 # - using the vector:
-summary(gravity_results, cluster = trade$Product)
+summary(gravity_pois, cluster = trade$Product)
 # - by reference:
-summary(gravity_results, cluster = "Product")
+summary(gravity_pois, cluster = "Product")
 # - with a formula:
-summary(gravity_results, cluster = ~Product)
+summary(gravity_pois, cluster = ~Product)
 
 ## ------------------------------------------------------------------------
 gravity_simple = feglm(Euros ~ log(dist_km), trade)
@@ -42,54 +42,54 @@ summary(gravity_simple, cluster = trade[, c("Origin", "Destination")])
 summary(gravity_simple, cluster = ~Origin+Destination)
 
 ## ------------------------------------------------------------------------
-gravity_results_ols <- feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+gravity_ols <- feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
 ## ------------------------------------------------------------------------
-gravity_results_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+gravity_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  esttable(gravity_results, gravity_results_negbin, gravity_results_ols,
-#           se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
+#  etable(gravity_pois, gravity_negbin, gravity_ols,
+#           se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
 
 ## ---- echo=FALSE, results='asis'-----------------------------------------
-tab = esttable(gravity_results, gravity_results_negbin, gravity_results_ols, se = "twoway", titles = c("Poisson", "Negative Binomial", "Gaussian"))
+tab = etable(gravity_pois, gravity_negbin, gravity_ols, se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
 # problem to display the second empty line in markdown
 knitr::kable(tab[-2, ])
 
 ## ------------------------------------------------------------------------
-gravity_subcluster = list()
-all_clusters = c("Year", "Destination", "Origin", "Product")
-for(i in 1:4){
-	gravity_subcluster[[i]] = feglm(Euros ~ log(dist_km), trade, fixef = all_clusters[1:i])
+gravity_subfe = list()
+all_FEs = c("Year", "Destination", "Origin")
+for(i in 0:3){
+	gravity_subfe[[i+1]] = feglm(Euros ~ log(dist_km), trade, fixef = all_FEs[0:i])
 }
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  esttable(gravity_subcluster, cluster = ~Origin+Destination)
+#  etable(gravity_subfe, cluster = ~Origin+Destination)
 
 ## ---- echo=FALSE, results='asis'-----------------------------------------
-tab = esttable(gravity_subcluster, cluster = ~Origin+Destination)
+tab = etable(gravity_subfe, cluster = ~Origin+Destination)
 knitr::kable(tab)
 
 ## ------------------------------------------------------------------------
 # with two-way clustered SEs
-esttex(gravity_subcluster, cluster = ~Origin+Destination)
+etable(gravity_subfe, cluster = ~Origin+Destination, tex = TRUE)
 
 ## ---- eval=FALSE---------------------------------------------------------
 #  # we set the dictionary once and for all
 #  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 #  # 1st export: we change the signif code and drop the intercept
-#  esttex(gravity_subcluster, signifCode = c("a" = 0.01, "b" = 0.05),
-#         drop = "Int", dict = myDict, file = "Estimation Table.tex",
+#  etable(gravity_subfe, signifCode = c("a" = 0.01, "b" = 0.05),
+#         drop = "Const", dict = myDict, file = "Estimation Tables.tex",
 #         replace = TRUE, title = "First export -- normal Standard-errors")
 #  # 2nd export: clustered S-E + distance as the first coefficient
-#  esttex(gravity_subcluster, se = "cluster", cluster = ~Product, order = "dist",
-#         dict = myDict, file = "Estimation Table.tex",
+#  etable(gravity_subfe, cluster = ~Product, order = "Dist",
+#         dict = myDict, file = "Estimation Tables.tex",
 #         title = "Second export -- clustered standard-errors (on Product variable)")
 #  
 
 ## ------------------------------------------------------------------------
-fixedEffects <- fixef(gravity_results)
+fixedEffects <- fixef(gravity_pois)
 summary(fixedEffects)
 
 ## ------------------------------------------------------------------------
@@ -121,18 +121,54 @@ est_comb
 ## ------------------------------------------------------------------------
 fixef(est_comb)[[1]]
 
-## ------------------------------------------------------------------------
+## ---- echo = FALSE-------------------------------------------------------
+# "::" = function(a, b) NULL
+
+## ---- eval = FALSE-------------------------------------------------------
+#  # Sample data illustrating the DiD
+#  data(base_did)
+#  head(base_did)
+#  # Estimation of yearly effect
+#  # We also add individual/time fixed-effects:
+#  est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
+#  est_did
+
+## ---- echo = FALSE-------------------------------------------------------
 # Sample data illustrating the DiD
 data(base_did)
 head(base_did)
-# Estimation of yearly effect (they are automatically added)
+# Estimation of yearly effect
 # We also add individual/time fixed-effects:
-est_did = did_estimate_yearly_effects(y ~ x1 | id + period, base_did,
-                                      treat_time = ~treat+period, reference = 5)
+est_did = eval(parse(text = "feols(y ~ x1 + treat::period(5) | id + period, base_did)"))
 est_did
 
 ## ---- fig.width=7--------------------------------------------------------
-did_plot_yearly_effects(est_did)
+coefplot(est_did)
+
+## ------------------------------------------------------------------------
+est1 = feols(y~l(x1, 0:1), base_did, panel.id = ~id+period)
+est2 = feols(f(y)~l(x1, -1:1), base_did, panel.id = ~id+period)
+est3 = feols(l(y)~l(x1, 0:3), base_did, panel.id = ~id+period)
+etable(est1, est2, est3, order = "f", drop="Int")
+
+## ------------------------------------------------------------------------
+# setting up the panel
+pdat = panel(base_did, ~id+period)
+# Now the panel.id argument is not required
+est1 = feols(y~l(x1, 0:1), pdat)
+est2 = feols(f(y)~l(x1, -1:1), pdat)
+# You can use sub selections of the panel data
+est_sub = feols(y~l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
+etable(est1, est2, est_sub, order = "f", drop="Int")
+
+## ------------------------------------------------------------------------
+library(data.table)
+pdat_dt = panel(as.data.table(base_did), ~id+period)
+# we create a lagged value of the variable x1
+pdat_dt[, x1_l1 := l(x1)]
+# Now 
+pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
+head(pdat_dt)
 
 ## ------------------------------------------------------------------------
 base_lag = base_did
@@ -178,7 +214,7 @@ result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = li
 # The coef should be around 3
 coef(result_NL_fe)
 # the gamma and the exponential of the fixed-effects should be similar
-rbind(gamma, exp(fixef(result_NL_fe)$id))
+rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 
 
 ## ---- eval = FALSE-------------------------------------------------------

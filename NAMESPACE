@@ -8,17 +8,33 @@ useDynLib(fixest, .registration = TRUE)
 export(feNmlm, femlm, feols, feglm, fepois, fenegbin)
 export(feglm.fit)
 # misc funs
-export(esttex, esttable, collinearity, obs2remove, r2,
-       did_estimate_yearly_effects, did_plot_yearly_effects, errbar, did_means)
+export(etable, esttex, esttable, collinearity, obs2remove, r2)
+# did
+export(did_means)
+# graph
+export(coefplot)
+# small funs
+export(coeftable, ctable, se, tstat, pvalue)
+# dof
+export(dof)
+# Lag related
+export(panel, unpanel, f, l)
+# interactions
+export(i, interact)
 # setters & getters
 exportPattern("^(s|g)etFixest")
+
+# deprecated
+export(did_estimate_yearly_effects, did_plot_yearly_effects, errbar)
 
 # Base methods
 S3method(print, fixest)
 S3method(summary, fixest.fixef)
 S3method(summary, fixest.obs2remove)
 S3method(summary, fixest)
+export(summ) # alias for summary.fixest
 S3method(plot, fixest.fixef)
+S3method("[", fixest_panel) # Lag related
 
 # Stats methods
 S3method(nobs, fixest)
@@ -56,7 +72,7 @@ importFrom(stats, cor, dnorm, lm, model.matrix, nlminb, optim,
 			  pnorm, qnorm, as.formula, terms, var, sd, formula,
 			  nobs, AIC, BIC, update, predict, fitted, fitted.values,
 			  resid, residuals, logLik, coef, coefficients, lag,
-			  confint, vcov, na.omit, model.frame, "na.pass", poisson)
+			  confint, vcov, na.omit, model.frame, "na.pass", poisson, pt)
 
 importFrom(MASS, ginv)
 
@@ -67,7 +83,7 @@ importFrom(Formula, Formula)
 importFrom(Rcpp, evalCpp)
 
 importFrom(graphics, par, plot, box, axis, abline, points, text, title,
-           lines, polygon, segments)
+           lines, polygon, segments, plot.default)
 
 
 

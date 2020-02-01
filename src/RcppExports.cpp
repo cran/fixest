@@ -576,6 +576,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_check_nested
+IntegerVector cpp_check_nested(SEXP fe_list, SEXP cluster_list, IntegerVector fe_sizes, int n);
+RcppExport SEXP _fixest_cpp_check_nested(SEXP fe_listSEXP, SEXP cluster_listSEXP, SEXP fe_sizesSEXP, SEXP nSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type fe_list(fe_listSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type cluster_list(cluster_listSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type fe_sizes(fe_sizesSEXP);
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_check_nested(fe_list, cluster_list, fe_sizes, n));
+    return rcpp_result_gen;
+END_RCPP
+}
 // get_nb_threads
 int get_nb_threads();
 RcppExport SEXP _fixest_get_nb_threads() {
@@ -824,6 +838,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpppar_check_only_0
+IntegerVector cpppar_check_only_0(SEXP x_mat, int n, int nthreads);
+RcppExport SEXP _fixest_cpppar_check_only_0(SEXP x_matSEXP, SEXP nSEXP, SEXP nthreadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type x_mat(x_matSEXP);
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< int >::type nthreads(nthreadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpppar_check_only_0(x_mat, n, nthreads));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_quf_str
 List cpp_quf_str(SEXP x);
 RcppExport SEXP _fixest_cpp_quf_str(SEXP xSEXP) {
@@ -843,6 +870,22 @@ BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type x(xSEXP);
     rcpp_result_gen = Rcpp::wrap(cpp_quf_gnl(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpppar_quf_table_sum
+List cpppar_quf_table_sum(SEXP x, SEXP y, bool do_sum_y, int type, IntegerVector only_slope, int nthreads);
+RcppExport SEXP _fixest_cpppar_quf_table_sum(SEXP xSEXP, SEXP ySEXP, SEXP do_sum_ySEXP, SEXP typeSEXP, SEXP only_slopeSEXP, SEXP nthreadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type x(xSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type y(ySEXP);
+    Rcpp::traits::input_parameter< bool >::type do_sum_y(do_sum_ySEXP);
+    Rcpp::traits::input_parameter< int >::type type(typeSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type only_slope(only_slopeSEXP);
+    Rcpp::traits::input_parameter< int >::type nthreads(nthreadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpppar_quf_table_sum(x, y, do_sum_y, type, only_slope, nthreads));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -883,6 +926,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fixest_cpp_find_duplicates", (DL_FUNC) &_fixest_cpp_find_duplicates, 2},
     {"_fixest_cpp_pgcd", (DL_FUNC) &_fixest_cpp_pgcd, 1},
     {"_fixest_cpp_lag_obs", (DL_FUNC) &_fixest_cpp_lag_obs, 3},
+    {"_fixest_cpp_check_nested", (DL_FUNC) &_fixest_cpp_check_nested, 4},
     {"_fixest_get_nb_threads", (DL_FUNC) &_fixest_get_nb_threads, 0},
     {"_fixest_cpppar_exp", (DL_FUNC) &_fixest_cpppar_exp, 2},
     {"_fixest_cpppar_log", (DL_FUNC) &_fixest_cpppar_log, 2},
@@ -903,8 +947,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fixest_cpppar_which_na_inf_vec", (DL_FUNC) &_fixest_cpppar_which_na_inf_vec, 2},
     {"_fixest_cpppar_which_na_inf_mat", (DL_FUNC) &_fixest_cpppar_which_na_inf_mat, 2},
     {"_fixest_cpppar_cond_means", (DL_FUNC) &_fixest_cpppar_cond_means, 3},
+    {"_fixest_cpppar_check_only_0", (DL_FUNC) &_fixest_cpppar_check_only_0, 3},
     {"_fixest_cpp_quf_str", (DL_FUNC) &_fixest_cpp_quf_str, 1},
     {"_fixest_cpp_quf_gnl", (DL_FUNC) &_fixest_cpp_quf_gnl, 1},
+    {"_fixest_cpppar_quf_table_sum", (DL_FUNC) &_fixest_cpppar_quf_table_sum, 6},
     {NULL, NULL, 0}
 };
 
