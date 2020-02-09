@@ -529,6 +529,8 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	# dict: a 'named' vector
 	# file: a character string
 
+
+
     useSummary = TRUE
 	if(missing(se) && missing(cluster)){
 		useSummary = FALSE
@@ -550,7 +552,7 @@ esttex <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway
 	# to get the model names
 	dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-	info = results2formattedList(..., se=se, dof=dof, fitstat=fitstat, cluster=cluster, digits=digits, sdBelow=sdBelow, signifCode=signifCode, subtitles=subtitles, yesNoFixef=yesNoFixef, keepFactors=keepFactors, isTex = TRUE, useSummary=useSummary, dots_call=dots_call, powerBelow=powerBelow, dict=dict, interaction.combine=interaction.combine)
+	info = results2formattedList(..., isTex = TRUE, useSummary=useSummary, se = se, dof = dof, cluster = cluster, digits = digits, fitstat = fitstat, title = title, sdBelow = sdBelow, drop = drop, order = order, dict = dict, file = file, replace = replace, convergence = convergence, signifCode = signifCode, label = label, subtitles = subtitles, fixef_sizes = fixef_sizes, yesNoFixef = yesNoFixef, keepFactors = keepFactors, show_family = family, powerBelow = powerBelow, interaction.combine = interaction.combine, dots_call = dots_call)
 
     res = etable_internal_latex(info)
 
@@ -582,7 +584,7 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
 	# to get the model names
 	dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-	info = results2formattedList(..., se=se, dof = dof, cluster=cluster, digits=digits, signifCode=signifCode, subtitles=subtitles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call, fitstat=fitstat, yesNoFixef = c("Yes", "No"))
+	info = results2formattedList(..., se=se, dof = dof, cluster=cluster, digits=digits, signifCode=signifCode, subtitles=subtitles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call, fitstat=fitstat, yesNoFixef = c("Yes", "No"), show_depvar = depvar, show_family = family)
 
 	res = etable_internal_df(info)
 
@@ -2145,10 +2147,10 @@ collinearity = function(x, verbose){
 #'
 #' @inheritParams etable
 #'
-#' @param object Can be either: i) an estimation object (obtained for example from \code{\link[fixest]{feols}}, ii) a matrix of coefficients table, or iii) a numeric vector of the point estimates -- the latter requiring the extra arguments \code{sd} or \code{ci_low} and \code{ci_top}.
+#' @param object Can be either: i) an estimation object (obtained for example from \code{\link[fixest]{feols}}, ii) a list of estimation objects (several results will be plotted at once), iii) a matrix of coefficients table, iv) a numeric vector of the point estimates -- the latter requiring the extra arguments \code{sd} or \code{ci_low} and \code{ci_high}.
 #' @param sd The standard errors of the estimates. It may be missing.
 #' @param ci_low If \code{sd} is not provided, the lower bound of the confidence interval. For each estimate.
-#' @param ci_top If \code{sd} is not provided, the upper bound of the confidence interval. For each estimate.
+#' @param ci_high If \code{sd} is not provided, the upper bound of the confidence interval. For each estimate.
 #' @param x The value of the x-axis. If missing, the names of the argument \code{estimate} are used.
 #' @param x.shift Shifts the confidence intervals bars to the left or right, depending on the value of \code{x.shift}. Default is 0.
 #' @param ci.width The width of the extremities of the confidence intervals. Default is \code{0.1}.
@@ -2176,6 +2178,8 @@ collinearity = function(x, verbose){
 #' @param only.params Logical, default is \code{FALSE}. If \code{TRUE} no graphic is displayed, only the values of \code{x} and \code{y} used in the plot are returned.
 #' @param only.inter Logical, default is \code{TRUE}. If an interaction of the type of \code{var::fe} (see \code{\link[fixest]{feols}} help for details) is found, then only these interactions are plotted. If \code{FALSE}, then interactions are treated as regular coefficients.
 #' @param ... Other arguments to be passed to \code{summary}, if \code{object} is an estimation, and/or to the function \code{plot} or \code{lines} (if \code{add = TRUE}).
+#' @param sep The distance between two estimates -- only when argument \code{object} is a list of estimation results.
+#' @param as.multiple Logical: default is \code{FALSE}. Only when \code{object} is a single estimation result: whether each coefficient should have a different color, line type, etc. By default they all get the same style.
 #'
 #' @seealso
 #' See \code{\link[fixest]{setFixest_coefplot}} to set the default values of \code{coefplot}, and the estimation functions: e.g. \code{\link[fixest]{feols}}, \code{\link[fixest]{fepois}}, \code{\link[fixest]{feglm}}, \code{\link[fixest]{fenegbin}}.
@@ -2197,13 +2201,23 @@ collinearity = function(x, verbose){
 #' est = feols(Petal.Length ~ Petal.Width + Sepal.Length +
 #'             Sepal.Width | Species, iris)
 #'
+#' # Estimation results with clustered standard-errors
+#' # (the default when fixed-effects are present)
+#' est_clu = summary(est)
+#' # Now with "regular" standard-errors
+#' est_std = summary(est, se = "standard")
+#'
+#' # You can plot the two results at once
+#' coefplot(list(est_clu, est_std))
+#'
+#'
+#' # Alternatively, you can use the argument x.shift
+#' # to do it sequentially:
 #'
 #' # First graph with clustered standard-errors
-#' # (the default when fixed-effects are present)
 #' coefplot(est, x.shift = -.2)
 #'
 #' # 'x.shift' was used to shift the coefficients on the left.
-#'
 #'
 #' # Second set of results: this time with
 #' #  standard-errors that are not clustered.
@@ -2297,18 +2311,17 @@ collinearity = function(x, verbose){
 #' coefplot(est)
 #'
 #'
-coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, order, ci.width=0.1, ci_level = 0.95, add = FALSE, pt.pch = 20, cex = par("cex"), pt.cex = cex, col = 1, pt.col = col, ci.col = col, lwd = par("lwd"), ci.lwd = lwd, ci.lty = 1, grid = TRUE, grid.par = list(lty=3, col = "gray"), zero = TRUE, zero.par = list(col="black", lwd=1), join = FALSE, join.par = list(col = pt.col, lwd=lwd), ref.line, ref.line.par = list(col = "black", lty = 2), xlim.add, ylim.add, only.params = FALSE, only.inter = TRUE, ...){
-	# creation de barres d'erreur
-	# 1 segment vertical de la taille de l'IC
-	# deux barres horizontales, a chaque bornes
+coefplot = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict, drop, order, ci.width="1%", ci_level = 0.95, add = FALSE, pt.pch = 20, cex = par("cex"), pt.cex = cex, col = 1:8, pt.col = col, ci.col = col, lwd = par("lwd"), ci.lwd = lwd, ci.lty = 1, grid = TRUE, grid.par = list(lty=3, col = "gray"), zero = TRUE, zero.par = list(col="black", lwd=1), join = FALSE, join.par = list(col = pt.col, lwd=lwd), ref.line, ref.line.par = list(col = "black", lty = 2), xlim.add, ylim.add, only.params = FALSE, only.inter = TRUE, sep, as.multiple = FALSE){
 
-    # I don't allow the different styles any more (maybe I can change that in the future)
+
     if(missing(dict)) dict = c()
-    # style = c("bar", "interval", "tube")
-    # style = match.arg(style)
-    style = "bar"
 
+    #
     # We get the default values
+    #
+
+    ylab_add_ci = missing(ci_low)
+
     opts = getOption("fixest_coefplot")
 
     if(length(opts) >= 1){
@@ -2340,244 +2353,354 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 
     dots = list(...)
 
-    if(is.list(object)){
-        sum_exists = FALSE
-        for(c_name in class(object)){
-            if(exists(paste0("summary.", c_name), mode = "function")){
-                sum_exists = TRUE
-                break
+    multiple_est = FALSE
+    if(is.list(object) && class(object)[1] == "list"){
+        # This is a list of estimations
+
+        multiple_est = TRUE
+
+        mc = match.call()
+        mc$object = as.name("my__object__")
+        mc$only.params = TRUE
+
+        nb_est = length(object)
+
+        res = list()
+        all_main = c()
+        for(i in 1:nb_est){
+            # cat("Eval =", i, "\n")
+            my__object__ = object[[i]]
+            prms = eval(mc)
+            all_main = c(all_main, prms$main)
+            df_prms = as.data.frame(prms[c("x", "y", "ci_low", "ci_high")])
+            df_prms$est_nb = i
+            df_prms$estimate_names = names(prms$y)
+            res[[i]] = df_prms
+        }
+
+        all_estimates = do.call("rbind", res)
+
+        # Later I'll add main as argument
+        all_main = unique(all_main)
+        if(length(all_main) == 1) {
+            dots$main = all_main
+        } else if(!is.null(dots$main)){
+            warning("Argument 'main' is inconsistent because of different dependent variables across estimations.")
+        }
+
+        # We respect the order provided by the user
+        my_names_order = unique(all_estimates$estimate_names)
+        my_order = 1:length(my_names_order)
+        names(my_order) = my_names_order
+        all_estimates$id_order = my_order[all_estimates$estimate_names]
+        all_estimates = all_estimates[base::order(all_estimates$id_order, all_estimates$est_nb), ]
+
+        # we rescale
+        if(missing(sep)){
+            all_sep = c(0.2, 0.2, 0.18, 0.16)
+            if(length(all_sep) < nb_est - 1){
+                sep = 1 / (n-1) * 0.7
+            }
+            sep = all_sep[nb_est - 1]
+        } else {
+            n_sep = length(sep)
+            if(n_sep > 1){
+                if(n_sep < nb_est - 1){
+                    sep = sep[n_sep]
+                } else {
+                    sep = sep[nb_est - 1]
+                }
             }
         }
 
-        if(!sum_exists) stop("There is no summary method for objects of class ", c_name, ". 'coefplot' applies summary to the object to extract the coeftable. Maybe add directly the coeftable in object instead?")
+        all_estimates$x_new = all_estimates$id_order + ((all_estimates$est_nb - 1) / (nb_est - 1) - 0.5) * ((nb_est - 1) * sep)
 
-        fun_name = paste0("summary.", c_name)
-        args_name_sum = names(formals(fun_name))
-        args_sum = intersect(names(dots), args_name_sum)
+        # The coefficients
 
-        # we kick out the summary arguments from dots
-        dots[args_sum] = NULL
+        estimate = all_estimates$y
+        names(estimate) = all_estimates$estimate_names
+        ci_low = all_estimates$ci_low
+        ci_high = all_estimates$ci_high
+        x = all_estimates$x_new
 
-        # We reconstruct a call to coeftable
-        mc_coeftable = match.call(expand.dots = TRUE)
-        mc_coeftable[[1]] = as.name("coeftable")
-        mc_coeftable[setdiff(names(mc_coeftable), c(args_sum, "object", ""))] = NULL
+        prms = data.frame(estimate = estimate, ci_low = ci_low, ci_high = ci_high, x = x, id = all_estimates$est_nb, estimate_names = all_estimates$estimate_names)
 
-        mat = eval(mc_coeftable, parent.frame())
 
-        sd = mat[, 2]
-        estimate = mat[, 1]
+        # Add appropriate values in the next update
+        join = FALSE
+        ref.line = FALSE
 
-        names(estimate) = rownames(mat)
-
-        if("fml" %in% names(object)){
-            depvar = gsub(" ", "", as.character(object$fml)[[2]])
-            if(depvar %in% names(dict)) depvar = dict[depvar]
-            listDefault(dots, "main", paste0("Effect on ", depvar))
-        }
-
-    } else if(is.matrix(object)){
-        # object is a matrix containing the coefs and SEs
-
-        m_names = tolower(colnames(object))
-        if(ncol(object) == 4 || (grepl("estimate", m_names[1]) && grepl("std\\.? error", m_names[1]))){
-            sd = object[, 2]
-            estimate = object[, 1]
-
-            names(estimate) = rownames(object)
-
-        } else {
-            stop("Argument 'object' is a matrix but it should contain 4 columns (the two first ones should be reporting the estimate and the standard-error). Either provide an appropriate matrix or give directly the vector of estimated coefficients in arg. estimate.")
-        }
-    } else if(length(object[1]) > 1 || !is.null(dim(object)) || !is.numeric(object)){
-        stop("Argument 'object' must be either: i) an estimation object, ii) a matrix of coefficients table, or iii) a numeric vector of the point estimates. Currently it is neither of the three.")
     } else {
-        # it's a numeric vector
-        estimate = object
+        if(is.list(object)){
+
+            sum_exists = FALSE
+            for(c_name in class(object)){
+                if(exists(paste0("summary.", c_name), mode = "function")){
+                    sum_exists = TRUE
+                    break
+                }
+            }
+
+            if(!sum_exists){
+                # stop("There is no summary method for objects of class ", c_name, ". 'coefplot' applies summary to the object to extract the coeftable. Maybe add directly the coeftable in object instead?")
+                mat = coeftable(object)
+            } else {
+                fun_name = paste0("summary.", c_name)
+                args_name_sum = names(formals(fun_name))
+                args_sum = intersect(names(dots), args_name_sum)
+
+                # we kick out the summary arguments from dots
+                dots[args_sum] = NULL
+
+                # We reconstruct a call to coeftable
+                mc_coeftable = match.call(expand.dots = TRUE)
+                mc_coeftable[[1]] = as.name("coeftable")
+                mc_coeftable[setdiff(names(mc_coeftable), c(args_sum, "object", ""))] = NULL
+
+                mat = eval(mc_coeftable, parent.frame())
+            }
+
+            sd = mat[, 2]
+            estimate = mat[, 1]
+
+            names(estimate) = rownames(mat)
+
+            if("fml" %in% names(object)){
+                depvar = gsub(" ", "", as.character(object$fml)[[2]])
+                if(depvar %in% names(dict)) depvar = dict[depvar]
+                listDefault(dots, "main", paste0("Effect on ", depvar))
+            }
+
+        } else if(is.matrix(object)){
+            # object is a matrix containing the coefs and SEs
+
+            m_names = tolower(colnames(object))
+            if(ncol(object) == 4 || (grepl("estimate", m_names[1]) && grepl("std\\.? error", m_names[1]))){
+                sd = object[, 2]
+                estimate = object[, 1]
+
+                names(estimate) = rownames(object)
+
+            } else {
+                stop("Argument 'object' is a matrix but it should contain 4 columns (the two first ones should be reporting the estimate and the standard-error). Either provide an appropriate matrix or give directly the vector of estimated coefficients in arg. estimate.")
+            }
+        } else if(length(object[1]) > 1 || !is.null(dim(object)) || !is.numeric(object)){
+            stop("Argument 'object' must be either: i) an estimation object, ii) a matrix of coefficients table, or iii) a numeric vector of the point estimates. Currently it is neither of the three.")
+        } else {
+            # it's a numeric vector
+            estimate = object
+        }
+
+    	n <- length(estimate)
+
+	    if(missing(sd)){
+	        if(missing(ci_low) || missing(ci_high)) stop("If 'sd' is not provided, you must provide the arguments 'ci_low' and 'ci_high'.")
+	    } else {
+	        if(!missing(ci_low) || !missing(ci_high)) warning("Since 'sd' is provided, arguments 'ci_low' or 'ci_high' are ignored.")
+
+	        # We compue the CI
+	        nb = abs(qnorm((1-ci_level)/2))
+	        ci_high = estimate + nb*sd
+	        ci_low = estimate - nb*sd
+	    }
+
+        #
+    	# INTERACTIONS
+    	#
+
+    	ref_id = NA
+    	if(only.inter && !is.null(names(estimate))){
+        	all_vars = names(estimate)
+        	if(any(grepl("::", all_vars))){
+
+        	    is_info = FALSE
+        	    if("fixest" %in% class(object)){
+        	        is_info = TRUE
+        	        interaction.info = object$interaction.info
+        	        is_ref = interaction.info$is_ref
+        	        items = interaction.info$items
+        	        is_num = interaction.info$fe_type %in% c("numeric", "integer")
+        	    }
+
+        	    # We retrict only to interactions
+        	    root_interaction = all_vars[grepl("::", all_vars)]
+        	    # We keep only the first one !
+        	    root_interaction = unique(gsub("::.+", "", root_interaction))[1]
+
+        	    inter_keep = grepl(root_interaction, all_vars, fixed = TRUE)
+        	    my_inter = all_vars[inter_keep]
+        	    estimate = estimate[inter_keep]
+        	    ci_high = ci_high[inter_keep]
+        	    ci_low = ci_low[inter_keep]
+
+        	    # We extract the name of the variables
+        	    fe_name = gsub(".+:", "", root_interaction)
+        	    if(fe_name %in% names(dict)) fe_name = dict[fe_name]
+        	    listDefault(dots, "xlab", fe_name)
+
+        	    var_name = gsub(":[[:alnum:]\\._]+", "", root_interaction)
+        	    if(var_name %in% names(dict)) var_name = dict[var_name]
+        	    listDefault(dots, "sub", paste0("(Interacted with ", var_name, ")"))
+
+        	    # We construct the x-axis
+        	    inter_values = gsub(".+::", "", my_inter)
+        	    names(estimate) = inter_values
+
+        	    inter_values_num = tryCatch(as.numeric(inter_values), warning = function(x) x)
+        	    if(is_info){
+
+        	        if(length(inter_values) != sum(!is_ref)){
+        	            stop("Internal error regarding the lengths of vectors of coefficients.")
+        	        }
+
+        	        if(any(is_ref)){
+        	            ref_id = which(is_ref)
+        	        }
+
+        	        my_values = my_ci_low = my_ci_high = rep(NA, length(is_ref))
+        	        names(my_values) = names(my_ci_low) = names(my_ci_high) = items
+
+        	        my_values[inter_values] = estimate
+        	        my_ci_high[inter_values] = ci_high
+        	        my_ci_low[inter_values] = ci_low
+
+        	        qui = which(is.na(my_values))
+        	        my_values[qui] = 0
+        	        my_ci_high[qui] = my_values[qui]
+        	        my_ci_low[qui] = my_values[qui]
+
+        	        estimate = my_values
+        	        ci_high = my_ci_high
+        	        ci_low = my_ci_low
+
+        	        if(is_num && missing(x)){
+        	            names(estimate) = NULL
+        	            x = items
+        	            if(missing(join)) join = TRUE
+        	            if(missing(ref.line)) ref.line = TRUE
+        	        }
+
+
+        	    } else if(is.numeric(inter_values_num)) {
+
+        	        # We check these are "real" numbers and not just "codes"
+        	        all_steps = diff(sort(inter_values_num))
+        	        ts = table(all_steps)
+        	        step_mode = as.numeric(names(ts)[which.max(ts)])
+        	        all_steps_rescaled = all_steps / step_mode
+
+        	        if(any(all_steps_rescaled < 10) && missing(x)){
+        	            names(estimate) = NULL
+        	            x = inter_values_num
+        	            if(missing(join)) join = TRUE
+        	        }
+        	    }
+
+    	        n = length(estimate)
+        	}
+    	}
+
+    	# We set the default after the interactions (which is the decision variable)
+    	if(missing(join)) join = FALSE
+    	if(missing(ref.line)) ref.line = FALSE
+
+    	# The DF of all the parameters
+    	prms = data.frame(estimate = estimate, ci_low = ci_low, ci_high = ci_high)
+    	if(!is.null(names(estimate))) prms$estimate_names = names(estimate)
+
+    	# setting the names of the estimate
+    	if(!missing(x)){
+    	    if(length(x) != n) stop("Argument 'x' must have the same length as the number of coefficients (currently ", length(x), " vs ", n, ").")
+
+    	    if(!is.numeric(x)){
+    	        names(estimate) = x
+    	        prms$estimate_names = names(estimate)
+    	    }
+
+    	    prms$x = x
+    	}
     }
 
-	n <- length(estimate)
+    n = nrow(prms)
 
-	if(missing(ci.lty)){
-		ci.lty = ifelse(style == "bar", 1, 2)
-	}
-
-	if(missing(sd)){
-		if(missing(ci_low) || missing(ci_top)) stop("If 'sd' is not provided, you must provide the arguments 'ci_low' and 'ci_top'.")
-
-		ci025 = ci_low
-		ci975 = ci_top
-
-	} else {
-		if(!missing(ci_low) || !missing(ci_top)) warning("Since 'sd' is provided, arguments 'ci_low' or 'ci_top' are ignored.")
-
-		# We compue the CI
-		nb = abs(qnorm((1-ci_level)/2))
-		ci975 = estimate + nb*sd
-		ci025 = estimate - nb*sd
-	}
-
-	#
-	# STEP 2 => Plotting
-	#
-
-	# INTERACTIONS
-	ref_id = NA
-	if(only.inter && !is.null(names(estimate))){
-    	all_vars = names(estimate)
-    	if(any(grepl("::", all_vars))){
-
-    	    is_info = FALSE
-    	    if("fixest" %in% class(object)){
-    	        is_info = TRUE
-    	        interaction.info = object$interaction.info
-    	        is_ref = interaction.info$is_ref
-    	        items = interaction.info$items
-    	        is_num = interaction.info$fe_type %in% c("numeric", "integer")
-    	    }
-
-    	    # We retrict only to interactions
-    	    root_interaction = all_vars[grepl("::", all_vars)]
-    	    # We keep only the first one !
-    	    root_interaction = unique(gsub("::.+", "", root_interaction))[1]
-
-    	    inter_keep = grepl(root_interaction, all_vars, fixed = TRUE)
-    	    my_inter = all_vars[inter_keep]
-    	    estimate = estimate[inter_keep]
-    	    ci975 = ci975[inter_keep]
-    	    ci025 = ci025[inter_keep]
-
-    	    # We extract the name of the variables
-    	    fe_name = gsub(".+:", "", root_interaction)
-    	    if(fe_name %in% names(dict)) fe_name = dict[fe_name]
-    	    listDefault(dots, "xlab", fe_name)
-
-    	    var_name = gsub(":[[:alnum:]\\._]+", "", root_interaction)
-    	    if(var_name %in% names(dict)) var_name = dict[var_name]
-    	    listDefault(dots, "sub", paste0("(Interacted with ", var_name, ")"))
-
-    	    # We construct the x-axis
-    	    inter_values = gsub(".+::", "", my_inter)
-    	    names(estimate) = inter_values
-
-    	    inter_values_num = tryCatch(as.numeric(inter_values), warning = function(x) x)
-    	    if(is_info){
-
-    	        if(length(inter_values) != sum(!is_ref)){
-    	            stop("Internal error regarding the lengths of vectors of coefficients.")
-    	        }
-
-    	        if(any(is_ref)){
-    	            ref_id = which(is_ref)
-    	        }
-
-    	        my_values = my_ci_low = my_ci_high = rep(NA, length(is_ref))
-    	        names(my_values) = names(my_ci_low) = names(my_ci_high) = items
-
-    	        my_values[inter_values] = estimate
-    	        my_ci_high[inter_values] = ci975
-    	        my_ci_low[inter_values] = ci025
-
-    	        qui = which(is.na(my_values))
-    	        my_values[qui] = 0
-    	        my_ci_high[qui] = my_values[qui]
-    	        my_ci_low[qui] = my_values[qui]
-
-    	        estimate = my_values
-    	        ci975 = my_ci_high
-    	        ci025 = my_ci_low
-
-    	        if(is_num && missing(x)){
-    	            names(estimate) = NULL
-    	            x = items
-    	            if(missing(join)) join = TRUE
-    	            if(missing(ref.line)) ref.line = TRUE
-    	        }
-
-
-    	    } else if(is.numeric(inter_values_num)) {
-
-    	        # We check these are "real" numbers and not just "codes"
-    	        all_steps = diff(sort(inter_values_num))
-    	        ts = table(all_steps)
-    	        step_mode = as.numeric(names(ts)[which.max(ts)])
-    	        all_steps_rescaled = all_steps / step_mode
-
-    	        if(any(all_steps_rescaled < 10) && missing(x)){
-    	            names(estimate) = NULL
-    	            x = inter_values_num
-    	            if(missing(join)) join = TRUE
-    	        }
-    	    }
-
-	        n = length(estimate)
-    	}
-	}
-
-	# We set the default after the interactions (which is the decision variable)
-	if(missing(join)) join = FALSE
-	if(missing(ref.line)) ref.line = FALSE
-
-	# setting the names of the estimate
-	if(!missing(x)){
-	    if(length(x) != n) stop("Argument 'x' must have the same length as the number of coefficients (currently ", length(x), " vs ", n, ").")
-
-	    if(!is.numeric(x)){
-	        names(estimate) = x
-	    }
-	}
-
+    #
 	# order/drop/dict
-	if(!is.null(names(estimate))){
+    #
 
+	if(!is.null(prms$estimate_names)){
+
+	    # dict
 	    if(missnull(dict)){
 	        dict = c()
 	    } else {
-	        check_arg(dict, "characterVector")
-	        if(is.null(names(dict))){
-                stop("Argument 'dict' must be a named character vector. Currently it has no names.")
-	        }
+	        prms$estimate_names = dict_apply(prms$estimate_names, dict)
 	    }
 
-	    # dict
-	    all_vars = names(estimate)
-
-	    who = all_vars %in% names(dict)
-	    all_vars[who] = dict[all_vars[who]]
-	    names(estimate) = all_vars
-
-	    my_order = 1:n
-	    names(my_order) = all_vars
-
 	    # dropping some coefs
-	    all_vars = drop_apply(all_vars, drop)
+	    all_vars = unique(prms$estimate_names)
 
-	    if(length(all_vars) == 0){
-	        stop("Argument 'drop' has removed all variables!")
+	    if(!missing(drop) && length(drop) > 0){
+    	    all_vars = drop_apply(all_vars, drop)
+
+    	    if(length(all_vars) == 0){
+    	        stop("Argument 'drop' has removed all variables!")
+    	    }
+
+    	    prms = prms[prms$estimate_names %in% all_vars,]
 	    }
 
 	    # ordering the coefs
-	    all_vars = order_apply(all_vars, order)
+	    if(!missing(order) && length(order) > 0){
+	        all_vars = order_apply(all_vars, order)
 
-	    qui = my_order[all_vars]
+	        my_order = 1:length(all_vars)
+	        names(my_order) = all_vars
+	        prms$id_order = my_order[prms$estimate_names]
 
-	    estimate = estimate[qui]
-	    ci975 = ci975[qui]
-	    ci025 = ci025[qui]
-	    if(!missing(x)) x = x[qui]
-	    n = length(qui)
+	        prms = prms[base::order(prms$id_order)]
+	    }
+
+	    estimate = prms$estimate
+	    names(estimate) = prms$estimate_names
+	    ci_high = prms$ci_high
+	    ci_low = prms$ci_low
+	    if(!is.null(prms$x)) x = prms$x
+
+	    n = nrow(prms)
 	}
 
+    #
 	# we create x_labels, x_value & x_at
-	if(!missing(x) && is.numeric(x)){
+    #
+
+    # id: used for colors/lty etc
+    if(!multiple_est){
+        if(as.multiple){
+            prms$id = 1:nrow(prms)
+        } else {
+            prms$id = 1
+        }
+    }
+
+	if(multiple_est){
+	    # We don't allow x.shift
+
+	    my_xlim = range(x) + c(-1, 1) * ((nb_est - 1) * sep)
+	    x_value = x
+
+	    x_labels = unique(prms$estimate_names)
+	    x_at = 1:length(x_labels)
+
+	} else if(!missing(x) && is.numeric(x)){
 	    my_xlim = range(c(x + x.shift, x - x.shift))
 
-	    x_at = NULL
 	    x_value = x + x.shift
 
 	    if(is.null(names(estimate))){
+	        x_at = NULL
 	        x_labels = NULL
 	    } else {
+	        x_at = x
 	        x_labels = names(estimate)
 	    }
 
@@ -2594,6 +2717,13 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 		my_xlim = range(c(1:n + x.shift, 1:n - x.shift)) + c(-0.5, +0.5)
 	}
 
+    prms$x = x_value
+    prms$y = prms$estimate
+
+    if(only.params){
+        return(list(x = x_value, y = estimate, ci_low = ci_low, ci_high = ci_high, main = dots$main))
+    }
+
 	all_plot_args = unique(c(names(par()), names(formals(plot.default))))
 	pblm = setdiff(names(dots), all_plot_args)
 	if(length(pblm) > 0){
@@ -2604,7 +2734,7 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 	# preparation of the do.call
 	dots$col = col
 	listDefault(dots, "xlab", "Variable")
-	ylab = paste0("Estimate and ", ifelse(missing(sd), "", paste0(floor(ci_level*100), "% ")), "Conf. Int.")
+	ylab = paste0("Estimate and ", ifelse(ylab_add_ci, paste0(floor(ci_level*100), "% "), ""), "Conf. Int.")
 	listDefault(dots, "ylab", ylab)
 
 	# The limits
@@ -2633,7 +2763,7 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 	listDefault(dots, "xlim", my_xlim)
 
 	# ylim
-	my_ylim = range(c(ci025, ci975))
+	my_ylim = range(c(ci_low, ci_high))
 
 	if(!missnull(ylim.add)){
 	    if("ylim" %in% names(dots)){
@@ -2659,22 +2789,8 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 	listDefault(dots, "ylim", my_ylim)
 
     dots$x = x_value
-
 	dots$y = estimate
-
-	if(style == "interval"){
-		dots$type = "o"
-		listDefault(dots, "lwd", 2)
-	} else if(style == "tube"){
-		dots$type = "n"
-		listDefault(dots, "lwd", 2)
-	} else {
-		dots$type = "p"
-	}
-
-	if(only.params){
-	    return(list(x = x_value, y = estimate, ylim = my_ylim))
-	}
+	dots$type = "p"
 
 	if(!add){
 
@@ -2724,95 +2840,101 @@ coefplot = function(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, orde
 
 	    box()
 	    axis(2)
-	    axis(1, at = x_at, labels = x_labels)
+
+	    if(is.null(x_at)){
+	        axis(1)
+	    } else {
+	        axis(1, at = x_at, labels = x_labels)
+	    }
 
 	}
 
-	if(style == "bar" && join){
+	n_id = length(unique(prms$id))
+
+	if(join){
 		# We join the dots
 
 	    listDefault(join.par, "lwd", lwd)
 	    listDefault(join.par, "col", pt.col)
 
-	    join.par$x = dots$x
-	    join.par$y = dots$y
+	    for(i in 1:n_id){
+	        my_join.par = join.par
 
-		do.call("lines", join.par)
+	        for(param in c("col", "lwd", "lty")){
+	            if(!is.null(join.par[[param]])){
+	                my_join.par[[param]] = par_fit(join.par[[param]], i)
+	            }
+	        }
+
+	        my_join.par$x = prms$x[prms$id == i]
+	        my_join.par$y = prms$y[prms$id == i]
+
+	        do.call("lines", my_join.par)
+	    }
+
 	}
 
 
-	if(style == "interval"){
-		# the "tube"
-		lines(x_value, ci025, lty = ci.lty, lwd = ci.lwd, col = ci.col)
-		lines(x_value, ci975, lty = ci.lty, lwd = ci.lwd, col = ci.col)
-	} else if(style == "tube"){
-		# Here we use shade area
-		shade_area(ci025, ci975, x_value, col = "lightgrey", lty=0)
+	#
+	# The confidence intervals
+	#
 
-		# dots$axes = NULL
-		# dots$type = "o"
-		# do.call("lines", dots)
-	} else {
-		for(i in 1:n){
-		    x = x_value
+    x = x_value
 
-			# a) barre verticale
-			segments(x0=x[i], y0=ci025[i], x1=x[i], y1=ci975[i], lwd = ci.lwd, col = ci.col, lty = ci.lty)
+	# a) barre verticale
+	segments(x0=x, y0=ci_low, x1=x, y1=ci_high, lwd = par_fit(ci.lwd, prms$id), col = par_fit(ci.col, prms$id), lty = par_fit(ci.lty, prms$id))
 
-			# Formatting the bar width
+	# Formatting the bar width
 
-			if(length(ci.width) > 1){
-			    stop("The argument 'ci.width' must be of length 1.")
-			}
-
-			if(is.character(ci.width)){
-
-			    width_nb = tryCatch(as.numeric(gsub("%", "", ci.width)), warning = function(x) x)
-			    if(!is.numeric(width_nb)){
-			        stop("The value of 'ci.width' is not valid. It should be equal either to a number, either to a percentage (e.g. ci.width=\"3%\").")
-			    }
-
-			    if(grepl("%", ci.width)){
-			        total_width = diff(par("usr")[1:2])
-			        ci.width = total_width * width_nb / 100
-			    } else {
-			        ci.width = width_nb
-			    }
-			}
-
-
-
-			# b) toppings
-			# Only if not reference
-			if(ci975[i] != ci025[i]){
-			    #  i) ci975
-			    segments(x0=x[i]-ci.width, y0=ci975[i], x1=x[i]+ci.width, y1=ci975[i], lwd = ci.lwd, col = ci.col, lty = ci.lty)
-			    #  ii) ci025
-			    segments(x0=x[i]-ci.width, y0=ci025[i], x1=x[i]+ci.width, y1=ci025[i], lwd = ci.lwd, col = ci.col, lty = ci.lty)
-			}
-
-		}
+	if(length(ci.width) > 1){
+	    stop("The argument 'ci.width' must be of length 1.")
 	}
 
-	# Last the points
+	if(is.character(ci.width)){
+
+	    width_nb = tryCatch(as.numeric(gsub("%", "", ci.width)), warning = function(x) x)
+	    if(!is.numeric(width_nb)){
+	        stop("The value of 'ci.width' is not valid. It should be equal either to a number, either to a percentage (e.g. ci.width=\"3%\").")
+	    }
+
+	    if(grepl("%", ci.width)){
+	        total_width = diff(par("usr")[1:2])
+	        ci.width = total_width * width_nb / 100
+	    } else {
+	        ci.width = width_nb
+	    }
+	}
+
+	# b) toppings
+	# Only if not a reference
+	qui = ci_high != ci_low
+    #  i) ci_high
+    segments(x0=x[qui]-ci.width, y0=ci_high[qui], x1=x[qui]+ci.width, y1=ci_high[qui], lwd = par_fit(ci.lwd, prms$id[qui]), col = par_fit(ci.col, prms$id[qui]), lty = par_fit(ci.lty, prms$id[qui]))
+    #  ii) ci_low
+    segments(x0=x[qui]-ci.width, y0=ci_low[qui], x1=x[qui]+ci.width, y1=ci_low[qui], lwd = par_fit(ci.lwd, prms$id[qui]), col = par_fit(ci.col, prms$id[qui]), lty = par_fit(ci.lty, prms$id[qui]))
+
+	#
+	# Last: the point estimates
+	#
+
 	if(!add){
 	    # now the points or lines
 	    if(dots$type != "n"){
 	        point.par = dots[c("x", "y", "type", "cex", "col", "pch", "lty", "lwd")]
-	        point.par$pch = pt.pch
-	        point.par$cex = pt.cex
-	        point.par$col = pt.col
+	        point.par$pch = par_fit(pt.pch, prms$id)
+	        point.par$cex = par_fit(pt.cex, prms$id)
+	        point.par$col = par_fit(pt.col, prms$id)
 	        point.par = point.par[lengths(point.par) > 0]
 	        do.call("lines", point.par)
 	    }
 	} else {
-	    dots$pch = pt.pch
-	    dots$cex = pt.cex
-	    dots$col = pt.col
+	    dots$pch = par_fit(pt.pch, prms$id)
+	    dots$cex = par_fit(pt.cex, prms$id)
+	    dots$col = par_fit(pt.col, prms$id)
 	    do.call("lines", dots)
 	}
 
-	res = list(x = x_value, y = estimate, ylim = my_ylim)
+	res = list(x = x_value, y = estimate, ylim = my_ylim, ci_low = ci_low, ci_high = ci_high)
 	return(invisible(res))
 }
 
@@ -4156,6 +4278,7 @@ etable_internal_latex = function(info){
     if(length(fe_names) > 0){
         dumIntro = paste0("\\hline\n\\emph{Fixed-Effects}& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
 
+        # The number of FEs
         for(m in 1:n_models) {
             quoi = is_fe[[m]][fe_names]
             quoi[is.na(quoi)] = yesNoFixef[2]
@@ -4191,7 +4314,7 @@ etable_internal_latex = function(info){
 
         # For the number of items
         all_nb_Factors = matrix(c(nb_fe, recursive=TRUE), nrow = length(fe_names))
-        fe_names_nbItems = paste0("# ", fe_names)
+        fe_names_nbItems = paste0("\\# ", fe_names)
         all_nb_Factors = cbind(fe_names_nbItems, all_nb_Factors)
         nb_factor_lines <- paste0(paste0(apply(all_nb_Factors, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
 
@@ -4730,8 +4853,8 @@ fixest_model_matrix = function(fml, data){
     # if there is factors => model.matrix
     dataNames = names(data)
     linear.varnames = all.vars(fml[[3]])
-    types = sapply(data[, dataNames %in% linear.varnames, FALSE], class)
-    if(length(types) == 0 || grepl("factor", deparse_long(fml)) || any(types %in% c("character", "factor"))){
+    is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
+    if(length(is_num) == 0 || any(!is_num) || grepl("factor", deparse_long(fml))){
         useModel.matrix = TRUE
     } else {
         useModel.matrix = FALSE
@@ -5184,7 +5307,7 @@ shade_area <- function(y1, y2, x, xmin, xmax, col="grey", ...){
 
 escape_all = function(x){
     # we escape all
-    res = gsub("((?<=[^\\\\])|(?<=^))(\\$|_|%|&|\\^)", "\\\\\\2", x, perl = TRUE)
+    res = gsub("((?<=[^\\\\])|(?<=^))(\\$|_|%|&|\\^|#)", "\\\\\\2", x, perl = TRUE)
     res
 }
 
@@ -5430,6 +5553,27 @@ mysignif = function (x, d = 2, r = 1){
         }
     }
     sapply(x, mysignif_single, d = d, r = r)
+}
+
+par_fit = function(my_par, id){
+    # simple function that extends the plot parameters
+    my_par = rep(my_par, ceiling(max(id) / length(my_par)))
+    my_par[id]
+}
+
+dict_apply = function(x, dict = NULL, depth = 1){
+
+    if(missing(dict) || length(dict) == 0){
+        return(x)
+    }
+
+    if(is.null(names(dict))){
+        stop_depth("The argument 'dict' must be a dictionnary, ie a named vector (eg dict=c(\"old_name\"=\"new_name\"). Currently it has no names.", depth = depth + 1)
+    }
+
+    who = x %in% names(dict)
+    x[who] = dict[as.character(x[who])]
+    x
 }
 
 drop_apply = function(x, drop = NULL, depth = 1){
@@ -5813,7 +5957,7 @@ format_se_type_latex = function(x, dict = c(), inline = FALSE){
         se_formatted = paste0(nway, " (", fe_format, ")")
     }
 
-    se_formatted
+    escape_latex(se_formatted)
 }
 
 tex_star = function(x){
@@ -7771,6 +7915,18 @@ model.matrix.fixest = function(object, data, na.rm = TRUE, ...){
 	}
 
     linear.mat
+}
+
+hatvalues.fixest = function(model, ...){
+    # Only works for feglm/feols objects
+    # to integrate
+
+
+
+}
+
+estfun.fixest = function(x, ...){
+
 }
 
 #### ............... ####

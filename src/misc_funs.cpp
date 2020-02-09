@@ -949,8 +949,8 @@ IntegerVector cpp_lag_obs(IntegerVector id, IntegerVector time, int nlag){
         *       but the code would have lost in clarity.
         *       For the lead: opposite to what is done before
         ***************************************************************************/
-         int nlead = -nlag;
-        i = nobs;
+        int nlead = -nlag;
+        i = nobs - 1;
         while(i >= 0){
             // R_CheckUserInterrupt(); // this is (too) costly
             id_current = id[i];
@@ -1033,5 +1033,35 @@ IntegerVector cpp_check_nested(SEXP fe_list, SEXP cluster_list, IntegerVector fe
 
     return res;
 }
+
+
+// [[Rcpp::export]]
+NumericVector cpp_diag_XUtX(NumericMatrix X, NumericMatrix U){
+    // computes the diagonal of X %*% U %*% t(X)
+
+    int n = X.nrow();
+    int K = X.ncol();
+
+    NumericVector res(n);
+
+    for(int i=0 ; i<n ; ++i){
+
+        double res_i = 0;
+        for(int k=0 ; k<K ; ++k){
+
+            double xk = 0;
+            for(int k2=0 ; k2<K ; ++k2){
+                xk += X(i, k2) * U(k, k2);
+            }
+
+            res_i += xk * X(i,k);
+        }
+
+        res[i] = res_i;
+    }
+
+    return res;
+}
+
 
 

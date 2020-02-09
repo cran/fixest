@@ -4,24 +4,26 @@
 \alias{coefplot}
 \title{Plots confidence intervals}
 \usage{
-coefplot(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, order,
-  ci.width = 0.1, ci_level = 0.95, add = FALSE, pt.pch = 20,
-  cex = par("cex"), pt.cex = cex, col = 1, pt.col = col,
-  ci.col = col, lwd = par("lwd"), ci.lwd = lwd, ci.lty = 1,
-  grid = TRUE, grid.par = list(lty = 3, col = "gray"), zero = TRUE,
-  zero.par = list(col = "black", lwd = 1), join = FALSE,
+coefplot(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict, drop,
+  order, ci.width = "1\%", ci_level = 0.95, add = FALSE,
+  pt.pch = 20, cex = par("cex"), pt.cex = cex, col = 1:8,
+  pt.col = col, ci.col = col, lwd = par("lwd"), ci.lwd = lwd,
+  ci.lty = 1, grid = TRUE, grid.par = list(lty = 3, col = "gray"),
+  zero = TRUE, zero.par = list(col = "black", lwd = 1), join = FALSE,
   join.par = list(col = pt.col, lwd = lwd), ref.line,
   ref.line.par = list(col = "black", lty = 2), xlim.add, ylim.add,
-  only.params = FALSE, only.inter = TRUE, ...)
+  only.params = FALSE, only.inter = TRUE, sep, as.multiple = FALSE)
 }
 \arguments{
-\item{object}{Can be either: i) an estimation object (obtained for example from \code{\link[fixest]{feols}}, ii) a matrix of coefficients table, or iii) a numeric vector of the point estimates -- the latter requiring the extra arguments \code{sd} or \code{ci_low} and \code{ci_top}.}
+\item{object}{Can be either: i) an estimation object (obtained for example from \code{\link[fixest]{feols}}, ii) a list of estimation objects (several results will be plotted at once), iii) a matrix of coefficients table, iv) a numeric vector of the point estimates -- the latter requiring the extra arguments \code{sd} or \code{ci_low} and \code{ci_high}.}
+
+\item{...}{Other arguments to be passed to \code{summary}, if \code{object} is an estimation, and/or to the function \code{plot} or \code{lines} (if \code{add = TRUE}).}
 
 \item{sd}{The standard errors of the estimates. It may be missing.}
 
 \item{ci_low}{If \code{sd} is not provided, the lower bound of the confidence interval. For each estimate.}
 
-\item{ci_top}{If \code{sd} is not provided, the upper bound of the confidence interval. For each estimate.}
+\item{ci_high}{If \code{sd} is not provided, the upper bound of the confidence interval. For each estimate.}
 
 \item{x}{The value of the x-axis. If missing, the names of the argument \code{estimate} are used.}
 
@@ -81,7 +83,9 @@ coefplot(object, sd, ci_low, ci_top, x, x.shift = 0, dict, drop, order,
 
 \item{only.inter}{Logical, default is \code{TRUE}. If an interaction of the type of \code{var::fe} (see \code{\link[fixest]{feols}} help for details) is found, then only these interactions are plotted. If \code{FALSE}, then interactions are treated as regular coefficients.}
 
-\item{...}{Other arguments to be passed to \code{summary}, if \code{object} is an estimation, and/or to the function \code{plot} or \code{lines} (if \code{add = TRUE}).}
+\item{sep}{The distance between two estimates -- only when argument \code{object} is a list of estimation results.}
+
+\item{as.multiple}{Logical: default is \code{FALSE}. Only when \code{object} is a single estimation result: whether each coefficient should have a different color, line type, etc. By default they all get the same style.}
 }
 \description{
 This function plots the results of estimations (coefficients and confidence intervals). It is flexible and handle interactions in a special way.
@@ -101,13 +105,23 @@ The function \code{coefplot} dispose of many arguments to parametrize the plots.
 est = feols(Petal.Length ~ Petal.Width + Sepal.Length +
             Sepal.Width | Species, iris)
 
+# Estimation results with clustered standard-errors
+# (the default when fixed-effects are present)
+est_clu = summary(est)
+# Now with "regular" standard-errors
+est_std = summary(est, se = "standard")
+
+# You can plot the two results at once
+coefplot(list(est_clu, est_std))
+
+
+# Alternatively, you can use the argument x.shift
+# to do it sequentially:
 
 # First graph with clustered standard-errors
-# (the default when fixed-effects are present)
 coefplot(est, x.shift = -.2)
 
 # 'x.shift' was used to shift the coefficients on the left.
-
 
 # Second set of results: this time with
 #  standard-errors that are not clustered.
