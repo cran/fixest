@@ -52,7 +52,7 @@ sum_threeway = summary(est_pois, se = "threeway")
 esttable(sum_white, sum_oneway, sum_twoway, sum_threeway)
 
 # Alternative ways to cluster the SE:
-\donttest{
+
 # two-way clustering: Destination and Product
 # (Note that arg. se = "twoway" is implicitly deduced from the argument cluster)
 summary(est_pois, cluster = c("Destination", "Product"))
@@ -61,7 +61,6 @@ summary(est_pois, cluster = list(trade$Destination, trade$Product))
 summary(est_pois, cluster = ~Destination+Product)
 # Since Destination and Product are used as fixed-effects, you can also use:
 summary(est_pois, cluster = 2:3)
-}
 
 
 }

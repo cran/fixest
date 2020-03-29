@@ -45,14 +45,15 @@ etable(est1, est2, est3, order = c("f", "^x"), drop="Int")
 # or using the argument panel.id
 feols(f(y)~l(x1, -1:1), base_did, panel.id = ~id+period)
 
-\donttest{
 # l() and f() can also be used within a data.table:
-pdat_dt = panel(as.data.table(base_did), ~id+period)
-# Now since pdat_dt is also a data.table
-#   you can create lags/leads directly
-pdat_dt[, x1_l1 := l(x1)]
-pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
+if(require("data.table")){
+  pdat_dt = panel(as.data.table(base_did), ~id+period)
+  # Now since pdat_dt is also a data.table
+  #   you can create lags/leads directly
+  pdat_dt[, x1_l1 := l(x1)]
+  pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 }
+
 
 
 }

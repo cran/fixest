@@ -52,14 +52,15 @@ pdat = panel(base_did, c("id", "period"))
 # and also to:
 pdat = panel(base_did, "id,period")
 
-\donttest{
 # l() and f() can also be used within a data.table:
-pdat_dt = panel(as.data.table(base_did), ~id+period)
-# Now since pdat_dt is also a data.table
-#   you can create lags/leads directly
-pdat_dt[, x1_l1 := l(x1)]
-pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
+if(require("data.table")){
+  pdat_dt = panel(as.data.table(base_did), ~id+period)
+  # Now since pdat_dt is also a data.table
+  #   you can create lags/leads directly
+  pdat_dt[, x1_l1 := l(x1)]
+  pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 }
+
 
 }
 \seealso{

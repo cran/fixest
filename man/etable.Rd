@@ -8,23 +8,27 @@
 \usage{
 etable(..., se = c("standard", "white", "cluster", "twoway", "threeway",
   "fourway"), dof = getFixest_dof(), cluster, digits = 4, tex, fitstat,
-  title, sdBelow = TRUE, drop, order, dict = getFixest_dict(), file,
-  replace = FALSE, convergence, signifCode, label, subtitles,
-  fixef_sizes = FALSE, yesNoFixef = c("Yes", "No"),
-  keepFactors = TRUE, family, powerBelow = -5,
-  interaction.combine = " $\\\\times $ ", depvar)
+  title, coefstat = c("se", "tstat", "confint"), ci = 0.95,
+  sdBelow = TRUE, keep, drop, order, dict = getFixest_dict(), file,
+  replace = FALSE, convergence, signifCode, label, float, subtitles,
+  fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
+  yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family,
+  powerBelow = -5, interaction.combine = " $\\\\times $ ", depvar)
 
 esttex(..., se = c("standard", "white", "cluster", "twoway", "threeway",
   "fourway"), dof = getFixest_dof(), cluster, digits = 4, fitstat,
-  title, sdBelow = TRUE, drop, order, dict = getFixest_dict(), file,
-  replace = FALSE, convergence, signifCode = c(`***` = 0.01, `**` =
-  0.05, `*` = 0.1), label, subtitles, fixef_sizes = FALSE,
+  coefstat = c("se", "tstat", "confint"), ci = 0.95, title,
+  float = float, sdBelow = TRUE, keep, drop, order,
+  dict = getFixest_dict(), file, replace = FALSE, convergence,
+  signifCode = c(`***` = 0.01, `**` = 0.05, `*` = 0.1), label, subtitles,
+  fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
   yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family,
   powerBelow = -5, interaction.combine = " $\\\\times $ ")
 
 esttable(..., se = c("standard", "white", "cluster", "twoway",
-  "threeway", "fourway"), dof = getFixest_dof(), cluster, depvar, drop,
-  order, digits = 4, fitstat, convergence, signifCode = c(`***` =
+  "threeway", "fourway"), dof = getFixest_dof(), cluster,
+  coefstat = c("se", "tstat", "confint"), ci = 0.95, depvar, keep,
+  drop, order, digits = 4, fitstat, convergence, signifCode = c(`***` =
   0.001, `**` = 0.01, `*` = 0.05, . = 0.1), subtitles,
   keepFactors = FALSE, family)
 }
@@ -45,7 +49,13 @@ esttable(..., se = c("standard", "white", "cluster", "twoway",
 
 \item{title}{(Tex only.) Character scalar. The title of the Latex table.}
 
+\item{coefstat}{One of \code{"se"} (default), \code{"tstat"} or \code{"confint"}. The statistic to report for each coefficient: the standard-error, the t-statistics or the confidence interval. You can adjust the confidence interval with the argument \code{ci}.}
+
+\item{ci}{Level of the confidence interval, defaults to \code{0.95}. Only used if \code{coefstat = confint}.}
+
 \item{sdBelow}{(Tex only.) Logical, default is \code{TRUE}. Should the standard-errors be displayed below the coefficients?}
+
+\item{keep}{Character vector. This element is used to display only a subset of variables. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). Each variable satisfying any of the regular expressions will be kept. This argument is applied post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display only \code{x1} to \code{x9}, then you could use \code{keep = "x[[:digit:]]$"}. If the first character is an exclamation mark, the effect is reversed (e.g. keep = "!Intercept" means: every variable that does not contain \dQuote{Intercept} is kept). See details.}
 
 \item{drop}{Character vector. This element is used if some variables are not to be displayed. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). Each variable satisfying any of the regular expressions will be discarded. This argument is applied post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display only \code{x1} to \code{x9}, then you could use \code{drop = "x[[:digit:]]{2}"}. If the first character is an exclamation mark, the effect is reversed (e.g. drop = "!Intercept" means: every variable that does not contain \dQuote{Intercept} is dropped). See details.}
 
@@ -59,13 +69,17 @@ esttable(..., se = c("standard", "white", "cluster", "twoway",
 
 \item{convergence}{Logical, default is missing. Should the convergence state of the algorithm be displayed? By default, convergence information is displayed if at least one model did not converge.}
 
-\item{signifCode}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default).}
+\item{signifCode}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default). To supress the significance codes, use \code{signifCode=NA} or \code{signifCode=NULL}.}
 
 \item{label}{(Tex only.) Character scalar. The label of the Latex table.}
+
+\item{float}{(Tex only.) Logical. By default, if the argument \code{title} or \code{label} is provided, it is set to \code{TRUE}. Otherwise, it is set to \code{FALSE}.}
 
 \item{subtitles}{Character vector of the same length as the number of models to be displayed. If provided, subtitles are added underneath the dependent variable name.}
 
 \item{fixef_sizes}{(Tex only.) Logical, default is \code{FALSE}. If \code{TRUE} and fixed-effects were used in the models, then the number of "individuals" per fixed-effect dimension is also displayed.}
+
+\item{fixef_sizes.simplify}{Logical, default is \code{TRUE}. Only used if \code{fixef_sizes = TRUE}. If \code{TRUE}, the fixed-effects sizes will be displayed in parentheses instead of in a separate line if there is no ambiguity (i.e. if the size is constant across models).}
 
 \item{yesNoFixef}{(Tex only.) A character vector of length 1 or 2. Default is \code{c("Yes", "No")}. This is the message displayed when a given cluster is (or is not) included in a regression. If \code{yesNoFixef} is of length 1, then the second element is the empty string.}
 
@@ -99,15 +113,17 @@ The function \code{esttable} is equivalent to the function \code{etable} with ar
 \item \code{esttable}: Facility to display the results of multiple \code{fixest} estimations.
 }}
 
-\section{Arguments drop and order}{
+\section{Arguments keep, drop and order}{
 
-The arguments \code{drop} and \code{order} use regular expressions. If you are aware of regular expressions, I urge you to learn it, since it is an extremely powerful way to manipulate character strings (and it exists across most programming languages).
+The arguments \code{keep}, \code{drop} and \code{order} use regular expressions. If you are not aware of regular expressions, I urge you to learn it, since it is an extremely powerful way to manipulate character strings (and it exists across most programming languages).
 
 For example drop = "Wind" would drop any variable whose name contains "Wind". Note that variables such as "Temp:Wind" or "StrongWind" do contain "Wind", so would be dropped. To drop only the variable named "Wind", you need to use \code{drop = "^Wind$"} (with "^" meaning beginning, resp. "$" meaning end, of the string => this is the language of regular expressions).
 
 Although you can combine several regular expressions in a single character string using pipes, \code{drop} also accepts a vector of regular expressions.
 
 You can use the special character "!" (exclamation mark) to reverse the effect of the regular expression (this feature is specific to this fonction). For example \code{drop = "!Wind"} would drop any variable that does not contain "Wind".
+
+You can use the special character "%" (percentage) to make reference to the original variable name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you want to delete that variable, you can use either \code{drop="June"}, or \code{drop="%Month6"} (which makes reference to its original name).
 
 The argument \code{order} takes in a vector of regular expressions, the order will follow the elments of this vector. The vector gives a list of priorities, on the left the elements with highest priority. For example, order = c("Wind", "!Inter", "!Temp") would give highest priorities to the variables containing "Wind" (which would then appear first), second highest priority is the variables not containing "Inter", last, with lowest priority, the variables not containing "Temp". If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
 }
@@ -123,18 +139,30 @@ est2 = feols(Ozone ~ Wind + Temp | Month, data = aq)
 # Displaying the two results in a single table
 etable(est1, est2)
 
-# drop: dropping the non interaction terms (see regexp help)
+# keep/drop: keeping only interactions
+etable(est1, est2, keep = ":")
+# or using drop  (see regexp help):
 etable(est1, est2, drop = "^[[:alnum:]]+$")
-# drop interactions
+
+# keep/drop: dropping interactions
 etable(est1, est2, drop = ":")
-# keep only interactions ("!" reverses the effect)
-etable(est1, est2, drop = "!:")
+# or using keep ("!" reverses the effect):
+etable(est1, est2, keep = "!:")
 
 # order: Wind variable first, intercept last
 etable(est1, est2, order = c("Wind", "Month"))
 etable(est1, est2, order = c("^Wind", "Wind", "Month"))
 # Interactions, then Intercept, last ("!" reverses the effect)
 etable(est1, est2, order = c("!Int", "!:"))
+
+# dict + keep/drop/order: using "\%" to match the original names
+dict = c("Month5"="May", "Month6"="Jun", "Month7"="Jul",
+         "Month8"="Aug", "Month9"="Sep")
+etable(est1, est2, tex = TRUE, dict = dict)
+# keeping only June and July
+etable(est1, est2, tex = TRUE, dict = dict, keep = c("\%Month6", "Jul"))
+# All months variabes first
+etable(est1, est2, tex = TRUE, dict = dict, order = c("\%Month"))
 
 # signifCode
 etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1,

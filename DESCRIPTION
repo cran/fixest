@@ -1,9 +1,10 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.3.1
+Version: 0.4.0
 Authors@R: person("Laurent", "Berge", email = "laurent.berge@uni.lu", role = c("aut", "cre"))
-Imports: stats, graphics, utils, Formula, MASS, numDeriv, nlme, Rcpp
+Imports: stats, graphics, grDevices, utils, Formula, MASS, numDeriv,
+        nlme, Rcpp
 Suggests: knitr, rmarkdown, data.table
 LinkingTo: Rcpp
 Depends: R(>= 3.1.0)
@@ -18,8 +19,8 @@ LazyData: true
 RoxygenNote: 6.1.1
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2020-02-09 12:31:39 UTC; Laurent
+Packaged: 2020-03-28 10:30:10 UTC; laurent.berge
 Author: Laurent Berge [aut, cre]
 Maintainer: Laurent Berge <laurent.berge@uni.lu>
 Repository: CRAN
-Date/Publication: 2020-02-09 14:00:03 UTC
+Date/Publication: 2020-03-29 11:00:05 UTC

@@ -41,18 +41,19 @@ b = feols(y~l(x1, 0:1), base_small, panel.id = ~id+period)
 etable(a, b)
 
 
-\donttest{
 # Using data.table to create new lead/lag variables
-pdat_dt = panel(as.data.table(base_did), ~id+period)
+if(require("data.table")){
+  pdat_dt = panel(as.data.table(base_did), ~id+period)
 
-# Variable creation
-pdat_dt[, x_l1 := l(x1)]
-pdat_dt[, c("x_l1", "x_f1_2") := .(l(x1), f(x1)**2)]
+  # Variable creation
+  pdat_dt[, x_l1 := l(x1)]
+  pdat_dt[, c("x_l1", "x_f1_2") := .(l(x1), f(x1)**2)]
 
-# Estimation on a subset of the data
-#  (the lead/lags work appropriately)
-feols(y~l(x1, 0:1), pdat_dt[!period \%in\% c(2, 4)])
+  # Estimation on a subset of the data
+  #  (the lead/lags work appropriately)
+  feols(y~l(x1, 0:1), pdat_dt[!period \%in\% c(2, 4)])
 }
+
 
 }
 \seealso{
