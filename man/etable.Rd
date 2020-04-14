@@ -81,7 +81,7 @@ esttable(..., se = c("standard", "white", "cluster", "twoway",
 
 \item{fixef_sizes.simplify}{Logical, default is \code{TRUE}. Only used if \code{fixef_sizes = TRUE}. If \code{TRUE}, the fixed-effects sizes will be displayed in parentheses instead of in a separate line if there is no ambiguity (i.e. if the size is constant across models).}
 
-\item{yesNoFixef}{(Tex only.) A character vector of length 1 or 2. Default is \code{c("Yes", "No")}. This is the message displayed when a given cluster is (or is not) included in a regression. If \code{yesNoFixef} is of length 1, then the second element is the empty string.}
+\item{yesNoFixef}{(Tex only.) A character vector of length 1 or 2. Default is \code{c("Yes", "No")}. This is the message displayed when a given fixed-effect is (or is not) included in a regression. If \code{yesNoFixef} is of length 1, then the second element is the empty string.}
 
 \item{keepFactors}{Logical, default is \code{TRUE}. If \code{FALSE}, then factor variables are displayed as fixed-effects and no coefficient is shown.}
 
@@ -177,7 +177,7 @@ etable(est1, est2, dict = dict, tex = TRUE)
 
 }
 \seealso{
-See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, \code{\link[fixest]{fixef.fixest}} to extract the cluster coefficients.
+See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, \code{\link[fixest]{fixef.fixest}} to extract the fixed-effects coefficients.
 }
 \author{
 Laurent Berge

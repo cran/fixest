@@ -124,21 +124,19 @@ fixef(est_comb)[[1]]
 ## ---- echo = FALSE-------------------------------------------------------
 # "::" = function(a, b) NULL
 
+## ---- eval = TRUE--------------------------------------------------------
+# Sample data illustrating the DiD
+data(base_did)
+head(base_did)
+
 ## ---- eval = FALSE-------------------------------------------------------
-#  # Sample data illustrating the DiD
-#  data(base_did)
-#  head(base_did)
 #  # Estimation of yearly effect
 #  # We also add individual/time fixed-effects:
 #  est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
 #  est_did
 
 ## ---- echo = FALSE-------------------------------------------------------
-# Sample data illustrating the DiD
-data(base_did)
-head(base_did)
-# Estimation of yearly effect
-# We also add individual/time fixed-effects:
+# I need to use a trick to be allowed to use "::"
 est_did = eval(parse(text = "feols(y ~ x1 + treat::period(5) | id + period, base_did)"))
 est_did
 
@@ -146,20 +144,20 @@ est_did
 coefplot(est_did)
 
 ## ------------------------------------------------------------------------
-est1 = feols(y~l(x1, 0:1), base_did, panel.id = ~id+period)
-est2 = feols(f(y)~l(x1, -1:1), base_did, panel.id = ~id+period)
-est3 = feols(l(y)~l(x1, 0:3), base_did, panel.id = ~id+period)
-etable(est1, est2, est3, order = "f", drop="Int")
+est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
+est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
+est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)
+etable(est1, est2, est3, order = "f", drop = "Int")
 
 ## ------------------------------------------------------------------------
 # setting up the panel
 pdat = panel(base_did, ~id+period)
 # Now the panel.id argument is not required
-est1 = feols(y~l(x1, 0:1), pdat)
-est2 = feols(f(y)~l(x1, -1:1), pdat)
+est1 = feols(y ~ l(x1, 0:1), pdat)
+est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 # You can use sub selections of the panel data
-est_sub = feols(y~l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
-etable(est1, est2, est_sub, order = "f", drop="Int")
+est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
+etable(est1, est2, est_sub, order = "f", drop = "Int")
 
 ## ------------------------------------------------------------------------
 library(data.table)
@@ -173,14 +171,14 @@ head(pdat_dt)
 ## ------------------------------------------------------------------------
 base_lag = base_did
 # we create a lagged value of the variable x1
-base_lag$x1.l1 = lag(x1~id+period, 1, base_lag)
+base_lag$x1.l1 = lag(x1 ~ id+period, 1, base_lag)
 head(base_lag)
 
 ## ------------------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
-base_lag_dt[, x1.l1 := lag(x1~id+period, 1)]
+base_lag_dt[, x1.l1 := lag(x1 ~ id+period, 1)]
 
 ## ------------------------------------------------------------------------
 # Generating data:

@@ -12,7 +12,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2020-03-28" />
+<meta name="date" content="2020-04-14" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -1512,7 +1512,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2020-03-28</h4>
+<h4 class="date">2020-04-14</h4>
 
 </div>
 
@@ -1520,12 +1520,12 @@ div.tocify {
 <!-- Help on vignette writing here: http://r-pkgs.had.co.nz/vignettes.html. -->
 <!-- Ajouter example simple et intuitif fixed-effects  -->
 <p>The package <code>fixest</code> provides a family of functions to perform estimations with multiple fixed-effects. The two main functions are <code>feols</code> for linear models and <code>feglm</code> for generalized linear models. In addition, the function <code>femlm</code> performs direct maximum likelihood estimation, and <code>feNmlm</code> extends the latter to allow the inclusion of non-linear in parameters right-hand-sides. Each of these functions supports <em>any number</em> of fixed-effects and is implemented with full fledged multi-threading in c++. Functions <code>feols</code> and <code>feglm</code> further support variables with varying slopes.</p>
-<p>This package is currently (Nov. 2019) the fastest software available to perform fixed-effects estimations (see the project’s <a href="https://github.com/lrberge/fixest/wiki">homepage</a> for a benchmarking).</p>
+<p>This package is currently (Feb. 2020) the fastest software available to perform fixed-effects estimations (see the project’s <a href="https://github.com/lrberge/fixest/">homepage</a> for a benchmarking).</p>
 <p>The standard-errors of the estimates can be easily and intuitively clustered (up to four-way).</p>
 <p>The function <code>etable</code> allows to seamlessly export the results of multiple estimations into either a data.frame, or into a Latex table of “article-like” quality.</p>
-<p>The main features of the package are illustrated in this vignette. The theory used to obtain the fixed-effects is based on Berge (2018), “<em>Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package fixest.</em>” CREA Discussion Papers, 13 (<a href="https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13" class="uri">https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13</a>).</p>
+<p>The main features of the package are illustrated in this vignette. The theory used to obtain the fixed-effects is based on Berge (2018), “<em>Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm.</em>” CREA Discussion Papers, 13 (<a href="https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13" class="uri">https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13</a>).</p>
 <div id="simple-example-using-trade-data" class="section level1">
-<h1><span class="header-section-number">1</span> Simple example using Trade data</h1>
+<h1><span class="header-section-number">1</span> Simple example using trade data</h1>
 <p>This example deals with international trade, which is a setup that usually requires performing estimations with many fixed-effects. We estimate a very simple gravity model in which we are interested in finding out the negative effect of geographic distance on trade. The sample data consists of European trade extracted from Eurostat. Let’s load the data contained in the package:</p>
 <pre class="r"><code>library(fixest)
 data(trade)</code></pre>
@@ -1976,8 +1976,8 @@ etable(gravity_subfe, cluster = ~Product, order = &quot;Dist&quot;,
 <p>In the first export, the coefficient of the intercept is dropped by using <code>drop = &quot;Const&quot;</code> (could be anything such that <code>grepl(drop[1], &quot;Constant&quot;)</code> is TRUE). In the second, the coefficient of the distance is put before the intercept (which is kept) thanks to the argument <code>order</code>. Note that the actions performed by the arguments <code>drop</code> or <code>order</code> are performed <strong>after</strong> the renaming takes place with the argument <code>dict</code>.</p>
 </div>
 </div>
-<div id="extracting-the-fixed-effects" class="section level2">
-<h2><span class="header-section-number">1.6</span> Extracting the fixed-effects</h2>
+<div id="extracting-the-fixed-effects-coefficients" class="section level2">
+<h2><span class="header-section-number">1.6</span> Extracting the fixed-effects coefficients</h2>
 <p>To obtain the fixed-effects of the estimation, the function <code>fixef</code> must be performed on the results. This function returns a list containing the fixed-effects coefficients for each dimension. The <code>summary</code> method helps to have a quick overview:</p>
 <pre class="r"><code>fixedEffects &lt;- fixef(gravity_pois)
 summary(fixedEffects)
@@ -2093,18 +2093,18 @@ est_comb
 <pre class="r"><code># Sample data illustrating the DiD
 data(base_did)
 head(base_did)
-# Estimation of yearly effect
-# We also add individual/time fixed-effects:
-est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
-est_did</code></pre>
-<pre><code>#&gt;             y         x1 id period post treat
+#&gt;             y         x1 id period post treat
 #&gt; 1  2.87530627  0.5365377  1      1    0     1
 #&gt; 2  1.86065272 -3.0431894  1      2    0     1
 #&gt; 3  0.09416524  5.5768439  1      3    0     1
 #&gt; 4  3.78147485 -2.8300587  1      4    0     1
 #&gt; 5 -2.55819959 -5.0443544  1      5    0     1
-#&gt; 6  1.72873240 -0.6363849  1      6    1     1
-#&gt; OLS estimation, Dep. Var.: y
+#&gt; 6  1.72873240 -0.6363849  1      6    1     1</code></pre>
+<pre class="r"><code># Estimation of yearly effect
+# We also add individual/time fixed-effects:
+est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
+est_did</code></pre>
+<pre><code>#&gt; OLS estimation, Dep. Var.: y
 #&gt; Observations: 1,080 
 #&gt; Fixed-effects: id: 108,  period: 10
 #&gt; Standard-errors: Clustered (id) 
@@ -2136,13 +2136,13 @@ est_did</code></pre>
 <h3><span class="header-section-number">2.4.1</span> Lagging variables in an estimation</h3>
 <p>There are two ways to provide leads and/or lags in a <code>fixest</code> estimation. Either “on-the-fly” by using the argument <code>panel.id</code>, either by setting up a panel data set with the function <code>panel</code> (useful if you run multiple models needing lags and/or leads), described in the next subsection.</p>
 <p>To set up the panel on-the-fly, you need to use the <code>panel.id</code> argument, which will give you access to the functions <code>f</code> and <code>l</code> to create leads and lags, respectively. Let’s give an example, using the previous data set, where we use lags and leads of the explanatory and dependent variables.</p>
-<pre class="r"><code>est1 = feols(y~l(x1, 0:1), base_did, panel.id = ~id+period)
+<pre class="r"><code>est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
 #&gt; NOTE: 108 observations removed because of NA values (Breakup: LHS: 0, RHS: 108).
-est2 = feols(f(y)~l(x1, -1:1), base_did, panel.id = ~id+period)
+est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
 #&gt; NOTE: 216 observations removed because of NA values (Breakup: LHS: 108, RHS: 216).
-est3 = feols(l(y)~l(x1, 0:3), base_did, panel.id = ~id+period)
+est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)
 #&gt; NOTE: 324 observations removed because of NA values (Breakup: LHS: 108, RHS: 324).
-etable(est1, est2, est3, order = &quot;f&quot;, drop=&quot;Int&quot;)
+etable(est1, est2, est3, order = &quot;f&quot;, drop = &quot;Int&quot;)
 #&gt;                                    est1               est2
 #&gt; Dependent Var.:                       y             f(y,1)
 #&gt;                                                           
@@ -2179,14 +2179,14 @@ etable(est1, est2, est3, order = &quot;f&quot;, drop=&quot;Int&quot;)
 <pre class="r"><code># setting up the panel
 pdat = panel(base_did, ~id+period)
 # Now the panel.id argument is not required
-est1 = feols(y~l(x1, 0:1), pdat)
+est1 = feols(y ~ l(x1, 0:1), pdat)
 #&gt; NOTE: 108 observations removed because of NA values (Breakup: LHS: 0, RHS: 108).
-est2 = feols(f(y)~l(x1, -1:1), pdat)
+est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 #&gt; NOTE: 216 observations removed because of NA values (Breakup: LHS: 108, RHS: 216).
 # You can use sub selections of the panel data
-est_sub = feols(y~l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
+est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 #&gt; NOTE: 324 observations removed because of NA values (Breakup: LHS: 0, RHS: 324).
-etable(est1, est2, est_sub, order = &quot;f&quot;, drop=&quot;Int&quot;)
+etable(est1, est2, est_sub, order = &quot;f&quot;, drop = &quot;Int&quot;)
 #&gt;                                    est1               est2
 #&gt; Dependent Var.:                       y             f(y,1)
 #&gt;                                                           
@@ -2239,7 +2239,7 @@ head(pdat_dt)
 <p>If you just want to create a single lag/lead variable, a simple and fast method has been implemented: <code>lag.formula</code>. Let’s give an example:</p>
 <pre class="r"><code>base_lag = base_did
 # we create a lagged value of the variable x1
-base_lag$x1.l1 = lag(x1~id+period, 1, base_lag)
+base_lag$x1.l1 = lag(x1 ~ id+period, 1, base_lag)
 head(base_lag)
 #&gt;             y         x1 id period post treat      x1.l1
 #&gt; 1  2.87530627  0.5365377  1      1    0     1         NA
@@ -2253,7 +2253,7 @@ head(base_lag)
 <pre class="r"><code>library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
-base_lag_dt[, x1.l1 := lag(x1~id+period, 1)]</code></pre>
+base_lag_dt[, x1.l1 := lag(x1 ~ id+period, 1)]</code></pre>
 </div>
 </div>
 <div id="non-linear-in-parameters-example" class="section level2">
@@ -2279,12 +2279,12 @@ base = data.frame(x, y, z)</code></pre>
 #&gt; Observations: 1,000 
 #&gt; Standard-errors: Standard 
 #&gt;   Estimate Std. Error z value  Pr(&gt;|z|)    
-#&gt; a   2.0526   0.012172  168.64 &lt; 2.2e-16 ***
-#&gt; b   3.0259   0.013082  231.30 &lt; 2.2e-16 ***
+#&gt; a   2.0110   0.011155  180.27 &lt; 2.2e-16 ***
+#&gt; b   3.0208   0.012420  243.22 &lt; 2.2e-16 ***
 #&gt; ---
 #&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-#&gt; Log-likelihood: -3,585.80   Adj. Pseudo-R2: 0.9357 
-#&gt;            BIC:  7,199.24     Squared Cor.: 0.99151</code></pre>
+#&gt; Log-likelihood: -3,652.34   Adj. Pseudo-R2: 0.94139 
+#&gt;            BIC:  7,332.32     Squared Cor.: 0.99314</code></pre>
 <p>We can see that we obtain coefficients close to the generating values.</p>
 <div id="adding-fixed-effects-to-non-linear-in-parameters-models" class="section level3">
 <h3><span class="header-section-number">2.5.1</span> Adding fixed-effects to non-linear in parameters models</h3>
@@ -2310,21 +2310,18 @@ result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = li
 # The coef should be around 3
 coef(result_NL_fe)
 #&gt;        b 
-#&gt; 3.012344
+#&gt; 3.013982
 # the gamma and the exponential of the fixed-effects should be similar
 rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
-#&gt;                1          2         3         4        5         6
-#&gt; gamma 0.04548142 0.01277001 0.7088584 0.7161107 1.381316 0.5621028
-#&gt;       0.05267985 0.01884108 0.7133873 0.7434338 1.396539 0.5667244
-#&gt;               7         8         9           10         11       12
-#&gt; gamma 0.1842861 0.4470440 0.3032295 0.0001006169 0.01892236 1.732244
-#&gt;       0.1888766 0.4540985 0.3311732 0.0066109835 0.02932312 1.718197
-#&gt;              13      14        15       16       17         18         19
-#&gt; gamma 0.1462513 1.87682 0.9178173 2.261544 4.115477 0.01498530 0.04810714
-#&gt;       0.1538916 1.86043 0.9106842 2.254130 4.086404 0.01965385 0.06036267
-#&gt;             20
-#&gt; gamma 1.410198
-#&gt;       1.408492</code></pre>
+#&gt;              1         2          3          4        5         6        7
+#&gt; gamma 4.416610 0.4437617 0.06920927 0.09813055 2.082926 0.5031739 1.771264
+#&gt;       4.344765 0.4495038 0.07593741 0.10597476 2.095109 0.5166161 1.755910
+#&gt;               8         9        10         11           12        13
+#&gt; gamma 0.5217038 0.1820355 0.9995075 0.09085272 3.499298e-05 0.4915117
+#&gt;       0.5280161 0.1770661 0.9993184 0.10501228 6.275758e-03 0.4991922
+#&gt;              14       15        16         17       18        19        20
+#&gt; gamma 0.4256777 1.554429 0.1705245 0.08747777 3.517580 0.3072301 0.1609287
+#&gt;       0.4234933 1.568351 0.1729369 0.10056969 3.518553 0.3161425 0.1706018</code></pre>
 <p>As we can see, we obtain the “right” estimates.</p>
 </div>
 </div>

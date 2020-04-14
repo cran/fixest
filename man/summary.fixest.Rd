@@ -40,7 +40,7 @@ This function is similar to \code{print.fixest}. It provides the table of coeffi
 # Load trade data
 data(trade)
 
-# We estimate the effect of distance on trade (with 3 cluster effects)
+# We estimate the effect of distance on trade (with 3 fixed-effects)
 est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
 
 # Comparing different types of standard errors
@@ -65,7 +65,7 @@ summary(est_pois, cluster = 2:3)
 
 }
 \seealso{
-See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{fixef.fixest}} to extract the cluster coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
+See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{fixef.fixest}} to extract the fixed-effects coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
 }
 \author{
 Laurent Berge
