@@ -4,14 +4,36 @@
 \alias{feNmlm}
 \title{Fixed effects nonlinear maximum likelihood models}
 \usage{
-feNmlm(fml, data, family = c("poisson", "negbin", "logit", "gaussian"),
-  NL.fml, fixef, na_inf.rm = getFixest_na_inf.rm(), NL.start, lower,
-  upper, NL.start.init, offset, panel.id, start = 0,
-  jacobian.method = "simple", useHessian = TRUE, hessian.args = NULL,
-  opt.control = list(), nthreads = getFixest_nthreads(), verbose = 0,
-  theta.init, fixef.tol = 1e-05, fixef.iter = 1000,
-  deriv.tol = 1e-04, deriv.iter = 1000, warn = TRUE,
-  notes = getFixest_notes(), combine.quick, ...)
+feNmlm(
+  fml,
+  data,
+  family = c("poisson", "negbin", "logit", "gaussian"),
+  NL.fml,
+  fixef,
+  na_inf.rm = getFixest_na_inf.rm(),
+  NL.start,
+  lower,
+  upper,
+  NL.start.init,
+  offset,
+  panel.id,
+  start = 0,
+  jacobian.method = "simple",
+  useHessian = TRUE,
+  hessian.args = NULL,
+  opt.control = list(),
+  nthreads = getFixest_nthreads(),
+  verbose = 0,
+  theta.init,
+  fixef.tol = 1e-05,
+  fixef.iter = 1000,
+  deriv.tol = 1e-04,
+  deriv.iter = 1000,
+  warn = TRUE,
+  notes = getFixest_notes(),
+  combine.quick,
+  ...
+)
 }
 \arguments{
 \item{fml}{A formula. This formula gives the linear formula to be estimated (it is similar to a \code{lm} formula), for example: \code{fml = z~x+y}. To include fixed-effects variables, you can 1) either insert them in this formula using a pipe (e.g. \code{fml = z~x+y|fixef_1+fixef_2}), or 2) either use the argument \code{fixef}. To include a non-linear in parameters element, you must use the argment \code{NL.fml}.}
@@ -36,7 +58,7 @@ feNmlm(fml, data, family = c("poisson", "negbin", "logit", "gaussian"),
 
 \item{offset}{A formula or a numeric vector. An offset can be added to the estimation. If equal to a formula, it should be of the form (for example) \code{~0.5*x**2}. This offset is linearly added to the elements of the main formula 'fml'.}
 
-\item{panel.id}{The panel identifiers. Can either be: i) a one sided formula (e.g. \code{panel.id~id+time}), ii) a character vector of length 2 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables with \code{^} only inside formulas (see the dedicated section in \code{\link[fixest]{feols}}).}
+\item{panel.id}{The panel identifiers. Can either be: i) a one sided formula (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables with \code{^} only inside formulas (see the dedicated section in \code{\link[fixest]{feols}}).}
 
 \item{start}{Starting values for the coefficients in the linear part (for the non-linear part, use NL.start). Can be: i) a numeric of length 1 (e.g. \code{start = 0}, the default), ii) a numeric vector of the exact same length as the number of variables, or iii) a named vector of any length (the names will be used to initialize the appropriate coefficients).}
 
@@ -145,9 +167,9 @@ You can provide several leads/lags at once: e.g. if your formula is equal to \co
 \section{Interactions}{
 
 
-You can interact a variable with a "factor-like" variable by using the syntax \code{var::fe(ref)}, where \code{fe} is the variable to be interacted with and the argument \code{ref} is a value of \code{fe} taken as a reference.
+You can interact a variable with a "factor-like" variable by using the syntax \code{var::fe(ref)}, where \code{fe} is the variable to be interacted with and the argument \code{ref} is a value (or several) of \code{fe} taken as a reference.
 
-The full syntax is: \code{var::fe(ref, confirm)}. You have two arguments, \code{ref} and \code{confirm}, the two are optional. The argument \code{confirm} is there to avoid mistakenly estimating a model with (too) many variables. If the variable \code{fe} takes over 100 different values, then you have to add the argument \code{confirm = TRUE}. It is important to note that *if you do not care about the standard-errors of the interactions*, then you can add interactions in the fixed-effects part of the formula (using the syntax fe[[var]], as explained in the section \dQuote{Varying slopes}).
+It is important to note that *if you do not care about the standard-errors of the interactions*, then you can add interactions in the fixed-effects part of the formula (using the syntax fe[[var]], as explained in the section \dQuote{Varying slopes}).
 
 Introducing interactions with this syntax leads to a different display of the interacted values in \code{\link[fixest]{etable}} and offers a special representation of the interacted coefficients in the function \code{\link[fixest]{coefplot}}. See examples.
 

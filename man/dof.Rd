@@ -4,14 +4,16 @@
 \alias{dof}
 \title{Type of degree of freedom in fixest summary}
 \usage{
-dof(fixef = "nested", exact = FALSE, cluster = TRUE)
+dof(adj = 1, fixef.K = "nested", fixef.exact = FALSE, cluster.adj = TRUE)
 }
 \arguments{
-\item{fixef}{How to account for the fixed-effects parameters, defaults to \code{"nested"}. If \code{FALSE} or \code{"no"}, fixed-effects parameters are discarded, meaning the number of parameters is only equal to the number of variables. If \code{TRUE} or \code{yes}, then the number of parameters is equal to the number of variables plus the number of fixed-effects. Finally, if \code{nested}, then the number of parameters is equal to the number of variables an the number of fixed-effects that *are not* nested in the clusters used to cluster the standard-errors.}
+\item{adj}{Can be equal to 0, 1 or 2. Type of small sample correction. If 0: no small sample correction. If 1: a correction of the form \code{n / (n - K)} with n the number of observation and K the number of estiamted parameters. If 2: the correction is \code{(n - 1) / (n - K)}.}
 
-\item{exact}{Logical, default is \code{FALSE}. If there are 2 or more fixed-effects, these fixed-effects they can be irregular, meaning they can provide the same information. If so, the "real" number of parameters should be lower than the total number of fixed-effects. If \code{exact = TRUE}, then \code{\link[fixest]{fixef.fixest}} is first run to determine the exact number of parameters among the fixed-effects. Mostly, panels of the type individual-firm-year require \code{exact = TRUE} (but it adds computational costs).}
+\item{fixef.K}{How to account for the fixed-effects parameters, defaults to \code{"nested"}. If \code{FALSE} or \code{"no"}, fixed-effects parameters are discarded, meaning the number of parameters is only equal to the number of variables. If \code{TRUE} or \code{yes}, then the number of parameters is equal to the number of variables plus the number of fixed-effects. Finally, if \code{nested}, then the number of parameters is equal to the number of variables an the number of fixed-effects that *are not* nested in the clusters used to cluster the standard-errors.}
 
-\item{cluster}{Logical, default is \code{TRUE}. How to make the small sample correction when clustering the standard-errors? If \code{TRUE} a \code{G/(G-1)} correction is performed with \code{G} the number of cluster values.}
+\item{fixef.exact}{Logical, default is \code{FALSE}. If there are 2 or more fixed-effects, these fixed-effects they can be irregular, meaning they can provide the same information. If so, the "real" number of parameters should be lower than the total number of fixed-effects. If \code{fixef.exact = TRUE}, then \code{\link[fixest]{fixef.fixest}} is first run to determine the exact number of parameters among the fixed-effects. Mostly, panels of the type individual-firm-year require \code{fixef.exact = TRUE} (but it adds computational costs).}
+
+\item{cluster.adj}{Logical, default is \code{TRUE}. How to make the small sample correction when clustering the standard-errors? If \code{TRUE} a \code{G/(G-1)} correction is performed with \code{G} the number of cluster values.}
 }
 \value{
 It returns a \code{dof.type} object.
@@ -20,6 +22,33 @@ It returns a \code{dof.type} object.
 Provides how the degrees of freedom should be calculated in \code{\link[fixest]{vcov.fixest}}/\code{\link[fixest]{summary.fixest}}.
 }
 \examples{
+
+#
+# Equivalence with lm/glm standard-errors
+#
+
+res = feols(Petal.Length ~ Petal.Width + Species, iris)
+res_lm = lm(Petal.Length ~ Petal.Width + Species, iris)
+
+# lm applies a correction of the type adj = 1 (fixest's default)
+vcov(res) / vcov(res_lm)
+
+# Glm
+res_pois = fepois(round(Petal.Length) ~ Petal.Width + Species, iris)
+res_glm = glm(round(Petal.Length) ~ Petal.Width + Species, iris, family = poisson())
+
+# glm applies a correction of the type adj = 0 (this time not fixest's default)
+vcov(res_pois, dof = dof(adj = 0)) / vcov(res_glm)
+
+# Same example with the Gamma
+res_gamma = feglm(round(Petal.Length) ~ Petal.Width + Species, iris, family = Gamma())
+res_glm_gamma = glm(round(Petal.Length) ~ Petal.Width + Species, iris, family = Gamma())
+
+vcov(res_gamma, dof = dof(adj = 0)) / vcov(res_glm_gamma)
+
+#
+# Fixed-effects corrections
+#
 
 # We create "irregular" FEs
 base = data.frame(x = rnorm(10))
@@ -36,28 +65,28 @@ est = feols(y ~ x | fe1 + fe2, base)
 # Clustered standard-errors: by fe1
 #
 
-# Default: fixef = "nested"
+# Default: fixef.K = "nested"
 #  => adjustment K = 1 + 5 (i.e. x + fe2)
 summary(est)
 attributes(vcov(est))[c("dof.type", "dof.K")]
 
 
-# fixef = FALSE
+# fixef.K = FALSE
 #  => adjustment K = 1 (i.e. only x)
-summary(est, dof = dof(fixef=FALSE))
-attr(vcov(est, dof = dof(fixef=FALSE)), "dof.K")
+summary(est, dof = dof(fixef.K=FALSE))
+attr(vcov(est, dof = dof(fixef.K=FALSE)), "dof.K")
 
 
-# fixef = TRUE
+# fixef.K = TRUE
 #  => adjustment K = 1 + 3 + 5 - 1 (i.e. x + fe1 + fe2 - 1 restriction)
-summary(est, dof = dof(fixef=TRUE))
-attr(vcov(est, dof = dof(fixef=TRUE)), "dof.K")
+summary(est, dof = dof(fixef.K=TRUE))
+attr(vcov(est, dof = dof(fixef.K=TRUE)), "dof.K")
 
 
-# fixef = TRUE & exact = TRUE
+# fixef.K = TRUE & fixef.exact = TRUE
 #  => adjustment K = 1 + 3 + 5 - 2 (i.e. x + fe1 + fe2 - 2 restrictions)
-summary(est, dof = dof(fixef=TRUE, exact = TRUE))
-attr(vcov(est, dof = dof(fixef=TRUE, exact = TRUE)), "dof.K")
+summary(est, dof = dof(fixef.K=TRUE, fixef.exact = TRUE))
+attr(vcov(est, dof = dof(fixef.K=TRUE, fixef.exact = TRUE)), "dof.K")
 
 # There are two restrictions:
 attr(fixef(est), "references")

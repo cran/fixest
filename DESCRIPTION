@@ -1,10 +1,10 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.4.1
+Version: 0.5.0
 Authors@R: person("Laurent", "Berge", email = "laurent.berge@uni.lu", role = c("aut", "cre"))
-Imports: stats, graphics, grDevices, utils, Formula, MASS, numDeriv,
-        nlme, Rcpp
+Imports: stats, graphics, grDevices, utils, Formula, numDeriv, nlme,
+        Rcpp, dreamerr(>= 1.2.0)
 Suggests: knitr, rmarkdown, data.table
 LinkingTo: Rcpp
 Depends: R(>= 3.1.0)
@@ -16,11 +16,11 @@ BugReports: https://github.com/lrberge/fixest/issues
 SystemRequirements: C++11
 VignetteBuilder: knitr
 LazyData: true
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.0
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2020-04-14 13:00:20 UTC; laurent.berge
+Packaged: 2020-06-10 09:50:14 UTC; laurent.berge
 Author: Laurent Berge [aut, cre]
 Maintainer: Laurent Berge <laurent.berge@uni.lu>
 Repository: CRAN
-Date/Publication: 2020-04-14 13:20:06 UTC
+Date/Publication: 2020-06-10 12:00:03 UTC

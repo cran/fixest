@@ -3,6 +3,94 @@
 
 \title{News for \R Package \pkg{fixest}}
 
+\section{Changes in version 0.5.0}{
+
+    \subsection{Move}{
+        \itemize{
+            \item This is the last version for which this NEWS.Rd is maintained. From now on, the content will be in NEWS.md.
+        }
+    }
+
+    \subsection{Bug fixes}{
+        \itemize{
+            \item Bug with estimations with varying slopes if the fixed-effect relative to the slope is not in its decreasing order (thanks to Davide Proserpio).
+            \item Bug when interacting two variables with the \code{var::fe} syntax with \code{confirm = TRUE} and no reference.
+            \item Bug in \code{etable} when the standard-errors where \code{NA}.
+            \item Fixed very minor bug when computing the SEs (1e-6 difference).
+        }
+    }
+
+    \subsection{Issue found: convergence problems with multiples variables with varying slopes}{
+        \itemize{
+            \item Convergence problems may arise in the presence of multiple variables with varying slopes. Theoretical work helped find a solution to this problem, but the implementation in R may prove not instantaneous.
+            \item In the meantime, now a warning is prompted when the algorithm suspects a convergence problem leading to poor precision of the estimated coefficients.
+        }
+    }
+
+    \subsection{New functionality: formula macros}{
+        \itemize{
+            \item You can use macros in formulas.
+            \item To set a macro variable, use e.g., \code{setFixest_fml(..ctrl = ~ var1 + var2)}. Here the macro variable \code{..ctrl} has been set to the value \code{"var1 + var2"}.
+            \item Now you can use this macro variable in any \code{fixest} estimation: e.g. \code{data(airquality) ; setFixest_fml(..ctrl = ~ Temp + Day) ; feols(Ozone ~ Wind + ..ctrl, airquality)}.
+            \item You can use macros in non-fixest estimations with \code{xpd}, which expands formulas. E.g. \code{lm(xpd(Ozone ~ Wind + ..ctrl), airquality)}.
+        }
+    }
+
+    \subsection{New functions}{
+        \itemize{
+            \item \code{to_integer}: user-level version of the internal algorithm transforming any kind of vector (or combination of vectors) into an integer ranging from 1 to the number of unique elements of the vector. Very fast.
+            \item \code{demean}: user-level version of the demeaning algorithm used in \code{feols}.
+        }
+    }
+
+    \subsection{Major user-visible changes}{
+        \itemize{
+            \item New internal algorithm to estimate OLS:
+            \item 1) It is numerically more stable.
+            \item 2) Incomparably faster when factors are to be estimated (and not explicitly used as fixed-effects).
+            \item 3) Collinear variables are removed on the fly.
+        }
+    }
+
+    \subsection{Other user-visible changes}{
+        \itemize{
+            \item Interactions in \code{var::fe(ref)} now accept multiple references (i.e. \code{ref} can be a vector).
+            \item In \code{etable}, the variable names of non-Latex output can now be changed.
+            \item You can use the argument \code{n} when applying summary to choose the number of coefficients to display.
+            \item Argument \code{confirm} has been removed from the function \code{interact}.
+            \item \code{r2} allows more flexibility in the keywords it accepts. Full names can be displayed with the new argument \code{full_names}. The adjusted R2 now matches the one of \code{lm} when there is no intercept.
+            \item Function \code{dof} gains a new argument \code{adj} which allows to make different types of common small sample corrections. Its other arguments have been renamed for clarity (\code{fixef} => \code{fixef.K}, \code{exact} => \code{fixef.exact}, \code{cluster} => \code{cluster.adj}).
+            \item Now t-statistics are used for \code{feols} and non-poisson, non-binomial models in \code{feglm}. For all other models, z-statistics are used. This complies with the default's R-stats behavior.
+        }
+    }
+
+    \subsection{Methods}{
+        \itemize{
+            \item The \code{residuals} method has been substantially improved, now allowing different types.
+            \item New stats methods: sigma, deviance, weights.
+        }
+    }
+
+    \subsection{Vignette and Readme}{
+        \itemize{
+            \item Typos corrected.
+            \item Images in the Readme set to 1200px.
+        }
+    }
+
+    \subsection{Error-handling}{
+        \itemize{
+            \item Improved error-handling with dreamerr's functions.
+        }
+    }
+
+    \subsection{Other}{
+        \itemize{
+            \item MASS dependenvy is removed.
+        }
+    }
+}
+
 \section{Changes in version 0.4.1 (2020-04-13)}{
   \subsection{Bug fixes}{
   \itemize{

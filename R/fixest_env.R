@@ -199,8 +199,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # they concern only logit and poisson (so far)
         #
 
-        fun_dev = family$dev.resids
-        family$dev.resids = function(y, mu, eta, wt) sum(fun_dev(y, mu, wt))
+        # fun_dev = family$dev.resids
+        # family$dev.resids = function(y, mu, eta, wt) sum(fun_dev(y, mu, wt))
+
+        dev.resids = family$dev.resids
+        family$sum_dev.resids = function(y, mu, eta, wt) sum(dev.resids(y, mu, wt))
+
         fun_mu.eta = family$mu.eta
         family$mu.eta = function(mu, eta) fun_mu.eta(eta)
 
@@ -238,9 +242,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     #
     # nthreads argument
-    if(!isScalar(nthreads) || (nthreads %% 1) != 0 || nthreads <= 0){
-        stop("The argument 'nthreads' must be an integer greater or equal to 1 and lower than the number of threads available (", max(get_nb_threads(), 1), ").")
-    }
+    # if(!isScalar(nthreads) || (nthreads %% 1) != 0 || nthreads <= 0){
+    #     stop("The argument 'nthreads' must be an integer greater or equal to 1 and lower than the number of threads available (", max(get_nb_threads(), 1), ").")
+    # }
+    check_value(nthreads, "integer scalar GT{0}", .message = paste0("The argument 'nthreads' must be an integer greater or equal to 1 and lower than the number of threads available (", max(get_nb_threads(), 1), ")."))
 
     if(nthreads > 1){
         max_threads = get_nb_threads()
@@ -265,6 +270,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     # Formatting data ####
     #
 
+    fml_no_xpd = NULL # will be returned if expansion is performed
     isPanel = FALSE
     if(isFit){
         isFixef = !missnull(fixef_mat)
@@ -297,6 +303,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         if(!"formula" %in% class(fml)) stop("The argument 'fml' must be a formula.")
         fml = formula(fml) # we regularize the formula to check it
         if(length(fml) != 3) stop("The formula must be two sided: e.g. y~x1+x2, or y~x1+x2|fe1+fe2.")
+
+        # We apply expand for macros => we return fml_no_xpd
+        if(length(getFixest_fml()) > 0){
+            fml_no_xpd = fml
+            fml = xpd(fml)
+        }
 
         #
         # Panel setup
@@ -576,6 +588,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             }
 
             useModel.matrix = attr(linear.mat, "useModel.matrix")
+            attr(linear.mat, "useModel.matrix") = NULL
 
             # Interaction information => if no interaction: NULL
             interaction.info = getOption("fixest_interaction_ref")
@@ -740,29 +753,13 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                     stop("In ", origin, " the offset cannot be a formula. You must provide a numeric vector.")
                 }
 
-                offset = formula(offset) # regularization
-
-                if(length(offset) != 2){
-                    stop("Argument 'offset' must be a one-sided formula (e.g.): ~ 1+x^2 ; or a numeric vector.")
-                }
-
-                offset.call = offset[[length(offset)]]
-                vars.offset = all.vars(offset.call)
-
-                if(any(!vars.offset %in% dataNames)){
-                    var_missing = setdiff(vars.offset, dataNames)
-                    stop("In the argument 'offset': the variable", enumerate_items(var_missing, "s.is"), " not in the data.")
-                }
-
-                offset.value = try(eval(offset.call, data), silent = TRUE)
-                if("try-error" %in% class(offset.value)){
-                    stop("Evaluation of the offset (equal to ", deparse_long(offset.call), ") raises and error: \n", offset.value)
-                }
+                check_value(offset, "os formula var(data)", .data = data)
+                offset.value = offset[[2]]
+                check_value_plus(offset.value, "evalset numeric vector conv", .data = data, .prefix = "In argument 'offset', the expression")
 
             } else {
-                if(!is.numeric(offset) || !isVector(offset)){
-                    stop("The argument 'offset' must be either a one-sided formula (e.g. ~x1), either a numeric vector.")
-                }
+
+                check_value_plus(offset, "numeric vector conv", .prefix = "If not a formula, argument 'offset'")
 
                 if(length(offset) == 1){
                     offset.value = rep(offset, nobs)
@@ -795,8 +792,13 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             }
         } else if(is.null(offset)){
             # msg if it's not what the user wanted
-            if(!is.null(mc_origin$offset) && deparse_long(mc_origin$offset) != "x$offset"){
-                stop("Argument 'offset' (", deparse_long(mc_origin$offset), ") is evaluated to NULL. This is likely not what you want.")
+            if(!is.null(mc_origin$offset)){
+                dp = deparse_long(mc_origin$offset)
+
+                if((grepl("[[", dp, fixed = TRUE) || grepl("$", dp, fixed = TRUE)) && dp != 'x$offset'){
+                    # we avoid this behavior
+                    stop("Argument 'offset' (", dp, ") is evaluated to NULL. This is likely not what you want.")
+                }
             }
         }
     }
@@ -819,29 +821,14 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                     stop("In ", origin, " the weights cannot be a formula. You must provide a numeric vector.")
                 }
 
-                weights = formula(weights) # regularization
+                check_value(weights, "os formula var(data)", .data = data)
+                weights.value = weights[[2]]
+                check_value_plus(weights.value, "evalset numeric vector conv", .data = data, .prefix = "In argument 'weights', the expression")
 
-                if(length(weights) != 2){
-                    stop("The argument weights must be either a one-sided formula (e.g. ~x1), either a numeric vector.")
-                }
-
-                weights.call = weights[[length(weights)]]
-                vars.weights = all.vars(weights.call)
-
-                if(any(!vars.weights %in% dataNames)){
-                    var_missing = vars.weights[!vars.weights %in% dataNames]
-                    stop("In the argument 'weights': the variable", enumerate_items(var_missing, "s.is"), " not in the data." )
-                }
-
-                weights.value = try(eval(weights.call, data), silent = TRUE)
-                if("try-error" %in% class(weights.value)){
-                    stop("Evaluation of the weights (equal to ", deparse_long(weights.call), ") raises and error: \n", weights.value)
-                }
 
             } else {
-                if(!is.numeric(weights) || !isVector(weights)){
-                    stop("The argument weights must be either a one-sided formula (e.g. ~x1), either a numeric vector. Currently it is not ", ifelse(!is.numeric(weights), "even numeric", "a vector despite being numeric"), ".")
-                }
+
+                check_value_plus(weights, "numeric vector conv", .prefix = "If not a formula, argument 'weights'")
 
                 if(length(weights) == 1){
                     if(weights == 1){
@@ -897,9 +884,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 notes = c(notes, message_0W)
             }
 
-        } else if(!is.null(mc_origin$weights) && deparse_long(mc_origin$weights) != 'x[["weights"]]'){
-            # we avoid this behavior
-            stop("Argument 'weights' (", deparse_long(mc_origin$weights), ") is evaluated to NULL. This is likely not what you want.")
+        } else if(!is.null(mc_origin$weights)){
+            dp = deparse_long(mc_origin$weights)
+            if((grepl("[[", dp, fixed = TRUE) || grepl("$", dp, fixed = TRUE)) && dp != 'x[["weights"]]'){
+                # we avoid this behavior
+                stop("Argument 'weights' (", dp, ") is evaluated to NULL. This is likely not what you want.")
+            }
         }
     }
 
@@ -911,6 +901,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     isSlope = onlySlope = FALSE
     if(from_update){
         # Fixed-effects information coming from the update method
+
+        #
+        # ... From update ####
+        #
 
         # means that there is no modification of past fixed-effects
 
@@ -973,7 +967,15 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     } else if(isFixef){
         # The main fixed-effects construction
 
+        #
+        # ... General ####
+        #
+
         if(isFit){
+
+            #
+            # ... From fit ####
+            #
 
             if(isVector(fixef_mat)){
                 fixef_mat = data.frame(x = fixef_mat, stringsAsFactors = FALSE)
@@ -1007,6 +1009,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             fml_full = as.formula(paste0(fml_char[2], "~", fml_char[3], "|", paste0(fixef_vars, collapse = "+")))
 
         } else {
+            #
+            # ... Reguar ####
+            #
+
             # Regular way
             if(is.character(fixef_vars) && any(grepl("^", fixef_vars, fixed = TRUE))){
                 # we make it a formula
@@ -1095,13 +1101,9 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             }
         }
 
-        # # We change factors to character
-        # isFactor = sapply(fixef_mat, is.factor)
-        # if(any(isFactor)){
-        #     for(i in which(isFactor)){
-        #         fixef_mat[[i]] = as.character(fixef_mat[[i]])
-        #     }
-        # }
+        #
+        # ... NA handling ####
+        #
 
         # We change non-numeric to character (impotant for parallel qufing)
         is_not_num = sapply(fixef_mat, function(x) !is.numeric(x))
@@ -1221,7 +1223,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         }
 
         #
-        # QUF setup ####
+        # ... QUF setup ####
         #
 
         Q = length(fixef_terms) # terms: contains FEs + slopes
@@ -1364,6 +1366,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
             if(isSlope){
                 slope_variables = slope_variables[new_order]
+                slope_flag = slope_flag[new_order]
             }
 
         }
@@ -1611,13 +1614,15 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             qui_pos = lhs > 0
             if(isWeight){
                 constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
-                dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
+                # dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
+                sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
             } else {
                 constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
-                dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+                # dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+                sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
             }
 
-            family_funs$dev.resids = dev.resids
+            family_funs$sum_dev.resids = sum_dev.resids
 
             family_funs$mu.eta = function(mu, eta) mu
             family_funs$validmu = function(mu) cpppar_poisson_validmu(mu, nthreads)
@@ -1626,11 +1631,13 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             family_funs$linkfun = function(mu) cpppar_logit_linkfun(mu, nthreads)
             family_funs$linkinv = function(eta) cpppar_logit_linkinv(eta, nthreads)
             if(isWeight){
-                dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, wt, nthreads))
+                # dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, wt, nthreads))
+                sum_dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, wt, nthreads))
             } else {
-                dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, 1, nthreads))
+                # dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, 1, nthreads))
+                sum_dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, 1, nthreads))
             }
-            family_funs$dev.resids = dev.resids
+            family_funs$sum_dev.resids = sum_dev.resids
 
             family_funs$mu.eta = function(mu, eta) cpppar_logit_mueta(eta, nthreads)
         }
@@ -2075,6 +2082,8 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     res = list(nobs=length(lhs), fml=fml, call = mc_origin, method = origin)
 
     if(isFixef) res$fml_full = fml_full
+
+    if(!is.null(fml_no_xpd)) res$fml_no_xpd = fml_no_xpd
 
     if(isFit) res$fromFit = TRUE
 

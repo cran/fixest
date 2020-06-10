@@ -6,38 +6,97 @@
 \alias{esttable}
 \title{Estimations table (export the results of multiples estimations to a DF or to Latex)}
 \usage{
-etable(..., se = c("standard", "white", "cluster", "twoway", "threeway",
-  "fourway"), dof = getFixest_dof(), cluster, digits = 4, tex, fitstat,
-  title, coefstat = c("se", "tstat", "confint"), ci = 0.95,
-  sdBelow = TRUE, keep, drop, order, dict = getFixest_dict(), file,
-  replace = FALSE, convergence, signifCode, label, float, subtitles,
-  fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
-  yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family,
-  powerBelow = -5, interaction.combine = " $\\\\times $ ", depvar)
+etable(
+  ...,
+  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  dof = getFixest_dof(),
+  cluster,
+  digits = 4,
+  tex,
+  fitstat,
+  title,
+  coefstat = c("se", "tstat", "confint"),
+  ci = 0.95,
+  sdBelow = TRUE,
+  keep,
+  drop,
+  order,
+  dict,
+  file,
+  replace = FALSE,
+  convergence,
+  signifCode,
+  label,
+  float,
+  subtitles,
+  fixef_sizes = FALSE,
+  fixef_sizes.simplify = TRUE,
+  yesNoFixef = c("Yes", "No"),
+  keepFactors = TRUE,
+  family,
+  powerBelow = -5,
+  interaction.combine = " $\\\\times $ ",
+  depvar
+)
 
-esttex(..., se = c("standard", "white", "cluster", "twoway", "threeway",
-  "fourway"), dof = getFixest_dof(), cluster, digits = 4, fitstat,
-  coefstat = c("se", "tstat", "confint"), ci = 0.95, title,
-  float = float, sdBelow = TRUE, keep, drop, order,
-  dict = getFixest_dict(), file, replace = FALSE, convergence,
-  signifCode = c(`***` = 0.01, `**` = 0.05, `*` = 0.1), label, subtitles,
-  fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
-  yesNoFixef = c("Yes", "No"), keepFactors = TRUE, family,
-  powerBelow = -5, interaction.combine = " $\\\\times $ ")
+esttex(
+  ...,
+  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  dof = getFixest_dof(),
+  cluster,
+  digits = 4,
+  fitstat,
+  coefstat = c("se", "tstat", "confint"),
+  ci = 0.95,
+  title,
+  float = float,
+  sdBelow = TRUE,
+  keep,
+  drop,
+  order,
+  dict,
+  file,
+  replace = FALSE,
+  convergence,
+  signifCode = c(`***` = 0.01, `**` = 0.05, `*` = 0.1),
+  label,
+  subtitles,
+  fixef_sizes = FALSE,
+  fixef_sizes.simplify = TRUE,
+  yesNoFixef = c("Yes", "No"),
+  keepFactors = TRUE,
+  family,
+  powerBelow = -5,
+  interaction.combine = " $\\\\times $ "
+)
 
-esttable(..., se = c("standard", "white", "cluster", "twoway",
-  "threeway", "fourway"), dof = getFixest_dof(), cluster,
-  coefstat = c("se", "tstat", "confint"), ci = 0.95, depvar, keep,
-  drop, order, digits = 4, fitstat, convergence, signifCode = c(`***` =
-  0.001, `**` = 0.01, `*` = 0.05, . = 0.1), subtitles,
-  keepFactors = FALSE, family)
+esttable(
+  ...,
+  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  dof = getFixest_dof(),
+  cluster,
+  coefstat = c("se", "tstat", "confint"),
+  ci = 0.95,
+  depvar,
+  keep,
+  drop,
+  dict,
+  order,
+  digits = 4,
+  fitstat,
+  convergence,
+  signifCode = c(`***` = 0.001, `**` = 0.01, `*` = 0.05, . = 0.1),
+  subtitles,
+  keepFactors = FALSE,
+  family
+)
 }
 \arguments{
 \item{...}{Used to capture different \code{fixest} estimation objects (obtained with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). Note that any other type of element is discarded. Note that you can give a list of \code{fixest} objects.}
 
 \item{se}{Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{White}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "standard"}. Note that this argument can be implicitly deduced from the argument \code{cluster}.}
 
-\item{dof}{An object of class \code{dof.type} obtained with the function \code{\link[fixest]{dof}}. Represent how the degree of freedom correction should be done. Defaults to \code{dof(fixef="nested", exact=FALSE, cluster = TRUE)}. See the help of the function \code{\link[fixest]{dof}} for details.}
+\item{dof}{An object of class \code{dof.type} obtained with the function \code{\link[fixest]{dof}}. Represent how the degree of freedom correction should be done. Defaults to \code{dof(adj = 1, fixef.K="nested", fixef.exact=FALSE, cluster.adj = TRUE)}. See the help of the function \code{\link[fixest]{dof}} for details.}
 
 \item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1, "var2")]}, \code{cluster = c("var1, "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster).}
 
@@ -61,7 +120,7 @@ esttable(..., se = c("standard", "white", "cluster", "twoway",
 
 \item{order}{Character vector. This element is used if the user wants the variables to be ordered in a certain way. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). The variables satisfying the first regular expression will be placed first, then the order follows the sequence of regular expressions. This argument is applied post aliasing (see argument \code{dict}). Example: you have the following variables: \code{month1} to \code{month6}, then \code{x1} to \code{x5}, then \code{year1} to \code{year6}. If you want to display first the x's, then the years, then the months you could use: \code{order = c("x", "year")}. If the first character is an exclamation mark, the effect is reversed (e.g. order = "!Intercept" means: every variable that does not contain \dQuote{Intercept} goes first).  See details.}
 
-\item{dict}{(Tex only.) A named character vector. It changes the original variable names to the ones contained in the \code{dict}. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}.}
+\item{dict}{A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, if Tex output is requested or if argument \code{file} is not missing, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. The default is not to change names if a \code{data.frame} is requested (i.e. \code{tex = FALSE}); if so, you can use \code{dict = TRUE} to use the dictionary you've set globally with \code{setFixest_dict()}.}
 
 \item{file}{A character scalar. If provided, the Latex (or data frame) table will be saved in a file whose path is \code{file}. If you provide this argument, then a Latex table will be exported, to export a regular \code{data.frame}, use argument \code{tex = FALSE}.}
 

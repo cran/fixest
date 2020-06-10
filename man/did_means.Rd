@@ -4,10 +4,24 @@
 \alias{did_means}
 \title{Treated and control sample descriptives}
 \usage{
-did_means(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
-  dict = getFixest_dict(), file, replace = FALSE, title, label,
-  raw = FALSE, indiv, treat_first, prepostnames = c("Before", "After"),
-  diff.inv = FALSE)
+did_means(
+  fml,
+  base,
+  treat_var,
+  post_var,
+  tex = FALSE,
+  treat_dict,
+  dict = getFixest_dict(),
+  file,
+  replace = FALSE,
+  title,
+  label,
+  raw = FALSE,
+  indiv,
+  treat_first,
+  prepostnames = c("Before", "After"),
+  diff.inv = FALSE
+)
 }
 \arguments{
 \item{fml}{Either a formula of the type \code{var1 + ... + var[N] ~ treat} or \code{var1 + ... + var[N] ~ treat | post}. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: \code{. ~ treat}.}

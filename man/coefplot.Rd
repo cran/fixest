@@ -4,23 +4,66 @@
 \alias{coefplot}
 \title{Plots confidence intervals and point estimates}
 \usage{
-coefplot(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0,
-  horiz = FALSE, dict = getFixest_dict(), keep, drop, order,
-  ci.width = "1\%", ci_level = 0.95, add = FALSE, pt.pch = 20,
-  pt.bg = NULL, cex = 1, pt.cex = cex, col = 1:8, pt.col = col,
-  ci.col = col, lwd = 1, pt.lwd = lwd, ci.lwd = lwd, ci.lty = 1,
-  grid = TRUE, grid.par = list(lty = 3, col = "gray"), zero = TRUE,
-  zero.par = list(col = "black", lwd = 1), pt.join = FALSE,
-  pt.join.par = list(col = pt.col, lwd = lwd), ci.join = FALSE,
-  ci.join.par = list(lwd = lwd, col = col, lty = 2), ci.fill = FALSE,
-  ci.fill.par = list(col = "lightgray", alpha = 0.5), ref = "auto",
-  ref.line = "auto", ref.line.par = list(col = "black", lty = 2),
-  lab.cex, lab.min.cex = 0.85, lab.max.mar = 0.25, lab.fit = "auto",
-  xlim.add, ylim.add, only.params = FALSE, only.inter = TRUE, sep,
-  as.multiple = FALSE, bg, group = "auto", group.par = list(lwd = 2,
-  line = 3, tcl = 0.75), main = "Effect on __depvar__",
-  value.lab = "Estimate and __ci__ Conf. Int.", ylab = NULL,
-  xlab = NULL, sub = NULL)
+coefplot(
+  object,
+  ...,
+  style,
+  sd,
+  ci_low,
+  ci_high,
+  x,
+  x.shift = 0,
+  horiz = FALSE,
+  dict = getFixest_dict(),
+  keep,
+  drop,
+  order,
+  ci.width = "1\%",
+  ci_level = 0.95,
+  add = FALSE,
+  pt.pch = 20,
+  pt.bg = NULL,
+  cex = 1,
+  pt.cex = cex,
+  col = 1:8,
+  pt.col = col,
+  ci.col = col,
+  lwd = 1,
+  pt.lwd = lwd,
+  ci.lwd = lwd,
+  ci.lty = 1,
+  grid = TRUE,
+  grid.par = list(lty = 3, col = "gray"),
+  zero = TRUE,
+  zero.par = list(col = "black", lwd = 1),
+  pt.join = FALSE,
+  pt.join.par = list(col = pt.col, lwd = lwd),
+  ci.join = FALSE,
+  ci.join.par = list(lwd = lwd, col = col, lty = 2),
+  ci.fill = FALSE,
+  ci.fill.par = list(col = "lightgray", alpha = 0.5),
+  ref = "auto",
+  ref.line = "auto",
+  ref.line.par = list(col = "black", lty = 2),
+  lab.cex,
+  lab.min.cex = 0.85,
+  lab.max.mar = 0.25,
+  lab.fit = "auto",
+  xlim.add,
+  ylim.add,
+  only.params = FALSE,
+  only.inter = TRUE,
+  sep,
+  as.multiple = FALSE,
+  bg,
+  group = "auto",
+  group.par = list(lwd = 2, line = 3, tcl = 0.75),
+  main = "Effect on __depvar__",
+  value.lab = "Estimate and __ci__ Conf. Int.",
+  ylab = NULL,
+  xlab = NULL,
+  sub = NULL
+)
 }
 \arguments{
 \item{object}{Can be either: i) an estimation object (obtained for example from \code{\link[fixest]{feols}}, ii) a list of estimation objects (several results will be plotted at once), iii) a matrix of coefficients table, iv) a numeric vector of the point estimates -- the latter requiring the extra arguments \code{sd} or \code{ci_low} and \code{ci_high}.}
@@ -41,7 +84,7 @@ coefplot(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0,
 
 \item{horiz}{A logical scalar, default is \code{FALSE}. Whether to display the confidence intervals horizontally instead of vertically.}
 
-\item{dict}{(Tex only.) A named character vector. It changes the original variable names to the ones contained in the \code{dict}. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}.}
+\item{dict}{A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, if Tex output is requested or if argument \code{file} is not missing, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. The default is not to change names if a \code{data.frame} is requested (i.e. \code{tex = FALSE}); if so, you can use \code{dict = TRUE} to use the dictionary you've set globally with \code{setFixest_dict()}.}
 
 \item{keep}{Character vector. This element is used to display only a subset of variables. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). Each variable satisfying any of the regular expressions will be kept. This argument is applied post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display only \code{x1} to \code{x9}, then you could use \code{keep = "x[[:digit:]]$"}. If the first character is an exclamation mark, the effect is reversed (e.g. keep = "!Intercept" means: every variable that does not contain \dQuote{Intercept} is kept). See details.}
 

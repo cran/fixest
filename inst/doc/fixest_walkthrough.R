@@ -1,28 +1,28 @@
-## ----setup, include = FALSE----------------------------------------------
+## ----setup, include = FALSE---------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
 
-## ----echo=TRUE-----------------------------------------------------------
+## ----echo=TRUE----------------------------------------------------------------
 library(fixest)
 data(trade)
 
 
-## ---- echo=FALSE, results='asis'-----------------------------------------
+## ---- echo=FALSE, results='asis'----------------------------------------------
 tab = head(trade)
 knitr::kable(tab)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 gravity_pois <- feglm(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 print(gravity_pois)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 summary(gravity_pois, se = "twoway")
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # Equivalent ways of clustering the SEs:
 # One-way clustering is deduced from the arguent 'cluster'
 # - using the vector:
@@ -32,7 +32,7 @@ summary(gravity_pois, cluster = "Product")
 # - with a formula:
 summary(gravity_pois, cluster = ~Product)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 gravity_simple = feglm(Euros ~ log(dist_km), trade)
 # Two way clustering is deduced from the argument 'cluster'
 # Using data:
@@ -41,41 +41,41 @@ summary(gravity_simple, cluster = trade[, c("Origin", "Destination")])
 #  fetched directly in the original database):
 summary(gravity_simple, cluster = ~Origin+Destination)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 gravity_ols <- feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 gravity_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
 
 
-## ---- eval=FALSE---------------------------------------------------------
+## ---- eval=FALSE--------------------------------------------------------------
 #  etable(gravity_pois, gravity_negbin, gravity_ols,
 #           se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
 
-## ---- echo=FALSE, results='asis'-----------------------------------------
+## ---- echo=FALSE, results='asis'----------------------------------------------
 tab = etable(gravity_pois, gravity_negbin, gravity_ols, se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
 # problem to display the second empty line in markdown
 knitr::kable(tab[-2, ])
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 gravity_subfe = list()
 all_FEs = c("Year", "Destination", "Origin")
 for(i in 0:3){
 	gravity_subfe[[i+1]] = feglm(Euros ~ log(dist_km), trade, fixef = all_FEs[0:i])
 }
 
-## ---- eval=FALSE---------------------------------------------------------
+## ---- eval=FALSE--------------------------------------------------------------
 #  etable(gravity_subfe, cluster = ~Origin+Destination)
 
-## ---- echo=FALSE, results='asis'-----------------------------------------
+## ---- echo=FALSE, results='asis'----------------------------------------------
 tab = etable(gravity_subfe, cluster = ~Origin+Destination)
 knitr::kable(tab)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # with two-way clustered SEs
 etable(gravity_subfe, cluster = ~Origin+Destination, tex = TRUE)
 
-## ---- eval=FALSE---------------------------------------------------------
+## ---- eval=FALSE--------------------------------------------------------------
 #  # we set the dictionary once and for all
 #  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 #  # 1st export: we change the signif code and drop the intercept
@@ -88,68 +88,68 @@ etable(gravity_subfe, cluster = ~Origin+Destination, tex = TRUE)
 #         title = "Second export -- clustered standard-errors (on Product variable)")
 #  
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 fixedEffects <- fixef(gravity_pois)
 summary(fixedEffects)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 fixedEffects$Year
 
-## ---- fig.width=7--------------------------------------------------------
+## ---- fig.width=7-------------------------------------------------------------
 plot(fixedEffects)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 base_vs = iris
 names(base_vs) = c(paste0("x", 1:4), "species")
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 est_vs = feols(x1 ~ x2 | species[x3], base_vs)
 est_vs
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 summary(fixef(est_vs))
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # we create another "fixed-effect"
 base_vs$fe = rep(1:5, 30)
 head(base_vs)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 est_comb = feols(x1 ~ x2 | species^fe, base_vs)
 est_comb
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 fixef(est_comb)[[1]]
 
-## ---- echo = FALSE-------------------------------------------------------
+## ---- echo = FALSE------------------------------------------------------------
 # "::" = function(a, b) NULL
 
-## ---- eval = TRUE--------------------------------------------------------
+## ---- eval = TRUE-------------------------------------------------------------
 # Sample data illustrating the DiD
 data(base_did)
 head(base_did)
 
-## ---- eval = FALSE-------------------------------------------------------
+## ---- eval = FALSE------------------------------------------------------------
 #  # Estimation of yearly effect
 #  # We also add individual/time fixed-effects:
 #  est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
 #  est_did
 
-## ---- echo = FALSE-------------------------------------------------------
+## ---- echo = FALSE------------------------------------------------------------
 # I need to use a trick to be allowed to use "::"
 est_did = eval(parse(text = "feols(y ~ x1 + treat::period(5) | id + period, base_did)"))
 est_did
 
-## ---- fig.width=7--------------------------------------------------------
+## ---- fig.width=7-------------------------------------------------------------
 coefplot(est_did)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
 est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
 est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)
 etable(est1, est2, est3, order = "f", drop = "Int")
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # setting up the panel
 pdat = panel(base_did, ~id+period)
 # Now the panel.id argument is not required
@@ -159,7 +159,7 @@ est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 etable(est1, est2, est_sub, order = "f", drop = "Int")
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 library(data.table)
 pdat_dt = panel(as.data.table(base_did), ~id+period)
 # we create a lagged value of the variable x1
@@ -168,19 +168,19 @@ pdat_dt[, x1_l1 := l(x1)]
 pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 head(pdat_dt)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 base_lag = base_did
 # we create a lagged value of the variable x1
 base_lag$x1.l1 = lag(x1 ~ id+period, 1, base_lag)
 head(base_lag)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
 base_lag_dt[, x1.l1 := lag(x1 ~ id+period, 1)]
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # Generating data:
 n = 1000
 # x and y: two positive random variables
@@ -190,13 +190,13 @@ y = rnorm(n, -1, 5)**2
 z = rpois(n, 2*x + 3*y) + rpois(n, 1)
 base = data.frame(x, y, z)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 result_NL = feNmlm(z~0, base, NL.fml = ~ log(a*x + b*y), NL.start = list(a=1, b=1), lower = list(a=0, b=0))
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 print(result_NL)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # the class of each observation
 id = sample(20, n, replace = TRUE)
 base$id = id
@@ -206,7 +206,7 @@ gamma = rnorm(20)**2
 z_bis = rpois(n, gamma[id] * (2*x + 3*y)) + rpois(n, 1)
 base$z_bis = z_bis
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # we add the fixed-effect in the formula
 result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = list(b=1), lower = list(b=0))
 # The coef should be around 3
@@ -215,7 +215,7 @@ coef(result_NL_fe)
 rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 
 
-## ---- eval = FALSE-------------------------------------------------------
+## ---- eval = FALSE------------------------------------------------------------
 #  # Sample of results:
 #  # 1 nthreads: 3.13s
 #  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 1))
@@ -224,7 +224,7 @@ rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 #  # 4 nthreads: 1.17s
 #  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 4))
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 base_coll = trade
 base_coll$constant_variable = 1
 res <- femlm(Euros ~ log(dist_km) + constant_variable|Origin+Destination+Product+Year, base_coll)
