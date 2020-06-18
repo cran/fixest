@@ -36,7 +36,8 @@ etable(
   family,
   powerBelow = -5,
   interaction.combine = " $\\\\times $ ",
-  depvar
+  depvar,
+  style = list()
 )
 
 esttex(
@@ -67,7 +68,8 @@ esttex(
   keepFactors = TRUE,
   family,
   powerBelow = -5,
-  interaction.combine = " $\\\\times $ "
+  interaction.combine = " $\\\\times $ ",
+  style = list()
 )
 
 esttable(
@@ -128,7 +130,7 @@ esttable(
 
 \item{convergence}{Logical, default is missing. Should the convergence state of the algorithm be displayed? By default, convergence information is displayed if at least one model did not converge.}
 
-\item{signifCode}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default). To supress the significance codes, use \code{signifCode=NA} or \code{signifCode=NULL}.}
+\item{signifCode}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default). To supress the significance codes, use \code{signifCode=NA} or \code{signifCode=NULL}. Can also be equal to \code{"letters"}, then the default becomes \code{c("a"=0.01, "b"=0.05, "c"=0.10)}.}
 
 \item{label}{(Tex only.) Character scalar. The label of the Latex table.}
 
@@ -151,6 +153,8 @@ esttable(
 \item{interaction.combine}{(Tex only.) Character scalar, defaults to \code{" $\\times$ "}. When the estimation contains interactions, then the variables names (after aliasing) are combined with this argument. For example: if \code{dict = c(x1="Wind", x2="Rain")} and you have the following interaction \code{x1:x2}, then it will be renamed (by default) \code{Wind $\\times$ Rain} -- using \code{interaction.combine = "*"} would lead to \code{Wind*Rain}.}
 
 \item{depvar}{(Data frame only.) Logical, default is missing. Whether a first line containing the dependent variables should be shown. By default, the dependent variables are shown only if they differ across models or if the argumen \code{file} is not missing.}
+
+\item{style}{A list. You can change the general style of the table with this argument. It should be of the form \code{style = list(keyword="key1:value1;key2:value2")} etc. The available keywords are \code{lines} (to manage the type of lines appearing in the table), and \code{depvar}, \code{model}, \code{var}, \code{fixef}, \code{slopes}, \code{fixef.sizes}, and \code{stats}. Most of these keywords accept the key \code{title:} which affects the title appearing just before the section. Eg to drop the \emph{Variables} header, just use \code{style=list("title:")}. Note that if you use \code{style=list("title: ")} (note the space after ":"), then an empty line will still be there. The keywords fixef, slopes and fixef.sizes also accept the keys \code{prefix} and \code{suffix}. E.g. if \code{style=list(fixef="suffix: FE")}, then there will be no header showing but the text " FE" will be appended to the ficed-effects variable names. The keys accepted in \code{lines} are \code{top}, \code{bottom}, \code{foot} and \code{sep}.}
 }
 \value{
 If \code{tex = TRUE}, the lines composing the Latex table are returned invisibly while the table is directly prompted on the console.
@@ -233,6 +237,22 @@ etable(est1, est2, fitstat = ~r2+ar2+apr2+war2)
 # Adding a dictionnary (Tex only)
 dict = c(Month5="May", Month6="Jun", Month7="Jul", Month8="Aug", Month9="Sep")
 etable(est1, est2, dict = dict, tex = TRUE)
+
+#
+# Using the argument style to customize Latex exports
+#
+
+# If you don't like the default layout of the table, no worries!
+# You can modify many parameters with the argument style
+
+# To drop the headers before each section, use:
+style_noHeaders = list(var="", fixef="suffix: FE", stats = "")
+etable(est1, est2, dict = dict, tex = TRUE, style = style_noHeaders)
+
+# To change the lines of the table
+style_lines = list(lines = "top:\\\\toprule;bottom:\\\\bottomrule;sep:\\\\midrule;foot:\\\\midrule")
+etable(est1, est2, dict = dict, tex = TRUE, style = style_lines)
+
 
 }
 \seealso{
