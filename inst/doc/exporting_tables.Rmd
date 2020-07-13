@@ -1,0 +1,111 @@
+---
+title: "Exporting estimation tables"
+author: "Laurent Berge"
+date: "`r Sys.Date()`"
+output: html_document
+vignette: >
+  %\VignetteIndexEntry{Exporting estimation tables}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+`fixest` offers a simple tool, the function `etable`, to export estimation tables to Latex. The main advantage of this function is its simplicity, many adjustments being made automatically behind the scene. 
+
+Its main limitations are that *i)* only `fixest` objects can be exported, and *ii)* only Latex is supported. Thus by no means it competes with other excellent tools to export tables in various format (like for instance [modelsummary](https://cran.r-project.org/package=modelsummary) or [texreg](https://cran.r-project.org/package=texreg)). 
+
+It offers however a fair deal of customization, and since you can seamlessly change its default values, you can completely transform the style of your tables without modifying a single line of code. 
+
+This document does not describe `etable`'s arguments in details (since it's in the help pages). Rather, it illustrates how to change the style of the table, once and for all.
+
+This document applies to `fixest` version 0.6.0 or higher.
+
+## First example
+
+Using data from the *airquality* data base, let's estimate 5 models:
+
+```{r}
+library(fixest)
+data(airquality)
+
+setFixest_notes(FALSE) # To avoid messages when NAs are removed
+
+est_noFE = feols(Ozone ~ Solar.R + Wind + Temp, airquality)
+est_1FE  = feols(Ozone ~ Solar.R + Wind + Temp | Day, airquality)
+est_2FE  = feols(Ozone ~ Solar.R + Wind + Temp | Day + Month , airquality)
+est_poly = feols(Ozone ~ Solar.R + Wind + poly(Temp, 3) | Day + Month, airquality)
+```
+
+To export the results to Latex, we use `etable`. We first set the dictionnary renaming the variables, then we export the results with clustered standard-errors at the Day level:
+
+```{r, eval = FALSE}
+# Dictionary => set only once per session
+setFixest_dict(c(Ozone = "Ozone (ppb)", Solar.R = "Solar Radiation (Langleys)",
+                 Wind = "Wind Speed (mph)", Temp = "Temperature"))
+
+etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", file = file,
+       group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
+
+```
+
+The previous code produces the following table:
+
+![Default table](https://github.com/lrberge/fixest/blob/master/vignettes/images/etable/first_table.PNG?raw=true)
+
+What can we notice? First, all variables are appropriately labeled. Second, all standard-errors of the four models are clustered by Day, and this is mentioned in the table footer. This is achieved with the argument `cluster`. Third, there's a fixed-effects section telling which model has which fixed-effect. Fourth, the polynomial of the Temperature is not shown, instead there's a line telling which model includes a cubic polynomial. This is achieved with the argument `group`. 
+
+The style of the table is rather sober, but no worries most of it can be customized.
+
+
+## Setting the style, once and for all
+
+The argument `style` defines how the table looks. It allows an in-depth customization of the table. The table is split into several components, each allowing some customization. The components of a table and some of its associated keywords are described by the following figure:
+
+![Illustration style](https://github.com/lrberge/fixest/blob/master/vignettes/images/etable/style_explanation.png?raw=true)
+
+The argument `style` must be a list, the names of which correspond to the different components. Each element of this list must be a single character string of the form `"keyword1:value1; keyword2:value; etc"`. The missing components fall back to their default values. The components, with the keywords they accept and their defaults are:
+
+ - **depvar**: *title*. Default `"title:Dependent Variable(s):"`.
+ - **model**: *title, format*. Default `"title:Model:; format:(1)"`. In `format`, you can use the special values 1, i, I, a or A; the corresponding values will be increased across the model columns.
+ - **var**: *title*. Default `"title:\\emph{Variables}"`.
+ - **fixef**: *title, prefix, suffix, where*. Default `"title:\\emph{Fixed-effects}; where:var"`. Valid values of `where` are "var" or "stats".
+ - **slopes**: *title, format*.  Default `"title:\\emph{Varying Slopes}; format:__var__ (__slope__)"`. In `format`, the special values \_\_var\_\_ and \_\_slope\_\_ are replaced with the corresponding labels of the variables and of the slope.
+ - **stats**: *title*.  Default `"title:\\emph{Fit statistics}"`.
+ - **notes**: *title*.  Default `"title:\\emph{\\medskip Notes:} "`.
+ - **lines**: *top, foot, bottom, sep*.  Default `"top:\\tabularnewline\\toprule\\toprule;bottom:;foot:\\bottomrule\\bottomrule;sep:\\midrule"`.
+
+Missing keywords are considered to be equal to the empty string.
+
+Now the `style` argument is illustrated along with the modification of default values.
+
+#### Changing the default values
+
+To permanently change the default values for function `etable`, just use the function `setFixest_etable`:
+
+```{r}
+new_style = list(lines = "top:\\toprule; bottom:\\bottomrule",
+                 var = "title:\\midrule", # cleans the title but keeps line
+                 depvar = "", # cleans the title
+                 model = "format:$Model_{I}$",  # cleans the titles + changes model format
+                 fixef = "title: ; suffix: fixed effects; where:stats",
+                 # fixef: cleans the titles + adds a suffix + places after the stats
+                 slopes = "format:__var__ $\\times $ __slope__",
+                 stats = "title: ") # cleans the title but adds an empty line
+
+setFixest_etable(fitstat = ~r2, signifCode = NA, yesNo = "$\\checkmark$",
+                 tablefoot = FALSE, style = new_style)
+```
+
+And now, using the exact same line of code as in the first example, we obtain a table with a different style:
+
+
+```{r, eval = FALSE}
+etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", file = file,
+       group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
+```
+
+![Table with new defaults](https://github.com/lrberge/fixest/blob/master/vignettes/images/etable/table_new_style.PNG?raw=true)
+
