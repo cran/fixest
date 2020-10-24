@@ -156,7 +156,7 @@ femlm_hessian <- function(coef, env){
 	# on ajoute la partie manquante
 	if(isNL) hessVar[1:k, 1:k] = hessVar[1:k, 1:k] + H
 
-	if(family=="negbin"){
+	if(family == "negbin"){
 		theta = coef[".theta"]
 		ll_dx_dother = famFuns$ll_dx_dother(y, mu, exp_mu, coef, env)
 
@@ -1007,6 +1007,11 @@ convergence = function(coef, mu_in, env, iterMax){
 	Q = length(fixef_sizes)
 	useAcc = get("useAcc", env)
 	diffConv = get("difficultConvergence", env)
+	mem.clean = get("mem.clean", env)
+
+	if(mem.clean){
+	    gc()
+	}
 
 	if(useAcc && diffConv && Q > 2){
 		# in case of complex cases: it's more efficient
@@ -1207,6 +1212,11 @@ dconvergence = function(dxi_dbeta, jacob.mat, ll_d2, env, iterMax){
 	Q = length(fixef_sizes)
 	accDeriv = get("accDeriv", env)
 	derivDiffConv = get("derivDifficultConvergence", env)
+	mem.clean = get("mem.clean", env)
+
+	if(mem.clean){
+	    gc()
+	}
 
 	if(accDeriv && derivDiffConv && Q > 2){
 		# in case of complex cases: it's more efficient

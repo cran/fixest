@@ -14,14 +14,14 @@
 #' @param ... Used to capture different \code{fixest} estimation objects (obtained with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). Note that any other type of element is discarded. Note that you can give a list of \code{fixest} objects.
 #' @param digits Integer, default is 4. The number of digits to be displayed.
 #' @param tex Logical: whether the results should be a data.frame or a Latex table. By default, this argument is \code{TRUE} if the argument \code{file} (used for exportation) is not missing; it is equal to \code{FALSE} otherwise.
-#' @param fitstat A character vector or a one sided formula. A vector listing which fit statistics to display. The valid types are 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). The default value depends on the models to display. Example of use: \code{fitstat=c('sq.cor', 'ar2', 'war2')}, or \code{fitstat=~sq.cor+ar2+war2} using a formula.
+#' @param fitstat A character vector or a one sided formula (both with only lowercase letters). A vector listing which fit statistics to display. The valid types are 'n', 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). Also accepts valid types from the function \code{\link[fixest]{fitstat}}. The default value depends on the models to display. Example of use: \code{fitstat=c('n', 'sq.cor', 'ar2', 'war2')}, or \code{fitstat=~n+sq.cor+ar2+war2} using a formula. You can use the dot to refer to default values:\code{ ~ . + ll} would add the log-likelihood to the default fit statistics.
 #' @param title (Tex only.) Character scalar. The title of the Latex table.
 #' @param float (Tex only.) Logical. By default, if the argument \code{title} or \code{label} is provided, it is set to \code{TRUE}. Otherwise, it is set to \code{FALSE}.
 #' @param sdBelow (Tex only.) Logical, default is \code{TRUE}. Should the standard-errors be displayed below the coefficients?
 #' @param keep Character vector. This element is used to display only a subset of variables. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). Each variable satisfying any of the regular expressions will be kept. This argument is applied post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display only \code{x1} to \code{x9}, then you could use \code{keep = "x[[:digit:]]$"}. If the first character is an exclamation mark, the effect is reversed (e.g. keep = "!Intercept" means: every variable that does not contain \dQuote{Intercept} is kept). See details.
 #' @param drop Character vector. This element is used if some variables are not to be displayed. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). Each variable satisfying any of the regular expressions will be discarded. This argument is applied post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display only \code{x1} to \code{x9}, then you could use \code{drop = "x[[:digit:]]{2}"}. If the first character is an exclamation mark, the effect is reversed (e.g. drop = "!Intercept" means: every variable that does not contain \dQuote{Intercept} is dropped). See details.
 #' @param order Character vector. This element is used if the user wants the variables to be ordered in a certain way. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). The variables satisfying the first regular expression will be placed first, then the order follows the sequence of regular expressions. This argument is applied post aliasing (see argument \code{dict}). Example: you have the following variables: \code{month1} to \code{month6}, then \code{x1} to \code{x5}, then \code{year1} to \code{year6}. If you want to display first the x's, then the years, then the months you could use: \code{order = c("x", "year")}. If the first character is an exclamation mark, the effect is reversed (e.g. order = "!Intercept" means: every variable that does not contain \dQuote{Intercept} goes first).  See details.
-#' @param dict A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, if Tex output is requested or if argument \code{file} is not missing, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. The default is not to change names if a \code{data.frame} is requested (i.e. \code{tex = FALSE}); if so, you can use \code{dict = TRUE} to use the dictionary you've set globally with \code{setFixest_dict()}.
+#' @param dict A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. You can use \code{dict = FALSE} to disable it..
 #' @param file A character scalar. If provided, the Latex (or data frame) table will be saved in a file whose path is \code{file}. If you provide this argument, then a Latex table will be exported, to export a regular \code{data.frame}, use argument \code{tex = FALSE}.
 #' @param replace Logical, default is \code{FALSE}. Only used if option \code{file} is used. Should the exported table be written in a new file that replaces any existing file?
 #' @param convergence Logical, default is missing. Should the convergence state of the algorithm be displayed? By default, convergence information is displayed if at least one model did not converge.
@@ -43,7 +43,11 @@
 #' @param group A list. The list elements should be vectors of regular expressions. For each elements of this list: A new line in the table is created, all variables that are matched by the regular expressions are discarded (same effect as the argument \code{drop}) and \code{TRUE} or \code{FALSE} will appear in the model cell, depending on whether some of the previous variables were found in the model. Example: \code{group=list("Controls: personal traits"=c("gender", "height", "weight"))} will create an new line with \code{"Controls: personal traits"} in the leftmost cell, all three variables gender, height and weight are discared, TRUE appearing in each model containing at least one of the three variables (the style of TRUE/FALSE is governed by the argument \code{yesNo}). You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{group=list("{title:Controls; where:stats}Personal traits"=c("gender", "height", "weight"))} will add an extra line right before with "Control" written in it, and the group information will appear after the statistics. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}.
 #' @param extraline A list. The list elements should be either a single logical or a vector of the same length as the number of models. For each elements of this list: A new line in the table is created, the list name being the row name and the vector being the content of the cells. Example: \code{extraline=list("Sub-sample"=c("<20 yo", "all", ">50 yo"))} will create an new line with \code{"Sub-sample"} in the leftmost cell, the vector filling the content of the cells for the three models. You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{group=list("{title:Sub-sample; where:stats}By age"=c("<20 yo", "all", ">50 yo"))} will add an extra line right before with "Sub-sample" written in it, and the extraline information will appear after the statistics section. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}.
 #' @param tablefoot Logical, default is \code{TRUE}. Whether to display the table footer containing the information on the way the standard-errors where computed and the meaning of the significance codes.
+#' @param placement (Tex only.) Character string giving the position of the float in Latex. Default is "htbp". It must consist of only the characters 'h', 't', 'b', 'p', 'H' and '!'. Reminder: h: here; t: top; b: bottom; p: float page; H: definitely here; !: prevents Latex to look for other positions. Note that it can be equal to the empty string (and you'll get the default placement).
+#' @param drop.section (Tex only.) Character vector which can be of length 0 (i.e. equal to \code{NULL}). Can contain the values "fixef", "slopes" or "stats". It would drop, respectively, the fixed-effects section, the variables with varying slopes section or the fit statistics section.
 #' @param reset (\code{setFixest_etable} only.) Logical, default is \code{FALSE}. If \code{TRUE}, this will reset all the default values that were already set by the user in previous calls.
+#' @param .vcov A function to be used to compute the standard-errors of each fixest object. You can pass extra arguments to this function using the argument \code{.vcov_args}. See the example.
+#' @param .vcov_args A list containing arguments to be passed to the function \code{.vcov}.
 #'
 #' @details
 #' The function \code{esttex} is equivalent to the function \code{etable} with argument \code{tex = TRUE}.
@@ -61,7 +65,7 @@
 #'
 #' You can use the special character "!" (exclamation mark) to reverse the effect of the regular expression (this feature is specific to this fonction). For example \code{drop = "!Wind"} would drop any variable that does not contain "Wind".
 #'
-#' You can use the special character "%" (percentage) to make reference to the original variable name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you want to delete that variable, you can use either \code{drop="June"}, or \code{drop="%Month6"} (which makes reference to its original name).
+#' You can use the special character "\%" (percentage) to make reference to the original variable name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you want to delete that variable, you can use either \code{drop="June"}, or \code{drop="\%Month6"} (which makes reference to its original name).
 #'
 #' The argument \code{order} takes in a vector of regular expressions, the order will follow the elments of this vector. The vector gives a list of priorities, on the left the elements with highest priority. For example, order = c("Wind", "!Inter", "!Temp") would give highest priorities to the variables containing "Wind" (which would then appear first), second highest priority is the variables not containing "Inter", last, with lowest priority, the variables not containing "Temp". If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
 #'
@@ -81,49 +85,54 @@
 #' @examples
 #'
 #' aq = airquality
-#' aq$Month = factor(aq$Month)
 #'
-#' est1 = feols(Ozone ~ Month / Wind + Temp, data = aq)
-#' est2 = feols(Ozone ~ Wind + Temp | Month, data = aq)
+#' est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = aq)
+#' est2 = feols(Ozone ~ i(Wind, Month) + Temp | Month, data = aq)
 #'
 #' # Displaying the two results in a single table
 #' etable(est1, est2)
 #'
 #' # keep/drop: keeping only interactions
-#' etable(est1, est2, keep = ":")
+#' etable(est1, est2, keep = " x ")
 #' # or using drop  (see regexp help):
-#' etable(est1, est2, drop = "^[[:alnum:]]+$")
+#' etable(est1, est2, drop = "^(Month|Temp|\\()")
 #'
 #' # keep/drop: dropping interactions
-#' etable(est1, est2, drop = ":")
+#' etable(est1, est2, drop = " x ")
 #' # or using keep ("!" reverses the effect):
-#' etable(est1, est2, keep = "!:")
+#' etable(est1, est2, keep = "! x ")
 #'
-#' # order: Wind variable first, intercept last
-#' etable(est1, est2, order = c("Wind", "Month"))
-#' etable(est1, est2, order = c("^Wind", "Wind", "Month"))
-#' # Interactions, then Intercept, last ("!" reverses the effect)
-#' etable(est1, est2, order = c("!Int", "!:"))
+#' # order: Wind variable first, intercept last (note the "!" to reverse the effect)
+#' etable(est1, est2, order = c("Wind", "!Inter"))
+#' # Month, then interactions, then the rest
+#' etable(est1, est2, order = c("^Month", " x "))
 #'
-#' # dict + keep/drop/order: using "%" to match the original names
-#' dict = c("Month5"="May", "Month6"="Jun", "Month7"="Jul",
-#'          "Month8"="Aug", "Month9"="Sep")
-#' etable(est1, est2, tex = TRUE, dict = dict)
-#' # keeping only June and July
-#' etable(est1, est2, tex = TRUE, dict = dict, keep = c("%Month6", "Jul"))
-#' # All months variabes first
-#' etable(est1, est2, tex = TRUE, dict = dict, order = c("%Month"))
+#' #
+#' # dict
+#' #
 #'
+#' # You can rename variables with dict = c(var1 = alias1, var2 = alias2, etc)
+#' # You can also rename values taken by factors.
+#' # Here's a full example:
+#' dict = c(Temp = "Temperature", "Month::5"="May", "6"="Jun")
+#' etable(est1, est2, dict = dict)
+#' # Note the difference of treatment between Jun and May
+#'
+#' # Assume the following dictionnary:
+#' dict = c("Month::5"="May", "Month::6"="Jun", "Month::7"="Jul",
+#'          "Month::8"="Aug", "Month::9"="Sep")
+#'
+#' # We would like to keep only the Months, but now the names are all changed...
+#' # How to do?
+#' # We can use the special character '%' to make reference to the original names.
+#'
+#' etable(est1, est2, dict = dict, keep = "%Month")
+#'
+#' #
 #' # signifCode
-#' etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1,
-#'                                   " D"=0.15, " F"=1))
+#' #
 #'
-#' # fitstat
-#' etable(est1, est2, fitstat = ~r2+ar2+apr2+war2)
-#'
-#' # Adding a dictionnary (Tex only)
-#' dict = c(Month5="May", Month6="Jun", Month7="Jul", Month8="Aug", Month9="Sep")
-#' etable(est1, est2, dict = dict, tex = TRUE)
+#' etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1, " D"=0.15, " F"=1))
 #'
 #' #
 #' # Using the argument style to customize Latex exports
@@ -179,7 +188,32 @@
 #'        extraline = list("{title:\\midrule}Sub-sample" =
 #'                           c("All", "May-June", "Jul.-Aug.", "Sept.")))
 #'
-etable = function(..., se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, digits=4, tex, fitstat, title, coefstat = c("se", "tstat", "confint"), ci = 0.95, sdBelow = TRUE, keep, drop, order, dict, file, replace=FALSE, convergence, signifCode, label, float, subtitles, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = "Yes", keepFactors = TRUE, family, powerBelow = -5, interaction.combine = " $\\times $ ", depvar, style = list(), notes = NULL, group = NULL, extraline = NULL, tablefoot = TRUE){
+#'
+#' #
+#' # Using custom functions to compute the standard errors
+#' #
+#'
+#' # You can customize the way you compute the SEs with the argument .vcov
+#' # Let's use some covariances from the sandwich package
+#'
+#' etable(est_c0, est_c1, est_c2, .vcov = sandwich::vcovHC)
+#'
+#' # To add extra arguments to vcovHC, you need to use .vcov_args
+#' etable(est_c0, est_c1, est_c2, .vcov = sandwich::vcovHC, .vcov_args = list(type = "HC0"))
+#'
+#' #
+#' # Customize which fit statistic to display
+#' #
+#'
+#' # You can change the fit statistics with the argument fitstat
+#' # and you can rename them with the dictionnary
+#' etable(est1, est2, fitstat = ~ r2 + n + G)
+#'
+#' # If you use a formula, '.' means the default:
+#' etable(est1, est2, fitstat = ~ ll + .)
+#'
+#'
+etable = function(..., se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, .vcov, .vcov_args = NULL, digits=4, tex, fitstat, title, coefstat = c("se", "tstat", "confint"), ci = 0.95, sdBelow = TRUE, keep, drop, order, dict, file, replace=FALSE, convergence, signifCode, label, float, subtitles, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = "Yes", keepFactors = TRUE, family, powerBelow = -5, interaction.combine = " $\\times $ ", depvar, style = list(), notes = NULL, group = NULL, extraline = NULL, tablefoot = TRUE, placement = "htbp", drop.section = NULL){
 
     #
     # Checking the arguments
@@ -187,7 +221,7 @@ etable = function(..., se = c("standard", "white", "cluster", "twoway", "threewa
 
     # Need to check for the presence of the se
     useSummary = TRUE
-    if(missing(se) && missing(cluster)){
+    if(missing(se) && missing(cluster) && missing(.vcov)){
         useSummary = FALSE
     }
 
@@ -235,11 +269,15 @@ etable = function(..., se = c("standard", "white", "cluster", "twoway", "threewa
         warning("Since float = TRUE, the argument", enumerate_items(what, "s.is"), " ignored", immediate. = TRUE, call. = FALSE)
     }
 
+    if(missing(dict) && !tex){
+        dict = TRUE
+    }
+
 
     # to get the model names
     dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-    info = results2formattedList(..., se=se, dof=dof, fitstat=fitstat, cluster=cluster, digits=digits, sdBelow=sdBelow, signifCode=signifCode, coefstat = coefstat, ci = ci, title=title, float=float, subtitles=subtitles, yesNo=yesNo, keepFactors=keepFactors, tex = tex, useSummary=useSummary, dots_call=dots_call, powerBelow=powerBelow, dict=dict, interaction.combine=interaction.combine, convergence=convergence, family=family, keep=keep, drop=drop, file=file, order=order, label=label, fixef_sizes=fixef_sizes, fixef_sizes.simplify=fixef_sizes.simplify, depvar=depvar, style=style, replace=replace, notes = notes, group = group, tablefoot = tablefoot, extraline=extraline)
+    info = results2formattedList(..., se=se, dof=dof, fitstat_all=fitstat, cluster=cluster, .vcov=.vcov, .vcov_args=.vcov_args, digits=digits, sdBelow=sdBelow, signifCode=signifCode, coefstat = coefstat, ci = ci, title=title, float=float, subtitles=subtitles, yesNo=yesNo, keepFactors=keepFactors, tex = tex, useSummary=useSummary, dots_call=dots_call, powerBelow=powerBelow, dict=dict, interaction.combine=interaction.combine, convergence=convergence, family=family, keep=keep, drop=drop, file=file, order=order, label=label, fixef_sizes=fixef_sizes, fixef_sizes.simplify=fixef_sizes.simplify, depvar=depvar, style=style, replace=replace, notes = notes, group = group, tablefoot = tablefoot, extraline=extraline, placement = placement, drop.section = drop.section)
 
     if(tex){
         res = etable_internal_latex(info)
@@ -253,6 +291,8 @@ etable = function(..., se = c("standard", "white", "cluster", "twoway", "threewa
 
         if(tex){
             cat(res, sep = "")
+            # We add extra whitespaces => otherwise the Latex file is a bit cluttered
+            cat("\n\n")
         } else {
             print(res)
         }
@@ -270,14 +310,14 @@ etable = function(..., se = c("standard", "white", "cluster", "twoway", "threewa
 
 
 #' @describeIn etable Exports the results of multiple \code{fixest} estimations in a Latex table.
-esttex <- function(..., se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, digits=4, fitstat, coefstat = c("se", "tstat", "confint"), ci = 0.95, title, float = float, sdBelow=TRUE, keep, drop, order, dict, file, replace=FALSE, convergence, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, subtitles, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = "Yes", keepFactors = TRUE, family, powerBelow = -5, interaction.combine = " $\\times $ ", style = list(), notes = NULL, group = NULL, tablefoot = TRUE, extraline = NULL){
+esttex <- function(..., se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, .vcov, .vcov_args = NULL, digits=4, fitstat, coefstat = c("se", "tstat", "confint"), ci = 0.95, title, float = float, sdBelow=TRUE, keep, drop, order, dict, file, replace=FALSE, convergence, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), label, subtitles, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = "Yes", keepFactors = TRUE, family, powerBelow = -5, interaction.combine = " $\\times $ ", style = list(), notes = NULL, group = NULL, tablefoot = TRUE, extraline = NULL, placement = "htbp", drop.section = NULL){
     # drop: a vector of regular expressions
     # order: a vector of regular expressions
     # dict: a 'named' vector
     # file: a character string
 
     useSummary = TRUE
-    if(missing(se) && missing(cluster)){
+    if(missing(se) && missing(cluster) && missing(.vcov)){
         useSummary = FALSE
     }
 
@@ -302,7 +342,7 @@ esttex <- function(..., se = c("standard", "white", "cluster", "twoway", "threew
     # to get the model names
     dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-    info = results2formattedList(..., tex = TRUE, useSummary=useSummary, se = se, dof = dof, cluster = cluster, digits = digits, fitstat = fitstat, title = title, float = float, sdBelow = sdBelow, keep=keep, drop = drop, order = order, dict = dict, file = file, replace = replace, convergence = convergence, signifCode = signifCode, coefstat = coefstat, ci = ci, label = label, subtitles = subtitles, fixef_sizes = fixef_sizes, fixef_sizes.simplify = fixef_sizes.simplify, yesNo = yesNo, keepFactors = keepFactors, family = family, powerBelow = powerBelow, interaction.combine = interaction.combine, dots_call = dots_call, depvar = TRUE, style=style, notes = notes, group = group, tablefoot = tablefoot, extraline=extraline)
+    info = results2formattedList(..., tex = TRUE, useSummary=useSummary, se=se, dof=dof, cluster=cluster, .vcov=.vcov, .vcov_args=.vcov_args, digits=digits, fitstat_all=fitstat, title=title, float=float, sdBelow=sdBelow, keep=keep, drop=drop, order=order, dict=dict, file=file, replace=replace, convergence=convergence, signifCode=signifCode, coefstat=coefstat, ci=ci, label=label, subtitles=subtitles, fixef_sizes=fixef_sizes, fixef_sizes.simplify=fixef_sizes.simplify, yesNo=yesNo, keepFactors=keepFactors, family=family, powerBelow=powerBelow, interaction.combine=interaction.combine, dots_call=dots_call, depvar=TRUE, style=style, notes=notes, group=group, tablefoot=tablefoot, extraline=extraline, placement=placement, drop.section=drop.section)
 
     res = etable_internal_latex(info)
 
@@ -312,16 +352,18 @@ esttex <- function(..., se = c("standard", "white", "cluster", "twoway", "threew
     }
 
     cat(res, sep = "")
+    # We add extra whitespaces => otherwise the Latex file is a bit cluttered
+    cat("\n\n")
     return(invisible(res))
 
 }
 
 #' @describeIn etable Facility to display the results of multiple \code{fixest} estimations.
-esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, coefstat = c("se", "tstat", "confint"), ci = 0.95, depvar, keep, drop, dict, order, digits=4, fitstat, convergence, signifCode = c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10), subtitles, keepFactors = FALSE, family, group = NULL, extraline = NULL){
+esttable <- function(..., se=c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"), dof = getFixest_dof(), cluster, .vcov, .vcov_args = NULL, coefstat = c("se", "tstat", "confint"), ci = 0.95, depvar, keep, drop, dict, order, digits=4, fitstat, convergence, signifCode = c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10), subtitles, keepFactors = FALSE, family, group = NULL, extraline = NULL){
 
     # Need to check for the presence of the se
     useSummary = TRUE
-    if(missing(se) && missing(cluster)){
+    if(missing(se) && missing(cluster) && missing(.vcov)){
         useSummary = FALSE
     }
 
@@ -336,14 +378,14 @@ esttable <- function(..., se=c("standard", "white", "cluster", "twoway", "threew
     # to get the model names
     dots_call = match.call(expand.dots = FALSE)[["..."]]
 
-    info = results2formattedList(..., se=se, dof = dof, cluster=cluster, digits=digits, signifCode=signifCode, coefstat = coefstat, ci = ci, subtitles=subtitles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call, fitstat=fitstat, yesNo = c("Yes", "No"), depvar = depvar, family = family, keep = keep, drop = drop, order = order, dict = dict, interaction.combine = ":", group = group, extraline = extraline)
+    info = results2formattedList(..., se=se, dof = dof, cluster=cluster, .vcov=.vcov, .vcov_args=.vcov_args, digits=digits, signifCode=signifCode, coefstat = coefstat, ci = ci, subtitles=subtitles, keepFactors=keepFactors, useSummary=useSummary, dots_call=dots_call, fitstat_all=fitstat, yesNo = c("Yes", "No"), depvar = depvar, family = family, keep = keep, drop = drop, order = order, dict = dict, interaction.combine = ":", group = group, extraline = extraline)
 
     res = etable_internal_df(info)
 
     return(res)
 }
 
-results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits = 4, fitstat, sdBelow=TRUE, dict, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), coefstat = "se", ci = 0.95, label, subtitles, title, float = FALSE, replace = FALSE, yesNo = c("Yes", "No"), keepFactors = FALSE, tex = FALSE, useSummary, dots_call, powerBelow, interaction.combine, convergence, family, drop, order, keep, file, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, depvar = FALSE, style = list(), notes = NULL, group = NULL, tablefoot = TRUE, extraline=NULL){
+results2formattedList = function(..., se, dof = getFixest_dof(), cluster, .vcov, .vcov_args = NULL, digits = 4, fitstat_all, sdBelow=TRUE, dict, signifCode = c("***"=0.01, "**"=0.05, "*"=0.10), coefstat = "se", ci = 0.95, label, subtitles, title, float = FALSE, replace = FALSE, yesNo = c("Yes", "No"), keepFactors = FALSE, tex = FALSE, useSummary, dots_call, powerBelow, interaction.combine, convergence, family, drop, order, keep, file, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, depvar = FALSE, style = list(), notes = NULL, group = NULL, tablefoot = TRUE, extraline=NULL, placement = "htbp", drop.section = NULL){
     # This function is the core of the functions esttable and esttex
 
 
@@ -426,6 +468,16 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
 
     check_arg(dict, "NULL logical scalar | named character vector no na")
 
+    check_arg(placement, "character scalar")
+    if(isTex){
+        if(nchar(placement) > 0){
+            p_split = strsplit(placement, "")[[1]]
+            check_value(p_split, "strict multi charin(h, t, b, p, H, !)", .message = "Argument 'placement' must be a character string containing only the following characters: 'h', 't', 'b', 'p', 'H', and '!'.")
+        }
+    }
+
+    check_arg_plus(drop.section, "NULL multi match(fixef, slopes, stats)")
+
     check_arg_plus(group, extraline, "NULL{list()} named list l0")
     # we check it more in depth later
 
@@ -486,6 +538,9 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
         }
     } else if(isTRUE(dict)) {
         dict = getFixest_dict()
+        if(is.null(dict)){
+            dict = c("____" = "OH OH OH")
+        }
     } else if(isFALSE(dict)) {
         dict = NULL
     }
@@ -593,7 +648,7 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
     var_list <- var_reorder_list <- coef_list <- coef_below <- sd_below <- list()
     depvar_list <- obs_list <- fitstat_list <- list()
     r2_list <- aic_list <- bic_list <- loglik_list <- convergence_list <- list()
-    sqCor_list = family_list = theta_list = list()
+    sqCor_list = family_list = list()
 
     # To take care of factors
     fe_names = c()
@@ -625,59 +680,122 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
     }
 
     #
-    # fitstat: which R2 to display?
+    # fitstat ####
     #
 
-    if(missing(fitstat)){
+    if(missing(fitstat_all)){
+        # => do default
+        fitstat_all = "."
+
+    } else if(isFALSE(fitstat_all) || (length(fitstat_all) == 1 && (is.na(fitstat_all) || fitstat_all == ""))){
+        fitstat_all = NULL
+        drop.section = c(drop.section, "stats")
+
+    } else if("formula" %in% class(fitstat_all)){
+        check_arg(fitstat_all, "os formula", .message = "Argument 'fitstat' must be a one sided formula (or a character vector) containing 'n', 'aic', 'bic', 'll', types from function fitstat (?fitstat), or valid r2 types names (?r2). ")
+
+        fitstat_all = gsub(" ", "", strsplit(deparse_long(fitstat_all[[2]]), "+", fixed = TRUE)[[1]])
+
+    } else {
+        check_arg(fitstat_all, "character vector no na", .message = "Argument 'fitstat' must be a character vector (or a one sided formula) containing 'aic', 'bic', 'll', or valid r2 types names (see function r2). ")
+
+    }
+
+    if("." %in% fitstat_all){
         # Default values:
         #   - if all OLS: typical R2
         #   - if any non-OLS: pseudo R2 + squared cor.
-        is_ols = sapply(all_models, function(x) deparse(x$call[[1]]) == "feols")
+        is_ols = sapply(all_models, function(x) x$method == "feols")
 
         if(all(is_ols)){
             if(any(sapply(all_models, function(x) "fixef_vars" %in% names(x)))){
                 # means any FE model
-                fitstat = c("r2", "wr2")
+                fitstat_default = c("r2", "wr2")
             } else {
-                fitstat = c("r2", "ar2")
+                fitstat_default = c("r2", "ar2")
             }
         } else {
-            fitstat = c("sq.cor", "pr2", "bic")
+            fitstat_default = c("sq.cor", "pr2", "bic")
         }
 
+        fitstat_default = c("n", fitstat_default)
 
-    } else if(isFALSE(fitstat) || (length(fitstat) == 1 && (is.na(fitstat) || fitstat == ""))){
-        fitstat = NULL
-    } else if("formula" %in% class(fitstat)){
-        check_arg(fitstat, "os formula", .message = "Argument 'fitstat' must be a one sided formula (or a character vector) containing 'aic', 'bic', 'll', or valid r2 types names (see function r2). ")
-        fitstat = attr(terms(fitstat), "term.labels")
-    } else {
-        check_arg(fitstat, "character vector no na", .message = "Argument 'fitstat' must be a character vector (or a one sided formula) containing 'aic', 'bic', 'll', or valid r2 types names (see function r2). ")
+        if(any(sapply(all_models, function(x) !is.null(x$theta)))){
+            fitstat_default = c(fitstat_default, "theta")
+        }
+
+        fitstat_default = setdiff(fitstat_default, fitstat_all)
+
+        if(length(fitstat_default) > 0){
+            i = which(fitstat_all == ".")[1]
+            if(i == length(fitstat_all)){
+                fitstat_all = c(fitstat_all[0:(i-1)], fitstat_default)
+            } else {
+                fitstat_all = c(fitstat_all[0:(i-1)], fitstat_default, fitstat_all[(i+1):length(fitstat_all)])
+            }
+        }
+
     }
+
+    fitstat_all = tolower(fitstat_all)
 
     # checking the types
-    fitstat_type_allowed = c("sq.cor", "r2", "ar2", "pr2", "apr2", "par2", "wr2", "war2", "awr2", "wpr2", "pwr2", "wapr2", "wpar2", "awpr2", "apwr2", "pawr2", "pwar2", "ll", "aic", "bic")
-    fitstat = unique(fitstat)
+    fitstat_fun_types = fitstat(give_types = TRUE)
+    fitstat_type_allowed = c("n", "sq.cor", "ll", "aic", "bic", fitstat_fun_types$types, "r2", "ar2", "pr2", "apr2", "par2", "wr2", "war2", "awr2", "wpr2", "pwr2", "wapr2", "wpar2", "awpr2", "apwr2", "pawr2", "pwar2")
+    fitstat_all = unique(fitstat_all)
 
-    pblm = setdiff(fitstat, fitstat_type_allowed)
+    pblm = setdiff(fitstat_all, fitstat_type_allowed)
     if(length(pblm) > 0){
-        stop_up("Argument 'fitstat' must be a character vector (or a one sided formula) containing 'aic', 'bic', 'll', or valid r2 types names. ", enumerate_items(pblm, "is.quote"), " not valid (see function r2).")
+        stop_up("Argument 'fitstat' must be a character vector (or a one sided formula) containing '", paste0(fitstat_type_allowed[1:(which(fitstat_type_allowed == "r2") - 1)], collapse = "', '"), "', or valid r2 types names (see function r2). ", enumerate_items(pblm, "is.quote"), " not valid.")
     }
 
-    fitstat_dict_tex = c("sq.cor"="Squared Correlation", r2="R$^2$", ar2="Adjusted R$^2$", pr2="Pseudo R$^2$", apr2="Adjusted Pseudo R$^2$", wr2="Within R$^2$", war2="Within Adjusted R$^2$", wpr2="Within Pseudo R$^2$", wapr2="Whithin Adjusted Pseudo R$^2$", aic = "AIC", bic = "BIC", ll = "Log-Likelihood")
+    if(isTex){
+        fitstat_dict = c("n" = "Observations", "sq.cor"="Squared Correlation", r2="R$^2$", ar2="Adjusted R$^2$", pr2="Pseudo R$^2$", apr2="Adjusted Pseudo R$^2$", wr2="Within R$^2$", war2="Within Adjusted R$^2$", wpr2="Within Pseudo R$^2$", wapr2="Whithin Adjusted Pseudo R$^2$", aic = "AIC", bic = "BIC", ll = "Log-Likelihood", fitstat_fun_types$tex_alias)
+    } else {
+        fitstat_dict = c("n" = "Observations", "sq.cor"="Squared Corr.", r2="R2", ar2="Adjusted R2", pr2="Pseudo R2", apr2="Adj. Pseudo R2", wr2="Within R2", war2="Within Adj. R2", wpr2="Within Pseudo R2", wapr2="Whithin Adj. Pseudo R2", aic = "AIC", bic = "BIC", ll = "Log-Likelihood", fitstat_fun_types$R_alias)
+    }
 
-    fitstat_dict_R = c("sq.cor"="Squared Corr.", r2="R2", ar2="Adjusted R2", pr2="Pseudo R2", apr2="Adj. Pseudo R2", wr2="Within R2", war2="Within Adj. R2", wpr2="Within Pseudo R2", wapr2="Whithin Adj. Pseudo R2", aic = "AIC", bic = "BIC", ll = "Log-Likelihood")
-
-    fitstat_dict = fitstat_dict_R
-    if(isTex) fitstat_dict = fitstat_dict_tex
+    # Renaming the stats with user-provided aliases
+    if(length(dict) > 0){
+        user_stat_name = intersect(names(fitstat_dict), names(dict))
+        if(length(user_stat_name) > 0){
+            fitstat_dict[user_stat_name] = dict[user_stat_name]
+        }
+    }
 
     # end: fitstat
+
+    #
+    # Loop ####
+    #
+
+    if(!missing(.vcov)){
+        if(!missing(cluster)) .vcov_args[["cluster"]] = as.name("cluster")
+        if(!missing(se)) .vcov_args[["se"]] = as.name("se")
+
+        sysOrigin = sys.parent()
+        mc = match.call(definition = sys.function(sysOrigin), call = sys.call(sysOrigin), expand.dots = FALSE)
+        vcov_name = deparse_long(mc$.vcov)
+    }
 
     for(m in 1:n_models){
 
         # If se or cluster is provided, we use summary
         if(useSummary){
-            x = summary(all_models[[m]], se=se, cluster, dof = dof, nframes_up = 2)
+
+            if(missing(.vcov)){
+                x = summary(all_models[[m]], se=se, cluster, dof = dof, nframes_up = 2)
+
+            } else {
+                # We check the arguments
+                check_arg(.vcov, "function", .message = "The argument '.vcov' must be a function to compute the variance-covariance matrix.")
+                check_arg_plus(.vcov_args, "NULL{list()} list", .message = "The argument '.vcov_args' must be a list of arguments to be passed to the function in '.vcov'.")
+
+                x = summary(all_models[[m]], .vcov = .vcov, .vcov_args = .vcov_args, vcov_name = vcov_name)
+
+            }
+
+
         } else {
             # What do we do if se not provided?
             # we apply summary only to the ones that are not summaries
@@ -713,11 +831,6 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
             fam = "Neg. Bin."
         }
         family_list[[m]] = fam
-
-
-        # Negbin parameter
-        theta = all_models[[m]]$theta
-        theta_list[[m]] = ifelse(is.null(theta), "", numberFormatNormal(theta))
 
         # variable dependante:
         depvar <- gsub(" ", "", as.character(x$fml)[[2]])
@@ -855,19 +968,35 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
             # if there are still interactions, we rename them
             new_var = var
             var_left = var[!qui]
-            if(length(var_left) > 0 && any(grepl(":", var_left))){
+            if(length(var_left) > 0 && any(grepl(":|\\*", var_left))){
                 check_interaction_reorder = TRUE
 
 
-                qui_inter = grepl(":", var_left)
-                inter = strsplit(var_left[qui_inter], "(?<=[^:]):(?=[^:])", perl = TRUE)
+                qui_inter = grepl("(?<=[^:\\*])(::|:|\\*)(?=[^:\\*])", var_left, perl = TRUE)
+                inter = strsplit(var_left[qui_inter], "(?<=[^:\\*])(:|\\*)(?=[^:\\*])", perl = TRUE)
 
                 fun_rename = function(x){
                     # We put the factors on the right
+
                     qui_factor = grepl("::", x)
                     if(any(qui_factor)){
                         res = x[base::order(qui_factor)]
-                        res = gsub("::", " $=$ ", res)
+
+                        n_last = length(res)
+
+                        if(res[n_last] %in% names(dict)){
+                            res[n_last] = dict[res[n_last]]
+                        } else {
+                            last_value_split = strsplit(res[n_last], "::")[[1]]
+                            last_value_split = dict_apply(last_value_split, dict)
+
+                            if(isTex){
+                                res[n_last] = paste(last_value_split, collapse = " $=$ ")
+                            } else {
+                                res[n_last] = paste(last_value_split, collapse = " = ")
+                            }
+                        }
+
                     } else {
                         res = x
                     }
@@ -875,7 +1004,13 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
                     who = res %in% names(dict)
 
                     res[who] = dict[res[who]]
-                    paste0(res, collapse = interaction.combine)
+                    if(isTex){
+                        res = paste0(res, collapse = interaction.combine)
+                    } else {
+                        res = paste0(res, collapse = " x ")
+                    }
+
+                    return(res)
                 }
 
                 inter_named = sapply(inter, fun_rename)
@@ -890,10 +1025,10 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
         } else {
             # We reorder the interaction terms alphabetically
             new_var = var
-            qui = grepl(":", new_var)
+            qui = grepl("(?<=[^:]):(?=[^:])", new_var, perl = TRUE)
             if(any(qui)){
                 check_interaction_reorder = TRUE
-                inter = strsplit(new_var[qui], ":")
+                inter = strsplit(new_var[qui], "(?<=[^:]):(?=[^:])", perl = TRUE)
                 new_inter = sapply(inter, function(x) paste0(sort(x), collapse = ":"))
                 new_var[qui] = new_inter
             }
@@ -913,21 +1048,16 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
 
         if(coefstat == "se"){
             se_value = fun_format(a[, 2])
+
         } else if(coefstat == "tstat"){
             se_value = fun_format(a[, 3])
+
         } else if(coefstat == "confint"){
             se_value = apply(confint(x, level = ci), 1, function(z) paste0("[", fun_format(z[1]), "; ", fun_format(z[2]), "]"))
+
         } else {
             stop("Wrong value for the argument 'coefstat': ", coefstat, " is not supported.")
         }
-
-        # if(isTex){
-        #     coef = coefFormatLatex(a[, 1], digits = digits, power = abs(powerBelow))
-        #     se_value = coefFormatLatex(a[, 2], digits = digits, power = abs(powerBelow))
-        # } else {
-        #     coef = as.character(round(a[, 1], digits))
-        #     se_value = as.character(myRound(a[, 2], digits))
-        # }
 
         if(add_signif){
             if(isTex){
@@ -984,28 +1114,35 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
 
         K <- x$nparams
 
-        if(length(fitstat) == 0){
+        if(length(fitstat_all) == 0){
             fitstat_list[[m]] = NA
         } else {
             fistat_format = list()
 
             fun_format = ifelse(isTex, numberFormatLatex, numberFormatNormal)
 
-            if("aic" %in% fitstat) fistat_format[["aic"]] = fun_format(round(AIC(x), 3))
-            if("bic" %in% fitstat) fistat_format[["bic"]] = fun_format(round(BIC(x), 3))
-            if("ll" %in% fitstat) fistat_format[["ll"]] = fun_format(logLik(x))
+            if("n" %in% fitstat_all) fistat_format[["n"]] = fun_format(n)
+            if("aic" %in% fitstat_all) fistat_format[["aic"]] = fun_format(round(AIC(x), 3))
+            if("bic" %in% fitstat_all) fistat_format[["bic"]] = fun_format(round(BIC(x), 3))
+            if("ll" %in% fitstat_all) fistat_format[["ll"]] = fun_format(logLik(x))
 
             # regular r2s
             r2_type_allowed = c("sq.cor", "r2", "ar2", "pr2", "apr2", "wr2", "war2", "wpr2", "wapr2")
-            if(any(fitstat %in% r2_type_allowed)){
-                all_r2 = r2(x, intersect(fitstat, r2_type_allowed))
+            if(any(fitstat_all %in% r2_type_allowed)){
+                all_r2 = r2(x, intersect(fitstat_all, r2_type_allowed))
                 for(r2_val in names(all_r2)){
                     nb = 5 - (r2_val == "sq.cor") * 2
                     fistat_format[[r2_val]] = round(as.vector(all_r2[r2_val]), nb)
                 }
             }
 
-            fitstat_list[[m]] = fistat_format[fitstat]
+            # Other fit statistics
+            fs_remaining = intersect(fitstat_all, fitstat(give_types = TRUE)$types)
+            for(fs in fs_remaining){
+                fistat_format[[fs]] = fun_format(round(fitstat(x, type = fs), 3))
+            }
+
+            fitstat_list[[m]] = fistat_format[fitstat_all]
         }
 
     }
@@ -1020,8 +1157,8 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
     }
 
 
-    if(length(fitstat) > 0){
-        attr(fitstat_list, "format_names") = fitstat_dict[fitstat]
+    if(length(fitstat_all) > 0){
+        attr(fitstat_list, "format_names") = fitstat_dict[fitstat_all]
     }
 
     if(isTex){
@@ -1060,7 +1197,7 @@ results2formattedList = function(..., se, dof = getFixest_dof(), cluster, digits
     if(missing(file)) file = NULL
     if(missing(label)) label = NULL
 
-    res = list(se_type_list=se_type_list, var_list=var_list, coef_list=coef_list, coef_below=coef_below, sd_below=sd_below, depvar_list=depvar_list, obs_list=obs_list, convergence_list=convergence_list, fe_names=fe_names, is_fe=is_fe, nb_fe=nb_fe, slope_flag_list = slope_flag_list, slope_names=slope_names, useSummary=useSummary, model_names=model_names, family_list=family_list, theta_list=theta_list, fitstat_list=fitstat_list, subtitles=subtitles, isSubtitles=isSubtitles, title=title, convergence=convergence, family=family, keep=keep, drop=drop, order=order, file=file, label=label, sdBelow=sdBelow, signifCode=signifCode, fixef_sizes=fixef_sizes, fixef_sizes.simplify = fixef_sizes.simplify, depvar=depvar, useSummary=useSummary, dict=dict, yesNo=yesNo, add_signif=add_signif, float=float, coefstat=coefstat, ci=ci, style=style, notes=notes, group=group, tablefoot=tablefoot, extraline=extraline)
+    res = list(se_type_list=se_type_list, var_list=var_list, coef_list=coef_list, coef_below=coef_below, sd_below=sd_below, depvar_list=depvar_list, obs_list=obs_list, convergence_list=convergence_list, fe_names=fe_names, is_fe=is_fe, nb_fe=nb_fe, slope_flag_list = slope_flag_list, slope_names=slope_names, useSummary=useSummary, model_names=model_names, family_list=family_list, fitstat_list=fitstat_list, subtitles=subtitles, isSubtitles=isSubtitles, title=title, convergence=convergence, family=family, keep=keep, drop=drop, order=order, file=file, label=label, sdBelow=sdBelow, signifCode=signifCode, fixef_sizes=fixef_sizes, fixef_sizes.simplify = fixef_sizes.simplify, depvar=depvar, useSummary=useSummary, dict=dict, yesNo=yesNo, add_signif=add_signif, float=float, coefstat=coefstat, ci=ci, style=style, notes=notes, group=group, tablefoot=tablefoot, extraline=extraline, placement=placement, drop.section=drop.section)
 
     return(res)
 }
@@ -1084,7 +1221,6 @@ etable_internal_latex = function(info){
     slope_names = info$slope_names
     slope_flag_list = info$slope_flag_list
     family_list = info$family_list
-    theta_list = info$theta_list
     fitstat_list = info$fitstat_list
     subtitles = info$subtitles
     isSubtitles = info$isSubtitles
@@ -1111,6 +1247,8 @@ etable_internal_latex = function(info){
     group = info$group
     tablefoot = info$tablefoot
     extraline = info$extraline
+    placement = info$placement
+    drop.section = info$drop.section
 
     # Formatting the searating lines
     if(nchar(style$lines$top) > 1) style$lines$top = paste0(style$lines$top, "\n")
@@ -1126,7 +1264,8 @@ etable_internal_latex = function(info){
     myTitle = title
     if(!is.null(label)) myTitle = paste0("\\label{", label, "} ", myTitle)
     if(float){
-        start_table = paste0("\\begin{table}[htbp]\\centering\n\\caption{",  myTitle, "}\n")
+        if(nchar(placement) > 0) placement = paste0("[", placement, "]")
+        start_table = paste0("\\begin{table}", placement, "\n\\centering\n\\caption{",  myTitle, "}\n")
         end_table = "\\end{table}"
     } else {
         start_table = ""
@@ -1222,7 +1361,7 @@ etable_internal_latex = function(info){
         variable_line = "\\midrule "
     } else {
         # variable_line = paste0(style$lines$sep, style$var$title, "\\tabularnewline\n")
-        variable_line = paste0(style$lines$sep, style$var$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+        variable_line = paste0(style$lines$sep, style$var$title, "& ", paste(rep(" ", n_models), collapse = " & "), "\\\\\n")
     }
 
     # Coefficients,  the tricky part
@@ -1260,6 +1399,8 @@ etable_internal_latex = function(info){
     # ordering the coefs
     all_vars = order_apply(all_vars, order)
 
+    if(length(all_vars) == 0) stop_up("Not any variable was selected, please reframe your keep/drop arguments.")
+
     # changing the names of the coefs
     aliasVars = all_vars
     names(aliasVars) = all_vars
@@ -1283,26 +1424,29 @@ etable_internal_latex = function(info){
 
             myCoef[is.na(myCoef)] = "  "
             mySd[is.na(mySd)] = "  "
-            myCoef = paste0(aliasVars[v], "&", paste0(myCoef, collapse="&"))
-            mySd = paste0("  &", paste0(mySd, collapse="&"))
+            myCoef = paste0(aliasVars[v], "&", paste0(myCoef, collapse = " & "))
+            mySd = paste0("  &", paste0(mySd, collapse = " & "))
             myLines = paste0(myCoef, "\\\\\n", mySd, "\\\\\n")
             coef_lines = c(coef_lines, myLines)
         }
         coef_lines = paste0(coef_lines, collapse="")
     } else {
-        coef_lines = paste0(paste0(apply(coef_mat, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+        coef_lines = paste0(paste0(apply(coef_mat, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
     }
 
+    #
     # Fixed-effects (if needed)
+    #
+
     nb_FE_lines = ""
-    if(length(fe_names) > 0){
+    if(length(fe_names) > 0 && !"fixef" %in% drop.section){
 
         if(nchar(style$fixef$title) == 0){
             dumIntro = style$lines$sep
         } else if(style$fixef$title == "\\midrule"){
             dumIntro = "\\midrule "
         } else {
-            dumIntro = paste0(style$lines$sep, style$fixef$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+            dumIntro = paste0(style$lines$sep, style$fixef$title, "& ", paste(rep(" ", n_models), collapse = " & "), "\\\\\n")
         }
 
         # The number of FEs
@@ -1359,28 +1503,31 @@ etable_internal_latex = function(info){
             if(any(is_complex)){
                 fe_names_nbItems = paste0(style$fixef.sizes$prefix, fe_names_raw[is_complex], style$fixef.sizes$suffix)
                 all_nb_FEs = cbind(fe_names_nbItems, all_nb_FEs[is_complex, , drop = FALSE])
-                nb_FE_lines <- paste0(paste0(apply(all_nb_FEs, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+                nb_FE_lines <- paste0(paste0(apply(all_nb_FEs, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
             }
 
         }
 
         all_fe = cbind(fe_names, all_fe)
-        FE_lines <- paste0(paste0(apply(all_fe, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+        FE_lines <- paste0(paste0(apply(all_fe, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
 
     } else {
         FE_lines = NULL
         dumIntro = NULL
     }
 
+    #
     # Slopes (if needed)
-    if(length(slope_names) > 0){
+    #
+
+    if(length(slope_names) > 0 &&  !"slopes" %in% drop.section){
 
         if(nchar(style$slopes$title) == 0){
             slope_intro = style$lines$sep
         } else if(style$slopes$title == "\\midrule"){
             slope_intro = "\\midrule "
         } else {
-            slope_intro = paste0(style$lines$sep, style$slopes$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+            slope_intro = paste0(style$lines$sep, style$slopes$title, "& ", paste(rep(" ", n_models), collapse = " & "), "\\\\\n")
         }
 
         # reformat the yes/no slope
@@ -1399,7 +1546,7 @@ etable_internal_latex = function(info){
         # Matrix with yes/no information
         all_slopes = matrix(c(slope_flag_list, recursive = TRUE), nrow = length(slope_names))
         all_slopes = cbind(slope_names, all_slopes)
-        slope_lines <- paste0(paste0(apply(all_slopes, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+        slope_lines <- paste0(paste0(apply(all_slopes, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
 
     } else {
         slope_intro = NULL
@@ -1408,7 +1555,7 @@ etable_internal_latex = function(info){
 
     # Subtitles
     if(isSubtitles){
-        info_subtitles = paste0("  & ", paste(subtitles, collapse="&"), "\\\\\n")
+        info_subtitles = paste0("  & ", paste(subtitles, collapse = " & "), "\\\\\n")
     } else {
         info_subtitles = ""
     }
@@ -1416,14 +1563,12 @@ etable_internal_latex = function(info){
     # Convergence information
     info_convergence = ""
     if(convergence){
-        info_convergence = paste0("Convergence &", paste(convergence_list, collapse="&"), "\\\\\n")
+        info_convergence = paste0("Convergence &", paste(convergence_list, collapse = " & "), "\\\\\n")
     }
-
-    info_theta <- paste0("Overdispersion& ", paste(theta_list, collapse="&"), "\\\\\n")
 
     # information on family
     if(family){
-        info_family <- paste0("Family &  ", paste(family_list, collapse=" & "), "\\\\\n")
+        info_family <- paste0(" &  ", paste(family_list, collapse = " & "), "\\\\\n")
     } else {
         info_family = ""
     }
@@ -1438,7 +1583,6 @@ etable_internal_latex = function(info){
             my_se = unique(unlist(se_type_list)) # it comes from summary
             # every model has the same type of SE
             if(my_se == "Standard") my_se = "Normal"
-            if(my_se == "White") my_se = "White-corrected"
 
             # Now we modify the names of the clusters if needed
             my_se = format_se_type_latex(my_se, dict)
@@ -1461,9 +1605,9 @@ etable_internal_latex = function(info){
             all_se_type = sapply(se_type_list, format_se_type_latex, dict = dict, inline = TRUE)
 
             if(coefstat == "se"){
-                coefstat_sentence = "Standard-Errors type"
+                coefstat_sentence = "Standard-Errors"
             } else {
-                coefstat_sentence = "Co-variance type"
+                coefstat_sentence = "Co-variance"
             }
 
             info_muli_se = paste0(coefstat_sentence, "& ", paste(all_se_type, collapse = "&"), "\\\\\n")
@@ -1471,7 +1615,7 @@ etable_internal_latex = function(info){
             if(add_signif){
                 info_SD = paste0(style$lines$foot, sd_intro, "Signif. Codes: ", paste(names(signifCode), signifCode, sep=": ", collapse = ", "), "}}\\\\\n")
             } else {
-                myAmpLine = paste0(paste0(rep(" ", length(depvar_list)+1), collapse="&"), "\\tabularnewline\n")
+                myAmpLine = paste0(paste0(rep(" ", length(depvar_list)+1), collapse = " & "), "\\tabularnewline\n")
                 info_SD = paste0(style$lines$foot, myAmpLine, "\\\\\n")
             }
 
@@ -1487,32 +1631,37 @@ etable_internal_latex = function(info){
     # Information on number of items
     supplemental_info = ""
 
-    if(all(theta_list == "")) info_theta = ""
-
     #
     # Fit statistics
     #
 
-    if(nchar(style$stats$title) == 0){
-        fit_info = style$lines$sep
-    } else if(style$stats$title == "\\midrule"){
-        fit_info = "\\midrule "
-    } else {
-        fit_info = paste0(style$lines$sep, style$stats$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
-    }
-
-    fit_info = paste0(fit_info, "Observations& ", paste(addCommas(obs_list), collapse="&"), "\\\\\n")
-    fit_info = paste0(fit_info, nb_FE_lines, info_convergence, info_muli_se)
-    if(!all(sapply(fitstat_list, function(x) all(is.na(x))))){
-
-        fit_names = attr(fitstat_list, "format_names")
-        nb = length(fit_names)
-        for(fit_id in 1:nb){
-            fit = sapply(fitstat_list, function(x) x[[fit_id]])
-            fit[is.na(fit)] = "--"
-            fit_info = paste0(fit_info, fit_names[fit_id], " & ", paste0(fit, collapse = "&"), "\\\\\n")
+    if(!"stats" %in% drop.section){
+        if(nchar(style$stats$title) == 0){
+            fit_info = style$lines$sep
+        } else if(style$stats$title == "\\midrule"){
+            fit_info = "\\midrule "
+        } else {
+            fit_info = paste0(style$lines$sep, style$stats$title, "& ", paste(rep(" ", n_models), collapse = "&"), "\\\\\n")
         }
+
+        # fit_info = paste0(fit_info, "Observations& ", paste(addCommas(obs_list), collapse = "&"), "\\\\\n")
+        fit_info = paste0(fit_info, nb_FE_lines, info_convergence, info_muli_se)
+
+        if(!all(sapply(fitstat_list, function(x) all(is.na(x))))){
+
+            fit_names = attr(fitstat_list, "format_names")
+            nb = length(fit_names)
+            for(fit_id in 1:nb){
+                fit = sapply(fitstat_list, function(x) x[[fit_id]])
+                if(all(is.na(fit))) next
+                fit[is.na(fit)] = ""
+                fit_info = paste0(fit_info, fit_names[fit_id], " & ", paste0(fit, collapse = "&"), "\\\\\n")
+            }
+        }
+    } else {
+        fit_info = ""
     }
+
 
     # Notes
     info_notes = ""
@@ -1521,11 +1670,14 @@ etable_internal_latex = function(info){
     }
 
     # Stacking var and stat
-    var_stack = c(variable_line, coef_lines, info_theta)
+    var_stack = c(variable_line, coef_lines)
     stat_stack = c(fit_info)
     dum_stack = c(dumIntro, FE_lines, slope_intro, slope_lines)
 
+    #
     # Group
+    #
+
     for(i in seq_along(group)){
         gi = group[[i]]
         gi_format = yesNo[2 - gi]
@@ -1553,7 +1705,7 @@ etable_internal_latex = function(info){
                 if(gi_style_parsed$title == "\\midrule"){
                     gi_full = "\\midrule "
                 } else {
-                    gi_full = paste0(gi_style_parsed$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+                    gi_full = paste0(gi_style_parsed$title, "& ", paste(rep(" ", n_models), collapse = " & "), "\\\\\n")
                 }
 
             }
@@ -1571,7 +1723,10 @@ etable_internal_latex = function(info){
 
     }
 
+    #
     # Extra lines
+    #
+
     for(i in seq_along(extraline)){
         el = extraline[[i]]
 
@@ -1610,7 +1765,7 @@ etable_internal_latex = function(info){
                 if(el_style_parsed$title == "\\midrule"){
                     el_full = "\\midrule "
                 } else {
-                    el_full = paste0(el_style_parsed$title, "& ", paste(rep(" ", n_models), collapse="&"), "\\\\\n")
+                    el_full = paste0(el_style_parsed$title, "& ", paste(rep(" ", n_models), collapse = " & "), "\\\\\n")
                 }
             }
         }
@@ -1636,8 +1791,6 @@ etable_internal_latex = function(info){
 
     res = c(supplemental_info, start_table, intro_latex, first_line, info_subtitles, model_line, info_family, var_stack, stat_stack, info_SD, style$lines$bottom, outro_latex, info_notes, end_table)
 
-    # res = c(supplemental_info, start_table, intro_latex, first_line, info_subtitles, model_line, info_family, variable_line, coef_lines, info_theta, dumIntro, FE_lines, slope_intro, slope_lines, fit_info, info_SD, style$lines$bottom, outro_latex, info_notes, end_table)
-
     res = res[nchar(res) > 0]
 
     return(res)
@@ -1661,7 +1814,6 @@ etable_internal_df = function(info){
     slope_names = info$slope_names
     slope_flag_list = info$slope_flag_list
     family_list = info$family_list
-    theta_list = info$theta_list
     fitstat_list = info$fitstat_list
     title = info$title
     label = info$label
@@ -1722,6 +1874,8 @@ etable_internal_df = function(info){
     # ordering the coefs
     all_vars = order_apply(all_vars, order)
 
+    if(length(all_vars) == 0) stop_up("Not any variable was selected, please reframe your keep/drop arguments.")
+
     coef_mat <- all_vars
     for(m in 1:n_models) coef_mat <- cbind(coef_mat, coef_list[[m]][all_vars])
     coef_mat[is.na(coef_mat)] <- "  "
@@ -1734,7 +1888,9 @@ etable_internal_df = function(info){
 
         gi_name = names(group)[i]
         from = nchar(strsplit(gi_name, "}", fixed = TRUE)[[1]][1])
-        gi_name = substr(gi_name, from + 2, nchar(gi_name))
+        if(from < nchar(gi_name)){
+            gi_name = substr(gi_name, from + 2, nchar(gi_name))
+        }
 
         my_line = c(gi_name, gi_format)
 
@@ -1761,16 +1917,13 @@ etable_internal_df = function(info){
 
         el_name = names(extraline)[i]
         from = nchar(strsplit(el_name, "}", fixed = TRUE)[[1]][1])
-        el_name = substr(el_name, from + 2, nchar(el_name))
+        if(from < nchar(el_name)){
+            el_name = substr(el_name, from + 2, nchar(el_name))
+        }
 
         my_line = c(el_name, el_format)
 
         res = rbind(res, my_line)
-    }
-
-    if("Neg. Bin." %in% family_list){
-        theta_line = c("Overdispersion:", unlist(theta_list))
-        res = rbind(res, theta_line)
     }
 
     # The line with the dependent variable => defined here to get the width
@@ -1798,7 +1951,7 @@ etable_internal_df = function(info){
         }
         all_fe = matrix(c(is_fe, recursive=TRUE), nrow = length(fe_names))
         all_fe = cbind(fe_names, all_fe)
-        FE_lines <- paste0(paste0(apply(all_fe, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+        FE_lines <- paste0(paste0(apply(all_fe, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
 
         myLine = "-------------------------------"
 
@@ -1818,7 +1971,7 @@ etable_internal_df = function(info){
         }
         all_slopes = matrix(c(slope_flag_list, recursive=TRUE), nrow = length(slope_names))
         all_slopes = cbind(slope_names, all_slopes)
-        slope_lines <- paste0(paste0(apply(all_slopes, 1, paste0, collapse="&"), collapse="\\\\\n"), "\\\\\n")
+        slope_lines <- paste0(paste0(apply(all_slopes, 1, paste0, collapse = " & "), collapse="\\\\\n"), "\\\\\n")
 
         myLine = "-------------------------------"
 
@@ -1851,25 +2004,36 @@ etable_internal_df = function(info){
         coefstat_sentence = "VCOV type"
     }
 
-    res <- rbind(res, c("Observations", addCommas(obs_list)))
+    # res <- rbind(res, c("Observations", addCommas(obs_list)))
     if(!useSummary || !any(grepl("\\(", unlist(se_type_list)))){
         se_type_format = c()
 
+        type = ""
         if(length(unique(gsub(" \\(.+", "", se_type_list))) == 1){
             # All identical
-            type = paste0(": ", gsub(" \\(.+", "", se_type_list[1]))
+
+            if(grepl("(", se_type_list[[1]], fixed = TRUE)){
+                # Only if clustered
+                type = paste0(": ", gsub(" \\(.+", "", se_type_list[[1]]))
+            }
+
             for(m in 1:n_models) se_type_format[m] = format_se_type(se_type_list[[m]], longueur[[1+m]], by = TRUE)
         } else {
-            type = ""
             for(m in 1:n_models) se_type_format[m] = format_se_type(se_type_list[[m]], longueur[[1+m]])
         }
 
         res <- rbind(res, c(paste0(coefstat_sentence, type), c(se_type_format, recursive = TRUE)))
     } else {
-        main_type = gsub(" \\(.+", "", se_type_list[[1]])
+
         se_type_format = c()
         for(m in 1:n_models) se_type_format[m] = format_se_type(se_type_list[[m]], longueur[[1+m]], by = TRUE)
-        res <- rbind(res, c(paste0(coefstat_sentence, ": ", main_type), c(se_type_format, recursive = TRUE)))
+
+        main_type = ""
+        if(grepl("(", se_type_list[[1]], fixed = TRUE)){
+            main_type = paste0(": ", gsub(" \\(.+", "", se_type_list[[1]]))
+        }
+
+        res <- rbind(res, c(paste0(coefstat_sentence, main_type), c(se_type_format, recursive = TRUE)))
     }
 
     # convergence status
@@ -1881,12 +2045,13 @@ etable_internal_df = function(info){
     # Fit statistics
     #
 
-    if(!identical(fitstat_list, NA)){
+    if(!all(sapply(fitstat_list, function(x) all(is.na(x))))){
 
         fit_names = attr(fitstat_list, "format_names")
         nb = length(fit_names)
         for(fit_id in 1:nb){
             fit = sapply(fitstat_list, function(x) x[[fit_id]])
+            if(all(is.na(fit))) next
             fit[is.na(fit)] = "--"
             res <- rbind(res, c(fit_names[fit_id], fit))
         }
@@ -1935,10 +2100,10 @@ etable_internal_df = function(info){
 
 
 #' @rdname etable
-setFixest_etable = function(digits=4, fitstat, coefstat = c("se", "tstat", "confint"), ci = 0.95, sdBelow = TRUE, keep, drop, order, dict, signifCode, float, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = c("Yes", "No"), family, powerBelow = -5, interaction.combine = " $\\times $ ", depvar, style = list(), notes = NULL, group = NULL, extraline = NULL, tablefoot = TRUE, reset = FALSE){
+setFixest_etable = function(digits=4, fitstat, coefstat = c("se", "tstat", "confint"), ci = 0.95, sdBelow = TRUE, keep, drop, order, dict, signifCode, float, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE, yesNo = c("Yes", "No"), family, powerBelow = -5, interaction.combine = " $\\times $ ", depvar, style = list(), notes = NULL, group = NULL, extraline = NULL, tablefoot = TRUE, placement = "htbp", drop.section = NULL, reset = FALSE){
 
     # cat(names(formals(setFixest_etable)), sep = '", "')
-    arg_list = c("digits", "fitstat", "coefstat", "ci", "sdBelow", "keep", "drop", "order", "dict", "signifCode", "float", "fixef_sizes", "fixef_sizes.simplify", "yesNo", "family", "powerBelow", "interaction.combine", "depvar", "style", "notes", "group", "extraline", "tablefoot", "reset")
+    arg_list = c("digits", "fitstat", "coefstat", "ci", "sdBelow", "keep", "drop", "order", "dict", "signifCode", "float", "fixef_sizes", "fixef_sizes.simplify", "yesNo", "family", "powerBelow", "interaction.combine", "depvar", "style", "notes", "group", "extraline", "tablefoot", "placement", "drop.section", "reset")
 
     #
     # Argument checking => strong since these will become default values
@@ -1988,6 +2153,15 @@ setFixest_etable = function(digits=4, fitstat, coefstat = c("se", "tstat", "conf
     check_arg(dict, "NULL logical scalar | named character vector no na")
 
     check_arg_plus(group, extraline, "NULL{list()} named list l0")
+
+    check_arg(placement, "character scalar")
+    if(!missing(placement)){
+        if(nchar(placement) == 0) stop("Argument 'placement' cannot be the empty string.")
+        p_split = strsplit(placement, "")[[1]]
+        check_value(p_split, "strict multi charin(h, t, b, p, H, !)", .message = "Argument 'placement' must be a character string containing only the following characters: 'h', 't', 'b', 'p', 'H', and '!'.")
+    }
+
+    check_arg_plus(drop.section, "NULL multi match(fixef, slopes, stats)")
 
     if(!missnull(style)){
         # We check the argument style + set it // all checks are made here

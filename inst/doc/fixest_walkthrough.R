@@ -22,14 +22,17 @@ print(gravity_pois)
 ## -----------------------------------------------------------------------------
 summary(gravity_pois, se = "twoway")
 
-## -----------------------------------------------------------------------------
-# Equivalent ways of clustering the SEs:
-# One-way clustering is deduced from the arguent 'cluster'
-# - using the vector:
-summary(gravity_pois, cluster = trade$Product)
-# - by reference:
-summary(gravity_pois, cluster = "Product")
-# - with a formula:
+## ---- eval = FALSE------------------------------------------------------------
+#  # Equivalent ways of clustering the SEs:
+#  # One-way clustering is deduced from the arguent 'cluster'
+#  # - using the vector:
+#  summary(gravity_pois, cluster = trade$Product)
+#  # - by reference:
+#  summary(gravity_pois, cluster = "Product")
+#  # - with a formula:
+#  summary(gravity_pois, cluster = ~Product)
+
+## ---- eval = TRUE-------------------------------------------------------------
 summary(gravity_pois, cluster = ~Product)
 
 ## -----------------------------------------------------------------------------
@@ -121,27 +124,29 @@ est_comb
 ## -----------------------------------------------------------------------------
 fixef(est_comb)[[1]]
 
-## ---- echo = FALSE------------------------------------------------------------
-# "::" = function(a, b) NULL
-
 ## ---- eval = TRUE-------------------------------------------------------------
 # Sample data illustrating the DiD
 data(base_did)
 head(base_did)
 
-## ---- eval = FALSE------------------------------------------------------------
-#  # Estimation of yearly effect
-#  # We also add individual/time fixed-effects:
-#  est_did = feols(y ~ x1 + treat::period(5) | id + period, base_did)
-#  est_did
-
-## ---- echo = FALSE------------------------------------------------------------
-# I need to use a trick to be allowed to use "::"
-est_did = eval(parse(text = "feols(y ~ x1 + treat::period(5) | id + period, base_did)"))
+## ---- eval = TRUE-------------------------------------------------------------
+# Estimation of yearly effect
+# We also add individual/time fixed-effects:
+est_did = feols(y ~ x1 + i(treat, period, 5) | id + period, base_did)
 est_did
 
 ## ---- fig.width=7-------------------------------------------------------------
 coefplot(est_did)
+
+## ---- eval = TRUE-------------------------------------------------------------
+# Estimation of yearly effect
+# We also add individual/time fixed-effects:
+est_f_did = feols(y ~ x1 + i(period, keep = 3:6) + i(treat, period, 5) | id, base_did)
+# The display in etable is now 'nicer' than when using regular factors
+etable(est_f_did, dict = c("period" = "Period", "6" = "six"))
+
+## ---- fig.width=7-------------------------------------------------------------
+coefplot(est_f_did, only.inter = FALSE)
 
 ## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
@@ -151,7 +156,7 @@ etable(est1, est2, est3, order = "f", drop = "Int")
 
 ## -----------------------------------------------------------------------------
 # setting up the panel
-pdat = panel(base_did, ~id+period)
+pdat = panel(base_did, ~id + period)
 # Now the panel.id argument is not required
 est1 = feols(y ~ l(x1, 0:1), pdat)
 est2 = feols(f(y) ~ l(x1, -1:1), pdat)
@@ -171,14 +176,14 @@ head(pdat_dt)
 ## -----------------------------------------------------------------------------
 base_lag = base_did
 # we create a lagged value of the variable x1
-base_lag$x1.l1 = lag(x1 ~ id+period, 1, base_lag)
+base_lag$x1.l1 = lag(x1 ~ id + period, 1, base_lag)
 head(base_lag)
 
 ## -----------------------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
-base_lag_dt[, x1.l1 := lag(x1 ~ id+period, 1)]
+base_lag_dt[, x1.l1 := lag(x1 ~ id + period, 1)]
 
 ## -----------------------------------------------------------------------------
 # Generating data:
@@ -223,11 +228,4 @@ rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 #  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 2))
 #  # 4 nthreads: 1.17s
 #  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 4))
-
-## -----------------------------------------------------------------------------
-base_coll = trade
-base_coll$constant_variable = 1
-res <- femlm(Euros ~ log(dist_km) + constant_variable|Origin+Destination+Product+Year, base_coll)
-collinearity(res)
-
 

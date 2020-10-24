@@ -7,18 +7,18 @@
 
 
 fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), NL.fml,
-                       fixef, na_inf.rm = getFixest_na_inf.rm(), NL.start, lower, upper, NL.start.init,
+                       fixef, NL.start, lower, upper, NL.start.init,
                        offset, linear.start = 0, jacobian.method = "simple",
                        useHessian = TRUE, hessian.args = NULL, opt.control = list(),
                        y, X, fixef_mat, panel.id,
                        nthreads = getFixest_nthreads(),
-                       verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000,
+                       verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000, collin.tol = 1e-14,
                        deriv.iter = 5000, deriv.tol = 1e-4, glm.iter = 25, glm.tol = 1e-8,
                        etastart, mustart,
                        warn = TRUE, notes = getFixest_notes(), combine.quick, demeaned = FALSE,
                        origin_bis, origin = "feNmlm", mc_origin, mc_origin_bis, mc_origin_ter,
                        computeModel0 = FALSE, weights,
-                       from_update = FALSE, object, sumFE_init, debug = FALSE, ...){
+                       from_update = FALSE, object, sumFE_init, debug = FALSE, mem.clean = FALSE, ...){
 
     # INTERNAL function:
     # the estimation functions need input data in the exact format without any mistake possible (bc of c++)
@@ -58,11 +58,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     #
     # Arguments control
-    main_args = c("fml", "data", "panel.id", "offset", "na_inf.rm", "fixef.tol", "fixef.iter", "fixef", "nthreads", "verbose", "warn", "notes", "combine.quick", "start")
+    main_args = c("fml", "data", "panel.id", "offset", "fixef.tol", "fixef.iter", "fixef", "nthreads", "verbose", "warn", "notes", "combine.quick", "start", "only.env", "mem.clean")
     femlm_args = c("family", "theta.init", "linear.start", "opt.control", "deriv.tol", "deriv.iter")
     feNmlm_args = c("NL.fml", "NL.start", "lower", "upper", "NL.start.init", "jacobian.method", "useHessian", "hessian.args")
-    feglm_args = c("family", "weights", "glm.iter", "glm.tol", "etastart", "mustart")
-    feols_args = c("weights", "demeaned")
+    feglm_args = c("family", "weights", "glm.iter", "glm.tol", "etastart", "mustart", "collin.tol")
+    feols_args = c("weights", "demeaned", "collin.tol")
     internal_args = c("debug", "object", "from_update", "sumFE_init")
 
     deprec_old_new = c()
@@ -93,7 +93,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     args_invalid = setdiff(args, valid_args)
     if(length(args_invalid) > 0){
-        if(warn) warning(substr(deparse(mc_origin)[1], 1, 15), "...: ", enumerate_items(args_invalid, "is"), " not ", ifsingle(args_invalid, "a valid argument", "valid arguments"), " for function ", origin, ".", call. = FALSE, immediate. = TRUE)
+        if(warn) warning(substr(deparse(mc_origin)[1], 1, 15), "...: ", enumerate_items(args_invalid, "is"), " not ", ifsingle(args_invalid, "a valid argument", "valid arguments"), " for function ", origin, ".", call. = FALSE)
     }
 
     args_deprec = deprec_old_new[deprec_old_new %in% args]
@@ -218,7 +218,9 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         computeModel0 = family_equiv %in% c("poisson", "logit")
     }
 
-    check_arg(demeaned, notes, warn, na_inf.rm, "logical scalar")
+    check_arg(demeaned, notes, warn, mem.clean, "logical scalar")
+
+    check_arg(collin.tol, "numeric scalar GT{0}")
 
     show_notes = notes
     notes = c()
@@ -230,23 +232,15 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     isNA_sample = FALSE
     message_NA = ""
 
+    # Note on mem.clean
+    # we remove the most intermediary objects as possible
+    # we apply gc only from time to time since it is costly
+    # flag gc triggered to monitor when gc was last triggered => avoids triggering it too often
+    gc2trig = TRUE
+
     #
     # nthreads argument
-    # if(!isScalar(nthreads) || (nthreads %% 1) != 0 || nthreads <= 0){
-    #     stop("The argument 'nthreads' must be an integer greater or equal to 1 and lower than the number of threads available (", max(get_nb_threads(), 1), ").")
-    # }
-    check_value(nthreads, "integer scalar GT{0}", .message = paste0("The argument 'nthreads' must be an integer greater or equal to 1 and lower than the number of threads available (", max(get_nb_threads(), 1), ")."))
-
-    if(nthreads > 1){
-        max_threads = get_nb_threads()
-        if(max_threads == 0){
-            warning("OpenMP not detected: cannot use ", nthreads, " threads, single-threaded mode instead.")
-            nthreads = 1
-        } else if(nthreads > max_threads){
-            warning("Asked for ", nthreads, " threads while the maximum is ", max_threads, ". Set to ", max_threads, " threads instead.")
-            nthreads = max_threads
-        }
-    }
+    nthreads = check_set_nthreads(nthreads)
 
     # The family functions (for femlm only)
     famFuns = switch(family,
@@ -356,7 +350,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         if(isPanel){
             fml = try(rewrite_fml(fml), silent = TRUE)
             if("try-error" %in% class(fml)){
-                stop("Problem in the formula: ", gsub("_expand", "", fml))
+                stop("Problem in the formula regarding lag/leads: ", gsub("__expand", "", fml))
             }
             FML = Formula::Formula(fml)
         }
@@ -452,23 +446,25 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     msgNA_y = "LHS: 0"
     info = cpppar_which_na_inf_vec(lhs, nthreads)
     if(info$any_na_inf){
-        if(!na_inf.rm){
-            msg = msg_na_inf(info$any_na, info$any_inf)
-            obs = head(which(info$is_na_inf), 3)
-            stop("The left hand side of the fomula contains ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm).")
-        } else {
-            # If na_inf.rm => we keep track of the NAs
-            if(info$any_na) ANY_NA = TRUE
-            if(info$any_inf) ANY_INF = TRUE
 
-            anyNA_y = TRUE
-            isNA_y = info$is_na_inf
-            anyNA_sample = TRUE
-            isNA_sample = isNA_sample | isNA_y
-            msgNA_y = paste0("LHS: ", numberFormatNormal(sum(isNA_y)))
-        }
+        if(info$any_na) ANY_NA = TRUE
+        if(info$any_inf) ANY_INF = TRUE
+
+        anyNA_y = TRUE
+        isNA_y = info$is_na_inf
+        anyNA_sample = TRUE
+        isNA_sample = isNA_sample | isNA_y
+        msgNA_y = paste0("LHS: ", numberFormatNormal(sum(isNA_y)))
 
         lhs_clean = lhs[!isNA_y]
+
+        if(mem.clean){
+            rm(isNA_y)
+        }
+    }
+
+    if(mem.clean){
+        rm(info)
     }
 
     # we check the var is not a constant
@@ -626,27 +622,27 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         info = cpppar_which_na_inf_mat(linear.mat, nthreads)
         if(info$any_na_inf){
             anyNA_L = TRUE
-            if(!na_inf.rm){
-                # Default behavior: no NA tolerance
-                quiNA = colSums(linear.mat[info$is_na_inf, , drop=FALSE]) > 0
-                whoIsNA = linear.params[quiNA]
-                msg = msg_na_inf(info$any_na, info$any_inf)
-                obs = which(info$is_na_inf)
 
-                stop("The right hand side contains ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm). FYI the variable", enumerate_items(whoIsNA, "s.is"), " concerned.")
-            } else {
-                # If na_inf.rm => we keep track of the NAs
-                if(info$any_na) ANY_NA = TRUE
-                if(info$any_inf) ANY_INF = TRUE
+            if(info$any_na) ANY_NA = TRUE
+            if(info$any_inf) ANY_INF = TRUE
 
-                isNA_L = info$is_na_inf
-                anyNA_sample = TRUE
-                isNA_sample = isNA_sample | isNA_L
-                msgNA_L = paste0(", RHS: ", numberFormatNormal(sum(isNA_L)))
+            isNA_L = info$is_na_inf
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_L
+            msgNA_L = paste0(", RHS: ", numberFormatNormal(sum(isNA_L)))
+
+            if(mem.clean){
+                rm(isNA_L)
             }
 
         } else {
             msgNA_L = ", RHS: 0"
+        }
+
+        if(mem.clean){
+            rm(info)
+            gc()
+            gc2trig = FALSE
         }
 
     } 	else {
@@ -677,40 +673,26 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         }
 
         data_NL = data[, nonlinear.varnames, drop = FALSE]
-        qui_num = sapply(data_NL, is.numeric)
-        if(any(!qui_num)){
-            var_pblm = nonlinear.varnames[qui_num]
-            stop("In NL.fml, the variable", enumerate_items(var_pblm, "s.is"), " not numeric. This is not allowed.")
-        }
 
-        data_NL = as.matrix(data_NL)
-
-        if(typeof(data_NL) != "double"){
-            data_NL = 1 * data_NL
-        }
-
-        # Control for NAs
+        # Update 08-2020 => We now allow non-numeric variables in the NL part (they can be used as identifiers)
         anyNA_NL = FALSE
-        info = which_na_inf(data_NL, nthreads)
-        if(info$any_na_inf){
+        if(any(quiNA <- sapply(data_NL, anyNA))){
             anyNA_NL = TRUE
-            if(!na_inf.rm){
-                quiNA = colSums(data_NL[info$is_na_inf, , drop=FALSE]) > 0
-                whoIsNA = nonlinear.varnames[quiNA]
-                msg = msg_na_inf(info$any_na, info$any_inf)
-                obs = which(info$is_na_inf)
+            quiNA = which(quiNA)
 
-                stop("The non-linear part (NL.fml) contains ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm). FYI the variable", enumerate_items(whoIsNA, "s.is"), " concerned.")
+            isNA_NL = is.na(data_NL[[quiNA[1]]])
+            for(i in quiNA[-1]){
+                isNA_NL = isNA_NL | is.na(data_NL[[quiNA[i]]])
+            }
 
-            } else {
-                # If na_inf.rm => we keep track of the NAs
-                if(info$any_na) ANY_NA = TRUE
-                if(info$any_inf) ANY_INF = TRUE
+            ANY_NA = TRUE
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_NL
+            msgNA_NL = paste0(", NL: ", numberFormatNormal(sum(isNA_NL)))
 
-                isNA_NL = info$is_na_inf
-                anyNA_sample = TRUE
-                isNA_sample = isNA_sample | isNA_NL
-                msgNA_NL = paste0(", NL: ", numberFormatNormal(sum(isNA_NL)))
+            if(mem.clean){
+                rm(isNA_NL)
+                gc2trig = TRUE
             }
 
         } else {
@@ -769,22 +751,27 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             info = cpppar_which_na_inf_vec(offset.value, nthreads)
             if(info$any_na_inf){
                 anyNA_offset = TRUE
-                if(na_inf.rm == FALSE){
-                    msg = msg_na_inf(info$any_na, info$any_inf)
-                    obs = head(which(info$is_na_inf), 3)
-                    stop("The offset contains ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm).")
-                } else {
-                    if(info$any_na) ANY_NA = TRUE
-                    if(info$any_inf) ANY_INF = TRUE
 
-                    isNA_offset = info$is_na_inf
-                    anyNA_sample = TRUE
-                    isNA_sample = isNA_sample | isNA_offset
-                    msgNA_offset = paste0(", Offset: ", numberFormatNormal(sum(isNA_offset)))
+                if(info$any_na) ANY_NA = TRUE
+                if(info$any_inf) ANY_INF = TRUE
+
+                isNA_offset = info$is_na_inf
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_offset
+                msgNA_offset = paste0(", Offset: ", numberFormatNormal(sum(isNA_offset)))
+
+                if(mem.clean){
+                    rm(isNA_offset)
                 }
             } else {
                 msgNA_offset = ", Offset: 0"
             }
+
+            if(mem.clean){
+                rm(info)
+                gc2trig = TRUE
+            }
+
         } else if(is.null(offset)){
             # msg if it's not what the user wanted
             if(!is.null(mc_origin$offset)){
@@ -845,22 +832,24 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             if(info$any_na_inf){
                 anyNA_weights = TRUE
 
-                if(na_inf.rm == FALSE){
-                    msg = msg_na_inf(info$any_na, info$any_inf)
-                    obs = head(which(info$is_na_inf), 3)
-                    stop("The weights contain ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm).")
+                if(info$any_na) ANY_NA = TRUE
+                if(info$any_inf) ANY_INF = TRUE
 
-                } else {
-                    if(info$any_na) ANY_NA = TRUE
-                    if(info$any_inf) ANY_INF = TRUE
+                isNA_W = info$is_na_inf
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_W
+                msgNA_weight = paste0(", Weights: ", numberFormatNormal(sum(isNA_W)))
 
-                    isNA_W = info$is_na_inf
-                    anyNA_sample = TRUE
-                    isNA_sample = isNA_sample | isNA_W
-                    msgNA_weight = paste0(", Weights: ", numberFormatNormal(sum(isNA_W)))
+                if(mem.clean){
+                    rm(isNA_W)
                 }
             } else {
                 msgNA_weight = ", Weights: 0"
+            }
+
+            if(mem.clean){
+                rm(info)
+                gc2trig = TRUE
             }
 
             # need to check NA if there are some (ie if NA in vector: any() gives TRUE if any TRUE, NA if no TRUE)
@@ -886,6 +875,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 stop("Argument 'weights' (", dp, ") is evaluated to NULL. This is likely not what you want.")
             }
         }
+    }
+
+    if(mem.clean && gc2trig){
+        gc()
+        gc2trig = FALSE
     }
 
 
@@ -975,6 +969,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             if(isVector(fixef_mat)){
                 fixef_mat = data.frame(x = fixef_mat, stringsAsFactors = FALSE)
                 names(fixef_mat) = deparse(mc_origin[["fixef_mat"]])[1]
+
             } else if(is.list(fixef_mat)){
                 all_len = lengths(fixef_mat)
                 if(any(diff(all_len) != 0)){
@@ -1005,7 +1000,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         } else {
             #
-            # ... Reguar ####
+            # ... Regular ####
             #
 
             # Regular way
@@ -1040,8 +1035,6 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                     stop("Argument 'combine.quick' must be a single logical.")
                 }
 
-                # start: NEW
-
                 fixef_terms_full = terms_fixef(fixef_fml)
                 if("try-error" %in% class(fixef_terms_full)){
                     stop("Problem extracting the terms of the fixed-effects part of the formula:\n", fixef_terms_full)
@@ -1057,11 +1050,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 fixef_vars = names(fixef_mat)
 
                 # Slopes
-                isSlope = any(fixef_terms_full$slope_flag)
+                isSlope = any(fixef_terms_full$slope_flag != 0)
                 if(isSlope){
 
                     if(!origin_type %in% c("feols", "feglm")){
-                        stop("The use of varying slopes is available only for functions feols, feglm or fepois.")
+                        stop("The use of varying slopes is available only for the functions feols, feglm or fepois.")
                     }
 
                     slope_mat = prepare_df(fixef_terms_full$slope_vars, data)
@@ -1069,8 +1062,8 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                         stop("Problem evaluating the variables with varying slopes in the fixed-effects part of the formula:\n", slope_mat)
                     }
                     slope_flag = fixef_terms_full$slope_flag
-                    slope_fe = fixef_terms_full$fe_vars
                     slope_vars = fixef_terms_full$slope_vars
+                    slope_vars_list = fixef_terms_full$slope_vars_list
 
                     # Further controls
                     not_numeric = !sapply(slope_mat, is.numeric)
@@ -1078,21 +1071,14 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                         stop("In the fixed-effects part of the formula (i.e. in ", as.character(fixef_fml[2]), "), variables with varying slopes must be numeric. Currently variable", enumerate_items(names(slope_mat)[not_numeric], "s.is"), " not.")
                     }
 
-                    onlySlope = all(slope_flag)
+                    # slope_flag: 0: no Varying slope // > 0: varying slope AND fixed-effect // < 0: varying slope WITHOUT fixed-effect
+                    onlySlope = all(slope_flag < 0)
 
                 }
 
                 # fml update
-                # fml = update(fml, as.formula(paste0(".~.|", paste0(fixef_terms, collapse = "+"))))
                 fml_char = as.character(fml)
                 fml_full = as.formula(paste0(fml_char[2], "~", fml_char[3], "|", paste0(fixef_terms, collapse = "+")))
-
-                #   end: NEW
-
-                # OLD -- deprec:
-                # fixef_mat = prepare_cluster_mat(fixef_fml, data, combine.quick)
-                # we change fixef_vars to become a vector of characters
-                # fixef_vars = names(fixef_mat)
             }
         }
 
@@ -1104,26 +1090,25 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         is_not_num = sapply(fixef_mat, function(x) !is.numeric(x))
         if(any(is_not_num)){
             for(i in which(is_not_num)){
-                fixef_mat[[i]] = as.character(fixef_mat[[i]])
+                if(!is.character(fixef_mat[[i]])){
+                    fixef_mat[[i]] = as.character(fixef_mat[[i]])
+                }
             }
         }
 
         if(anyNA(fixef_mat)){
             isNA_fixef = rowSums(is.na(fixef_mat)) > 0
 
-            if(!na_inf.rm){
-                # Default behavior, NA not allowed
-                var_problem = fixef_vars[sapply(fixef_mat, anyNA)]
-                obs = head(which(isNA_fixef), 3)
-                stop("The fixed-effects variables contain NA values. Please provide data without NA (or use na_inf.rm).", ifelse(ncol(fixef_mat) > 1, paste0(" FYI the fixed-effects with NA are: ", paste0(var_problem, collapse = ", "), "."), ""), " (e.g. observation", enumerate_items(obs, "s"), ".)")
+            ANY_NA = TRUE
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_fixef
+            msgNA_fixef = paste0(", Fixed-effects: ", numberFormatNormal(sum(isNA_fixef)))
 
-            } else {
-                # If na_inf.rm => we keep track of the NAs
-                ANY_NA = TRUE
-                anyNA_sample = TRUE
-                isNA_sample = isNA_sample | isNA_fixef
-                msgNA_fixef = paste0(", Fixed-effects: ", numberFormatNormal(sum(isNA_fixef)))
+            if(mem.clean){
+                rm(isNA_fixef)
+                gc2trig = TRUE
             }
+
         } else {
             msgNA_fixef = ", Fixed-effects: 0"
         }
@@ -1131,32 +1116,37 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # NAs in slopes
         if(isSlope){
 
-            mat_tmp = matrix(as.numeric(unlist(slope_mat)), nrow(slope_mat))
-            info = cpppar_which_na_inf_mat(mat_tmp, nthreads)
+            if(mem.clean && gc2trig){
+                gc()
+                gc2trig = FALSE
+            }
+
+            # Convert to double
+            who_not_double = which(sapply(slope_mat, is.integer))
+            for(i in who_not_double){
+                slope_mat[[i]] = as.numeric(slope_mat[[i]])
+            }
+
+            info = cpppar_which_na_inf_df(slope_mat, nthreads)
             if(info$any_na_inf){
 
-                if(!na_inf.rm){
-                    # Default behavior: no NA tolerance
-                    quiNA = colSums(slope_mat[info$is_na_inf, , drop=FALSE]) > 0
-                    whoIsNA = names(slope_mat)[quiNA]
-                    msg = msg_na_inf(info$any_na, info$any_inf)
-                    obs = which(info$is_na_inf)
+                if(info$any_na) ANY_NA = TRUE
+                if(info$any_inf) ANY_INF = TRUE
 
-                    stop("In the fixed-effects part of the formula, variables with varying slopes contain ", msg, " (e.g. observation", enumerate_items(obs, "s"), "). Please provide data without ", msg, " (or use na_inf.rm). FYI the variable", enumerate_items(whoIsNA, "s.is"), " concerned.")
-                } else {
-                    # If na_inf.rm => we keep track of the NAs
-                    if(info$any_na) ANY_NA = TRUE
-                    if(info$any_inf) ANY_INF = TRUE
-
-                    isNA_slope = info$is_na_inf
-                    anyNA_sample = TRUE
-                    isNA_sample = isNA_sample | isNA_slope
-                    msgNA_slope = paste0(", Var. Slopes: ", numberFormatNormal(sum(isNA_slope)))
-                }
+                isNA_slope = info$is_na_inf
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_slope
+                msgNA_slope = paste0(", Var. Slopes: ", numberFormatNormal(sum(isNA_slope)))
 
             } else {
                 msgNA_slope = ", Var. Slopes: 0"
             }
+
+            if(mem.clean){
+                rm(info)
+                gc()
+            }
+
         } else {
             msgNA_slope = ""
             fixef_terms = fixef_vars # both are identical if no slope
@@ -1166,18 +1156,19 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         obs2remove_NA = c()
         if(anyNA_sample || any0W){
             # we remove all NAs obs + 0 weight obs
+            gc2trig = TRUE
 
             nbNA = sum(isNA_sample)
 
             if(anyNA_sample){
                 msg = msg_na_inf(ANY_NA, ANY_INF)
-                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of ", msg, " (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ").")
+                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of ", msg, " (", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ").")
                 notes = c(notes, message_NA)
             }
 
             if(nbNA == nobs){
                 msg = msg_na_inf(ANY_NA, ANY_INF)
-                stop("All observations contain ", msg, ". Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ")")
+                stop("All observations contain ", msg, ". Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ".)")
             }
 
             if(any0W){
@@ -1222,9 +1213,9 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # ... QUF setup ####
         #
 
-        Q = length(fixef_terms) # terms: contains FEs + slopes
+        Q = length(fixef_vars) # terms: contains FEs + slopes
 
-        fixef_removed = slope_variables = list()
+        fixef_removed = list()
         obs2remove = c()
 
         type = switch(family, gaussian = 0, logit = 2, 1)
@@ -1233,7 +1224,16 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         only_slope = FALSE
         if(isSlope){
             # only slope: not any non-slope
-            only_slope = as.vector(tapply(!slope_flag, slope_fe, sum)[fixef_vars]) == 0
+            # only_slope = as.vector(tapply(!slope_flag, slope_fe, sum)[fixef_vars]) == 0
+            only_slope = slope_flag < 0
+
+            # shallow copy
+            slope_variables = as.list(slope_mat)
+        }
+
+        if(mem.clean && gc2trig){
+            gc()
+            gc2trig = FALSE
         }
 
         quf_info_all = cpppar_quf_table_sum(x = fixef_mat, y = lhs, do_sum_y = do_sum_y, type = type, only_slope = only_slope, nthreads = nthreads)
@@ -1263,6 +1263,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             # update of the lhs
             lhs = lhs[-obs2remove]
 
+            # update of the slope variables
+            if(isSlope){
+                for(i in seq_along(slope_variables)) slope_variables[[i]] = slope_variables[[i]][-obs2remove]
+            }
+
             # Names of the FE removed
             for(i in 1:length(fixef_id)){
                 if(is_string[i]){
@@ -1280,30 +1285,6 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             notes = c(notes, message_fixef)
         }
 
-        # If slopes: we need to recreate some values (quf/table/sum_y)
-        if(isSlope){
-
-            # The slope variables
-            for(i in which(slope_flag)){
-                slope_variables[[i]] = slope_mat[[slope_vars[i]]]
-                if(length(slope_variables[[i]]) == 1){
-                    # si l'utilisateur utilise une constante comme variable...
-                    # il faut aussi controler pour quand il fait n'importe quoi...
-                    slope_variables[[i]] = rep(slope_variables[[i]], length(lhs))
-                }
-            }
-
-            dict = 1:length(fixef_vars)
-            names(dict) = fixef_vars
-            new_id = dict[slope_fe]
-
-            fixef_id = fixef_id[new_id]
-            fixef_names = fixef_names[new_id]
-            sum_y_all = sum_y_all[new_id]
-            fixef_table = fixef_table[new_id]
-            fixef_sizes = lengths(fixef_table)
-        }
-
         if(length(obs2remove_NA) > 0){
             # we update the value of obs2remove (will contain both NA and removed bc of outcomes)
             if(length(obs2remove) > 0){
@@ -1319,29 +1300,22 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # we save the fixed-effects IDs + sizes (to be returned in "res") [original order!]
         #
 
-        if(isSlope){
-            # we only have one ID per FE used (not 1 per slope)
-            index = c()
-            for(var in fixef_vars){
-                index = c(index, which.max(slope_fe == var))
-            }
-        } else {
-            index = 1:Q
-        }
-
-
         fixef_id_res = list()
-        for(i in index){
+        for(i in 1:Q){
             dum = fixef_id[[i]]
             attr(dum, "fixef_names") = as.character(fixef_names[[i]])
-            if(isSlope){
-                fixef_id_res[[slope_fe[i]]] = dum
-            } else {
-                fixef_id_res[[fixef_vars[i]]] = dum
-            }
+            fixef_id_res[[fixef_vars[i]]] = dum
         }
 
-        fixef_sizes_res = fixef_sizes[index]
+
+        # The real size is equal to nb_coef * nb_slopes
+        if(isSlope){
+            fixef_sizes_real = fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0))
+        } else {
+            fixef_sizes_real = fixef_sizes
+        }
+
+        fixef_sizes_res = fixef_sizes
         names(fixef_sizes_res) = fixef_vars
 
         #
@@ -1349,11 +1323,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         #
 
         IS_REORDER = FALSE
-        if(any(fixef_sizes != sort(fixef_sizes, decreasing = TRUE))){
+        if(any(fixef_sizes_real != sort(fixef_sizes_real, decreasing = TRUE))){
             IS_REORDER = TRUE
             # FE with the most cases first (limits precision problems)
 
-            new_order = order(fixef_sizes, decreasing = TRUE)
+            new_order = order(fixef_sizes_real, decreasing = TRUE)
 
             fixef_sizes = fixef_sizes[new_order]
             fixef_id = fixef_id[new_order]
@@ -1361,10 +1335,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             fixef_table = fixef_table[new_order]
 
             if(isSlope){
-                slope_variables = slope_variables[new_order]
+                slope_variables = slope_variables[unlist(slope_vars_list[new_order], use.names = FALSE)]
                 slope_flag = slope_flag[new_order]
             }
 
+        } else {
+            new_order = 1:Q
         }
 
     } else {
@@ -1377,11 +1353,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             nbNA = sum(isNA_sample)
 
             if(anyNA_sample){
-                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of NA values (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ").")
+                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of NA values (", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ").")
                 notes = c(notes, message_NA)
 
                 if(nbNA == nobs){
-                    stop("All observations contain NAs. Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ")")
+                    stop("All observations contain NAs. Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ".)")
                 }
             }
 
@@ -1392,7 +1368,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
                 if(nbNA == nobs){
                     if(anyNA_sample){
-                        stop("All observations are either NA or 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup NA: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ")")
+                        stop("All observations are either NA or 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup NA: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ".)")
                     } else {
                         stop("All observations are 0-weight. Estimation cannot be done.")
                     }
@@ -1439,7 +1415,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         if(useModel.matrix){
             # There are factors => possibly some vars are only 0 now that NAs are removed
 
-            only_0 = cpppar_check_only_0(linear.mat, nrow(linear.mat), nthreads)
+            only_0 = cpppar_check_only_0(linear.mat, nthreads)
             if(all(only_0 == 1)){
                 stop("After removing NAs, not a single explanatory variable is different from 0.")
             } else if(any(only_0 == 1)){
@@ -1671,11 +1647,22 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     if(isNL){
         if(missing(NL.start.init)){
             if(missing(NL.start)) stop("There must be starting values for NL parameters. Please use argument NL.start (or NL.start.init).")
-            if(typeof(NL.start) != "list") stop("NL.start must be a list.")
-            if(any(!nonlinear.params %in% names(NL.start))) stop(paste("Some NL parameters have no starting values:\n", paste(nonlinear.params[!nonlinear.params %in% names(NL.start)], collapse=", "), ".", sep=""))
+            if(length(NL.start) == 1 && is.numeric(NL.start)){
+                # NL.start is used for NL.start.init
+                if(is.na(NL.start)) stop("Argument 'NL.start' is currently equal to NA. Please provide a valid starting value.")
+                NL.start.init = NL.start
+                NL.start <- list()
+                NL.start[nonlinear.params] <- NL.start.init
 
-            # we restrict NL.start to the nonlinear.params
-            NL.start = NL.start[nonlinear.params]
+            } else if(typeof(NL.start) != "list"){
+                stop("NL.start must be a list.")
+            } else if(any(!nonlinear.params %in% names(NL.start))){
+                stop(paste("Some NL parameters have no starting values:\n", paste(nonlinear.params[!nonlinear.params %in% names(NL.start)], collapse=", "), ".", sep=""))
+            } else {
+                # we restrict NL.start to the nonlinear.params
+                NL.start = NL.start[nonlinear.params]
+            }
+
         } else {
             if(length(NL.start.init)>1) stop("NL.start.init must be a scalar.")
             if(!is.numeric(NL.start.init)) stop("NL.start.init must be numeric!")
@@ -1898,7 +1885,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         # New cpp functions
         # This is where we send the elements needed for convergence in cpp
-        assign("fixef_id_vector", as.integer(unlist(fixef_id) - 1), env)
+        if(origin_type == "feNmlm"){
+            assign("fixef_id_vector", as.integer(unlist(fixef_id) - 1), env)
+        } else {
+            assign("fixef_id_list", fixef_id, env)
+        }
+
         assign("fixef_table_vector", as.integer(unlist(fixef_table)), env)
         assign("sum_y_vector", unlist(sum_y_all), env)
 
@@ -1926,11 +1918,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # Slopes
 
         if(isSlope){
-            assign("slope_flag", as.integer(slope_flag), env)
-            assign("slope_variables", as.numeric(unlist(slope_variables)), env)
+            assign("slope_flag", slope_flag, env)
+            assign("slope_variables", slope_variables, env)
         } else {
             assign("slope_flag", rep(0L, length(fixef_vars)), env)
-            assign("slope_variables", 0, env)
+            assign("slope_variables", list(0), env)
         }
 
     }
@@ -1975,6 +1967,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     assign("fixef.tol", fixef.tol, env)
     assign("NR.tol", NR.tol, env)
     assign("deriv.tol", deriv.tol, env)
+    assign("collin.tol", collin.tol, env)
     # ITERATIONS
     assign("fixef.iter", fixef.iter, env)
     assign("deriv.iter", deriv.iter, env)
@@ -1988,6 +1981,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     assign("origin", origin, env)
     assign("warn", warn, env)
     assign("opt.control", opt.control, env)
+    assign("mem.clean", mem.clean, env)
 
 
     # To monitor how the FEs are computed (if the problem is difficult or not)
@@ -2067,6 +2061,9 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     assign("start", start, env)
 
+    # fixest tag
+    assign("fixest_env", TRUE, env)
+
     #
     # Res ####
     #
@@ -2087,7 +2084,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     K = length(params)
     if(isFixef){
         if(isSlope){
-            K = K + sum(fixef_sizes) - sum(slope_flag == FALSE) + any(slope_flag == FALSE)
+            K = K + sum(fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0)))
+            # now the references
+            if(any(slope_flag >= 0)){
+                K = K + 1 - sum(slope_flag >= 0)
+            }
         } else {
             K = K + sum(fixef_sizes - 1) + 1
         }
@@ -2106,18 +2107,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         if(isSlope){
             res$fixef_terms = fixef_terms
-
-            # We also add the variables => makes fixef self-contained
-            # It looks odd but the user may ask for the same var to have
-            # varying slopes in svl dimensions
-            sv = list()
-            slope_vars_unik = slope_vars[!is.na(slope_vars)]
-            if(IS_REORDER) slope_variables = slope_variables[order(new_order)]
-            for(var in slope_vars_unik){
-                sv[[var]] = slope_variables[[which.max(slope_vars == var)]]
-            }
-
-            res$slope_variables = sv
+            original_order = order(new_order)
+            res$slope_flag = slope_flag[order(new_order)]
+            res$slope_flag_reordered = slope_flag
+            res$slope_variables_reordered = slope_variables
+            res$fe.reorder = new_order
         }
 
         res$fixef_id = fixef_id_res

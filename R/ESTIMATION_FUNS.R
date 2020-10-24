@@ -17,6 +17,7 @@
 #' @param verbose Integer. Higher values give more information. In particular, it can detail the number of iterations in the demeaning algoritmh (the first number is the left-hand-side, the other numbers are the right-hand-side variables).
 #' @param demeaned Logical, default is \code{FALSE}. Only used in the presence of fixed-effects: should the centered variables be returned? If \code{TRUE},  it creates the items \code{y_demeaned} and \code{X_demeaned}.
 #' @param notes Logical. By default, two notes are displayed: when NAs are removed (to show additional information) and when some observations are removed because of collinearity. To avoid displaying these messages, you can set \code{notes = FALSE}. You can remove these messages permanently by using \code{setFixest_notes(FALSE)}.
+#' @param collin.tol Numeric scalar, default is \code{1e-14}. Threshold decising when variables should be considered collinear and subsequently removed from the estimation. Higher values means more variables will be removed (if there is presence of collinearity). One signal of presence of collinearity is t-stats that are extremely low (for instance when t-stats < 1e-3).
 #'
 #' @details
 #' The method used to demean each variable along the fixed-effects is based on Berge (2018), since this is the same problem to solve as for the Gaussian case in a ML setup.
@@ -69,7 +70,7 @@
 #' \item{call}{The call of the function.}
 #' \item{method}{The method used to estimate the model.}
 #' \item{family}{The family used to estimate the model.}
-#' \item{fml_full}{[where relevant] The "full" formula containing the linear part and the fixed-effects.}
+#' \item{fml_full}{(When relevant.) The "full" formula containing the linear part and the fixed-effects.}
 #' \item{nparams}{The number of parameters of the model.}
 #' \item{fixef_vars}{The names of each fixed-effect dimension.}
 #' \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
@@ -93,10 +94,12 @@
 #' \item{scores}{The matrix of the scores (first derivative for each observation).}
 #' \item{residuals}{The difference between the dependent variable and the expected predictor.}
 #' \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
-#' \item{offset}{[where relevant] The offset formula.}
-#' \item{weights}{[where relevant] The weights formula.}
-#' \item{collin.var}{[where relevant] Vector containing the variables removed because of collinearity.}
-#' \item{collin.coef}{[where relevant] Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
+#' \item{offset}{(When relevant.) The offset formula.}
+#' \item{weights}{(When relevant.) The weights formula.}
+#' \item{obsRemoved}{(When relevant.) Vector of observations that were removed because of NA values.}
+#' \item{collin.var}{(When relevant.) Vector containing the variables removed because of collinearity.}
+#' \item{collin.coef}{(When relevant.) Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
+#' \item{collin.min_norm}{The minimal diagonal value of the Cholesky decomposition. Small values indicate possible presence collinearity.}
 #' \item{y_demeaned}{Only when \code{demeaned = TRUE}: the centered dependent variable.}
 #' \item{X_demeaned}{Only when \code{demeaned = TRUE}: the centered explanatory variable.}
 #'
@@ -171,9 +174,9 @@
 #' # You have many more example in coefplot help
 #'
 #'
-feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, fixef.iter = 10000,
-                 na_inf.rm = getFixest_na_inf.rm(), nthreads = getFixest_nthreads(),
-                 verbose = 0, warn = TRUE, notes = getFixest_notes(), combine.quick, demeaned = FALSE, ...){
+feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10,
+                 nthreads = getFixest_nthreads(), verbose = 0, warn = TRUE, notes = getFixest_notes(), combine.quick,
+                 demeaned = FALSE, mem.clean = FALSE, only.env = FALSE, env, ...){
 
 	dots = list(...)
 
@@ -181,7 +184,7 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 	fromGLM = FALSE
 	if("X" %in% names(dots)){
 		fromGLM = TRUE
-		env = dots$env
+		# env is provided by feglm
 		X = dots$X
 		y = as.vector(dots$y)
 		init = dots$means
@@ -190,10 +193,19 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		time_start = proc.time()
 
 		# we use fixest_env for appropriate controls and data handling
-		env = try(fixest_env(fml = fml, data = data, weights = weights, offset = offset, panel.id = panel.id, fixef = fixef, fixef.tol = fixef.tol, fixef.iter = fixef.iter, na_inf.rm = na_inf.rm, nthreads = nthreads, verbose = verbose, warn = warn, notes = notes, combine.quick = combine.quick, demeaned = demeaned, origin = "feols", mc_origin = match.call(), ...), silent = TRUE)
+		if(missing(env)){
+		    env = try(fixest_env(fml = fml, data = data, weights = weights, offset = offset, panel.id = panel.id, fixef = fixef, fixef.tol = fixef.tol, fixef.iter = fixef.iter, collin.tol = collin.tol, nthreads = nthreads, verbose = verbose, warn = warn, notes = notes, combine.quick = combine.quick, demeaned = demeaned, mem.clean = mem.clean, origin = "feols", mc_origin = match.call(), ...), silent = TRUE)
+		} else if(r <- !is.environment(env) || !isTRUE(env$fixest_env)) {
+		    stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not ", ifelse(r, "an", "a 'fixest'"), " environment.")
+		}
 
 		if("try-error" %in% class(env)){
 			stop(format_error_msg(env, "feols"))
+		}
+
+		check_arg(only.env, "logical scalar")
+		if(only.env){
+		    return(env)
 		}
 
 		y = get("lhs", env)
@@ -212,6 +224,8 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		weights = get("weights.value", env)
 		isWeight = length(weights) > 1
 		correct_0w = FALSE
+
+		mem.clean = get("mem.clean", env)
 
 		verbose = get("verbose", env)
 		if(verbose >= 2) cat("Setup in ", (proc.time() - time_start)[3], "s\n", sep="")
@@ -235,21 +249,29 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		time_demean = proc.time()
 
 		# Number of nthreads
-		nthreads = min(nthreads, ncol(X) + 1 - onlyFixef)
+		n_vars_X = ifelse(is.null(ncol(X)), 0, ncol(X))
+		# nthreads = min(nthreads, ncol(X) + 1 - onlyFixef)
 
 		# fixef information
 		fixef_sizes = get("fixef_sizes", env)
 		fixef_table_vector = get("fixef_table_vector", env)
-		fixef_id_vector = get("fixef_id_vector", env)
+		fixef_id_list = get("fixef_id_list", env)
 
 		slope_flag = get("slope_flag", env)
 		slope_vars = get("slope_variables", env)
 
-		vars_demean <- cpp_demean(y, X, weights, iterMax = fixef.iter,
-		                          diffMax = fixef.tol, nb_cluster_all = fixef_sizes,
-		                          dum_vector = fixef_id_vector, tableCluster_vector = fixef_table_vector,
-		                          slope_flag = slope_flag, slope_vars = slope_vars,
-		                          r_init = init, checkWeight = fromGLM, nthreads = nthreads)
+		if(mem.clean){
+		    # we can't really rm many variables... but gc can be enough
+		    # cpp_demean is the most mem intensive bit
+		    gc()
+		}
+
+		vars_demean = cpp_demean(y, X, n_vars_X, weights, iterMax = fixef.iter,
+		                            diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
+		                            fe_id_list = fixef_id_list, table_id_I = fixef_table_vector,
+		                            slope_flag_Q = slope_flag, slope_vars_list = slope_vars,
+		                            r_init = init, nthreads = nthreads)
+
 
 		y_demean = vars_demean$y_demean
 		X_demean = vars_demean$X_demean
@@ -258,10 +280,14 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 			res$means = vars_demean$means
 		}
 
+		if(mem.clean){
+		    rm(vars_demean)
+		}
+
 		if(any(slope_flag > 0) && any(res$iterations > 300)){
 		    # Maybe we have a convergence problem
 		    # This is poorly coded, but it's a temporary fix
-		    opt_fe = check_conv(y_demean, X_demean, fixef_id_vector, slope_flag, slope_vars, weights)
+		    opt_fe = check_conv(y_demean, X_demean, fixef_id_list, slope_flag, slope_vars, weights)
 
 		    # This is a bit too rough a check but it should catch the most problematic cases
 		    if(any(opt_fe > 1e-4)){
@@ -305,9 +331,17 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 	# Estimation
 	#
 
+	if(mem.clean){
+	    gc()
+	}
+
 	if(!onlyFixef){
 
-	    est = ols_fit(y_demean, X_demean, weights, correct_0w, nthreads)
+	    est = ols_fit(y_demean, X_demean, weights, correct_0w, collin.tol, nthreads)
+
+	    if(mem.clean){
+	        gc()
+	    }
 
 	    # Corner case: not any relevant variable
 	    if(!is.null(est$all_removed)){
@@ -327,11 +361,13 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		# Additional stuff
 		res$residuals = est$residuals
 		res$multicol = est$multicol
+		res$collin.min_norm = est$collin.min_norm
 		if(fromGLM) res$is_excluded = est$is_excluded
 
 		if(demeaned){
 		    res$y_demeaned = y_demean
 		    res$X_demeaned = X_demean
+		    colnames(res$X_demeaned) = colnames(X)
 		}
 
 	} else {
@@ -348,6 +384,10 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 	time_post = proc.time()
 	if(verbose >= 1 && (time_post - time_esti)[3] > 0.05){
 		cat("Estimation in ", (time_post - time_esti)[3], "s\n", sep="")
+	}
+
+	if(mem.clean){
+	    gc()
 	}
 
 	if(fromGLM){
@@ -397,6 +437,10 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		res$fitted.values = res$sumFE = y - res$residuals
 	} else {
 
+	    if(mem.clean){
+	        gc()
+	    }
+
 		# X_beta / fitted / sumFE
 		if(isFixef){
 			x_beta = cpppar_xbeta(X, coef, nthreads)
@@ -419,6 +463,10 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 		}
 
 		res$hessian = est$xwx
+
+		if(mem.clean){
+		    gc()
+		}
 
 		if(isWeight){
 			res$sigma2 = cpp_ssq(res$residuals * sqrt(weights)) / (length(y) - df_k)
@@ -455,7 +503,12 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 	    res$sq.cor = NA
 	}
 
+	if(mem.clean){
+	    gc()
+	}
+
 	res$ssr_null = cpp_ssr_null(y)
+	res$ssr = cpp_ssq(res$residuals)
 	sigma_null = sqrt(res$ssr_null/n)
 	res$ll_null = -1/2/sigma_null^2*res$ssr_null - n*log(sigma_null) - n*log(2*pi)/2
 
@@ -480,7 +533,7 @@ feols = function(fml, data, weights, offset, panel.id, fixef, fixef.tol = 1e-6, 
 	res
 }
 
-ols_fit = function(y, X, w, correct_0w = FALSE, nthreads){
+ols_fit = function(y, X, w, correct_0w = FALSE, collin.tol, nthreads){
     # No control here -- done before
 
     info_products = cpp_sparse_products(X, w, y, correct_0w, nthreads)
@@ -488,7 +541,7 @@ ols_fit = function(y, X, w, correct_0w = FALSE, nthreads){
     xwy = info_products$Xty
 
     multicol = FALSE
-    info_inv = cpp_cholesky(xwx)
+    info_inv = cpp_cholesky(xwx, collin.tol, nthreads)
 
     if(!is.null(info_inv$all_removed)){
         # Means all variables are collinear! => can happen when using FEs
@@ -512,14 +565,14 @@ ols_fit = function(y, X, w, correct_0w = FALSE, nthreads){
 
     residuals = y - fitted.values
 
-    res = list(xwx = xwx, coefficients = beta, fitted.values = fitted.values, xwx_inv = xwx_inv, multicol = multicol, residuals = residuals, is_excluded = is_excluded)
+    res = list(xwx = xwx, coefficients = beta, fitted.values = fitted.values, xwx_inv = xwx_inv, multicol = multicol, residuals = residuals, is_excluded = is_excluded, collin.min_norm = info_inv$min_norm)
 
     res
 }
 
 
 
-check_conv = function(y, X, fixef_id_vector, slope_flag, slope_vars, weights){
+check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
     # VERY SLOW!!!!
     # IF THIS FUNCTION LASTS => TO BE PORTED TO C++
 
@@ -547,8 +600,7 @@ check_conv = function(y, X, fixef_id_vector, slope_flag, slope_vars, weights){
         }
 
         for(q in 1:Q){
-            index_id = 1:nobs + (q - 1) * nobs
-            fixef_id = fixef_id_vector[index_id]
+            fixef_id = fixef_id_list[[q]]
 
             if(slope_flag[q]){
                 index_var = 1:nobs + (cumsum(slope_flag)[q] - 1) * nobs
@@ -603,16 +655,16 @@ check_conv = function(y, X, fixef_id_vector, slope_flag, slope_vars, weights){
 #' \item{call}{The call of the function.}
 #' \item{method}{The method used to estimate the model.}
 #' \item{family}{The family used to estimate the model.}
-#' \item{fml_full}{[where relevant] The "full" formula containing the linear part and the fixed-effects.}
+#' \item{fml_full}{(When relevant.) The "full" formula containing the linear part and the fixed-effects.}
 #' \item{nparams}{The number of parameters of the model.}
 #' \item{fixef_vars}{The names of each fixed-effect dimension.}
 #' \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
 #' \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
-#' \item{y}{[where relevant] The dependent variable (used to compute the within-R2 when fixed-effects are present).}
+#' \item{y}{(When relevant.) The dependent variable (used to compute the within-R2 when fixed-effects are present).}
 #' \item{convStatus}{Logical, convergence status of the IRWLS algorithm.}
 #' \item{irls_weights}{The weights of the last iteration of the IRWLS algorithm.}
-#' \item{obsRemoved}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
-#' \item{fixef_removed}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
+#' \item{obsRemoved}{(When relevant.) Vector of observations that were removed because of NA values or because of only 0/1 outcome within a fixed-effect (depends on the family though).}
+#' \item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 #' \item{coefficients}{The named vector of estimated coefficients.}
 #' \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
 #' \item{loglik}{The loglikelihood.}
@@ -631,10 +683,10 @@ check_conv = function(y, X, fixef_id_vector, slope_flag, slope_vars, weights){
 #' \item{scores}{The matrix of the scores (first derivative for each observation).}
 #' \item{residuals}{The difference between the dependent variable and the expected predictor.}
 #' \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
-#' \item{offset}{[where relevant] The offset formula.}
-#' \item{weights}{[where relevant] The weights formula.}
-#' \item{collin.var}{[where relevant] Vector containing the variables removed because of collinearity.}
-#' \item{collin.coef}{[where relevant] Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
+#' \item{offset}{(When relevant.) The offset formula.}
+#' \item{weights}{(When relevant.) The weights formula.}
+#' \item{collin.var}{(When relevant.) Vector containing the variables removed because of collinearity.}
+#' \item{collin.coef}{(When relevant.) Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
 #'
 #'
 #'
@@ -671,21 +723,31 @@ check_conv = function(y, X, fixef_id_vector, slope_flag, slope_vars, weights){
 #'
 #'
 feglm = function(fml, data, family = "poisson", offset, weights, panel.id, start = NULL,
-                 etastart = NULL, mustart = NULL, fixef,
-                 fixef.tol = 1e-6, fixef.iter = 10000, glm.iter = 25, glm.tol = 1e-8,
-                 na_inf.rm = getFixest_na_inf.rm(), nthreads = getFixest_nthreads(),
-                 warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, ...){
+                 etastart = NULL, mustart = NULL, fixef, fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-14,
+                 glm.iter = 25, glm.tol = 1e-8, nthreads = getFixest_nthreads(),
+                 warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
 
     if(missing(weights)) weights = NULL
 
     time_start = proc.time()
 
-    env = try(fixest_env(fml=fml, data=data, family = family, offset = offset, weights = weights, panel.id = panel.id, linear.start = start, etastart=etastart, mustart=mustart, fixef = fixef, fixef.tol=fixef.tol, fixef.iter=fixef.iter, glm.iter = glm.iter, glm.tol = glm.tol, na_inf.rm = na_inf.rm, nthreads = nthreads, warn=warn, notes=notes, verbose = verbose, combine.quick = combine.quick, origin = "feglm", mc_origin = match.call(), ...), silent = TRUE)
+    if(missing(env)){
+        env = try(fixest_env(fml=fml, data=data, family = family, offset = offset, weights = weights, panel.id = panel.id, linear.start = start, etastart=etastart, mustart=mustart, fixef = fixef, fixef.tol=fixef.tol, fixef.iter=fixef.iter, collin.tol = collin.tol, glm.iter = glm.iter, glm.tol = glm.tol, nthreads = nthreads, warn=warn, notes=notes, verbose = verbose, combine.quick = combine.quick, mem.clean = mem.clean, origin = "feglm", mc_origin = match.call(), ...), silent = TRUE)
+
+    } else {
+        if(!is.environment(env)) stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not an environment.")
+        if(is.null(env$fixest_env)) stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not a 'fixest' environment.")
+    }
 
     if("try-error" %in% class(env)){
         mc = match.call()
         origin = ifelse(is.null(mc$origin), "feglm", mc$origin)
         stop(format_error_msg(env, origin))
+    }
+
+    check_arg(only.env, "logical scalar")
+    if(only.env){
+        return(env)
     }
 
     verbose = get("verbose", env)
@@ -701,20 +763,22 @@ feglm = function(fml, data, family = "poisson", offset, weights, panel.id, start
 
 #' @rdname feglm
 feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start = NULL,
-                     etastart = NULL, mustart = NULL, fixef.tol = 1e-6, fixef.iter = 10000,
-                     glm.iter = 25, glm.tol = 1e-8, na_inf.rm = getFixest_na_inf.rm(),
-                     nthreads = getFixest_nthreads(), warn = TRUE, notes = getFixest_notes(), verbose = 0, ...){
+                     etastart = NULL, mustart = NULL, fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10, glm.iter = 25, glm.tol = 1e-8,
+                     nthreads = getFixest_nthreads(), warn = TRUE, notes = getFixest_notes(), mem.clean = FALSE,
+                     verbose = 0, only.env = FALSE, env, ...){
 
     dots = list(...)
 
     lean = isTRUE(dots$lean)
     means = 1
-    if("env" %in% names(dots)){
+    if(!missing(env)){
         # This is an internal call from the function feglm
         # no need to further check the arguments
         # we extract them from the env
 
-        env = dots$env
+        if(r <- !is.environment(env) || !isTRUE(env$fixest_env)) {
+            stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not ", ifelse(r, "an", "a 'fixest'"), " environment.")
+        }
 
         # main variables
         if(missing(y)) y = get("lhs", env)
@@ -729,6 +793,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
         # other params
         if(missing(fixef.tol)) fixef.tol = get("fixef.tol", env)
         if(missing(fixef.iter)) fixef.iter = get("fixef.iter", env)
+        if(missing(collin.tol)) collin.tol = get("collin.tol", env)
         if(missing(glm.iter)) glm.iter = get("glm.iter", env)
         if(missing(glm.tol)) glm.tol = get("glm.tol", env)
         if(missing(warn)) warn = get("warn", env)
@@ -755,10 +820,15 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
 
         time_start = proc.time()
 
-        env = try(fixest_env(y = y, X = X, fixef_mat = fixef_mat, family = family, na_inf.rm = na_inf.rm, nthreads = nthreads, offset = offset, weights = weights, linear.start = start, etastart=etastart, mustart=mustart, fixef.tol = fixef.tol, fixef.iter = fixef.iter, glm.iter = glm.iter, glm.tol = glm.tol, notes=notes, warn=warn, verbose = verbose, origin = "feglm.fit", mc_origin = match.call(), ...), silent = TRUE)
+        env = try(fixest_env(y = y, X = X, fixef_mat = fixef_mat, family = family, nthreads = nthreads, offset = offset, weights = weights, linear.start = start, etastart=etastart, mustart=mustart, fixef.tol = fixef.tol, fixef.iter = fixef.iter, collin.tol = collin.tol, glm.iter = glm.iter, glm.tol = glm.tol, notes=notes, mem.clean = mem.clean, warn=warn, verbose = verbose, origin = "feglm.fit", mc_origin = match.call(), ...), silent = TRUE)
 
         if("try-error" %in% class(env)){
             stop(format_error_msg(env, "feglm.fit"))
+        }
+
+        check_arg(only.env, "logical scalar")
+        if(only.env){
+            return(env)
         }
 
         verbose = get("verbose", env)
@@ -804,6 +874,10 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     #
     # Init
     #
+
+    if(mem.clean){
+        gc()
+    }
 
     if(init.type == "mu"){
 
@@ -867,6 +941,10 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
         # NOTA: FE only => ADDS LOTS OF COMPUTATIONAL COSTS without convergence benefit
     }
 
+    if(mem.clean){
+        gc()
+    }
+
     if(init.type != "coef"){
         # starting deviance with constant equal to 1e-5
         # this is important for getting in step halving early (when deviance goes awry right from the start)
@@ -889,10 +967,14 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     # The main loop
     #
 
-    wols = list(means = 1)
+    wols_means = 1
     conv = FALSE
     warning_msg = div_message = ""
     for (iter in 1:glm.iter) {
+
+        if(mem.clean){
+            gc()
+        }
 
         mu.eta.val = mu.eta(mu, eta)
         var_mu = variance(mu)
@@ -927,7 +1009,12 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
             break
         }
 
-        wols = feols(y = z, X = X, weights = w, means = wols$means, correct_0w = any_0w, env = env, fixef.tol = fixef.tol * 10**(iter==1), fixef.iter = fixef.iter, nthreads = nthreads, verbose = verbose - 1)
+        if(mem.clean && iter > 1){
+            rm(wols)
+            gc()
+        }
+
+        wols = feols(y = z, X = X, weights = w, means = wols_means, correct_0w = any_0w, env = env, fixef.tol = fixef.tol * 10**(iter==1), fixef.iter = fixef.iter, collin.tol = collin.tol, nthreads = nthreads, mem.clean = mem.clean, verbose = verbose - 1)
 
         # In theory OLS estimation is guaranteed to exist
         # yet, NA coef may happen with non-infinite very large values of z/w (e.g. values > 1e100)
@@ -940,11 +1027,17 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
             div_message = "Weighted-OLS returned NA coefficients."
             wols = wols_old
             break
+        } else {
+            wols_means = wols$means
         }
 
         eta = wols$fitted.values
         if(isOffset){
             eta = eta + offset
+        }
+
+        if(mem.clean){
+            gc()
         }
 
         mu = linkinv(eta)
@@ -1004,6 +1097,10 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
 
                 iter_sh = iter_sh + 1
                 eta_new = (eta_old + eta_new) / 2
+
+                if(mem.clean){
+                    gc()
+                }
 
                 mu = linkinv(eta_new + offset)
                 dev = sum_dev.resids(y, mu, eta_new + offset, wt = weights)
@@ -1081,6 +1178,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     res$irls_weights = w # weights from the iteratively reweighted least square
 
     res$coefficients = coef = wols$coefficients
+    res$collin.min_norm = wols$collin.min_norm
 
     if(!is.null(wols$warn_varying_slope)){
         warning(wols$warn_varying_slope)
@@ -1110,6 +1208,10 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     if(!onlyFixef && !lean){
         # score + hessian + vcov
 
+        if(mem.clean){
+            gc()
+        }
+
         # dispersion + scores
         if(family$family %in% c("poisson", "binomial")){
             res$scores = (wols$residuals * res$irls_weights) * wols$X_demean
@@ -1119,21 +1221,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
             res$hessian = cpppar_crossprod(wols$X_demean, res$irls_weights, nthreads) / res$dispersion
         }
 
-        # cov:
-        # var <- NULL
-        # try(var <- solve(res$hessian), silent = TRUE)
-        # if(is.null(var) || wols$multicol){
-        #     if(is.null(var)){
-        #         warning_msg = paste(warning_msg, "Covariance not defined, presence of collinearity. Use function collinearity() to pinpoint the problems.")
-        #         res$cov.unscaled = res$hessian * NA
-        #     } else {
-        #         warning_msg = paste(warning_msg, "Presence of collinearity in the IRLS stage. Use function collinearity() to pinpoint the problems.")
-        #         res$cov.unscaled = var
-        #     }
-        # } else {
-        #     res$cov.unscaled = var
-        # }
-        info_inv = cpp_cholesky(res$hessian, nthreads)
+        info_inv = cpp_cholesky(res$hessian, collin.tol, nthreads)
         if(!is.null(info_inv$all_removed)){
             # This should not occur, but I prefer to be safe
             stop("Not any single variable with a positive variance was found after the weighted-OLS stage. (If possible, could you send a replicable example to fixest's author? He's curious about when that actually happens, since in theory it should never happen.)")
@@ -1202,6 +1290,11 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
     # simpler form for poisson
     if(family_equiv == "poisson"){
         if(isWeight){
+
+            if(mem.clean){
+                gc()
+            }
+
             res$loglik = sum( (y * eta - mu - cpppar_lgamma(y + 1, nthreads)) * weights)
         } else {
             lfact = get("lfactorial", env)
@@ -1221,6 +1314,11 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
         fitted_null = linkinv(env$model0$constant)
     } else {
         if(verbose >= 1) cat("Null model:\n")
+
+        if(mem.clean){
+            gc()
+        }
+
         model_null = feglm.fit(X = matrix(1, nrow = n, ncol = 1), fixef_mat = NULL, env = env, lean = TRUE)
         ll_null = model_null$loglik
         fitted_null = model_null$fitted.values
@@ -1277,15 +1375,15 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
 #' \item{call}{The call of the function.}
 #' \item{method}{The method used to estimate the model.}
 #' \item{family}{The family used to estimate the model.}
-#' \item{fml_full}{[where relevant] The "full" formula containing the linear part and the fixed-effects.}
+#' \item{fml_full}{(When relevant.) The "full" formula containing the linear part and the fixed-effects.}
 #' \item{nparams}{The number of parameters of the model.}
 #' \item{fixef_vars}{The names of each fixed-effect dimension.}
 #' \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
 #' \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
 #' \item{convStatus}{Logical, convergence status.}
 #' \item{message}{The convergence message from the optimization procedures.}
-#' \item{obsRemoved}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
-#' \item{fixef_removed}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
+#' \item{obsRemoved}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
+#' \item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 #' \item{coefficients}{The named vector of estimated coefficients.}
 #' \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
 #' \item{loglik}{The log-likelihood.}
@@ -1303,8 +1401,8 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
 #' \item{scores}{The matrix of the scores (first derivative for each observation).}
 #' \item{residuals}{The difference between the dependent variable and the expected predictor.}
 #' \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
-#' \item{offset}{[where relevant] The offset formula.}
-#' \item{weights}{[where relevant] The weights formula.}
+#' \item{offset}{(When relevant.) The offset formula.}
+#' \item{weights}{(When relevant.) The weights formula.}
 #'
 #'
 #' @seealso
@@ -1337,36 +1435,35 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, weights, start
 #'
 #' # We estimate the effect of distance on trade => we account for 3 fixed-effects
 #' # 1) Poisson estimation
-#' est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
+#' est_pois = femlm(Euros ~ log(dist_km) | Origin + Destination + Product, trade)
 #'
 #' # 2) Log-Log Gaussian estimation (with same FEs)
-#' est_gaus = update(est_pois, log(Euros+1) ~ ., family="gaussian")
+#' est_gaus = update(est_pois, log(Euros+1) ~ ., family = "gaussian")
 #'
 #' # Comparison of the results using the function esttable
-#' esttable(est_pois, est_gaus)
+#' etable(est_pois, est_gaus)
 #' # Now using two way clustered standard-errors
-#' esttable(est_pois, est_gaus, se = "twoway")
+#' etable(est_pois, est_gaus, se = "twoway")
 #'
 #' # Comparing different types of standard errors
-#' sum_white    = summary(est_pois, se = "white")
+#' sum_hetero    = summary(est_pois, se = "hetero")
 #' sum_oneway   = summary(est_pois, se = "cluster")
 #' sum_twoway   = summary(est_pois, se = "twoway")
 #' sum_threeway = summary(est_pois, se = "threeway")
 #'
-#' esttable(sum_white, sum_oneway, sum_twoway, sum_threeway)
+#' etable(sum_hetero, sum_oneway, sum_twoway, sum_threeway)
 #'
 #'
 #'
 #'
 femlm <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), start = 0, fixef,
-						offset, panel.id, na_inf.rm = getFixest_na_inf.rm(),
-						fixef.tol = 1e-5, fixef.iter = 10000,
+						offset, panel.id, fixef.tol = 1e-5, fixef.iter = 10000,
 						nthreads = getFixest_nthreads(), verbose = 0, warn = TRUE,
-						notes = getFixest_notes(), theta.init, combine.quick, ...){
+						notes = getFixest_notes(), theta.init, combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
 
 	# This is just an alias
 
-	res = try(feNmlm(fml=fml, data=data, family=family, fixef=fixef, offset=offset, panel.id = panel.id, start = start, na_inf.rm=na_inf.rm, fixef.tol=fixef.tol, fixef.iter=fixef.iter, nthreads=nthreads, verbose=verbose, warn=warn, notes=notes, theta.init = theta.init, combine.quick = combine.quick, origin="femlm", mc_origin_bis=match.call(), ...), silent = TRUE)
+	res = try(feNmlm(fml=fml, data=data, family=family, fixef=fixef, offset=offset, panel.id = panel.id, start = start, fixef.tol=fixef.tol, fixef.iter=fixef.iter, nthreads=nthreads, verbose=verbose, warn=warn, notes=notes, theta.init = theta.init, combine.quick = combine.quick, mem.clean = mem.clean, origin="femlm", mc_origin_bis=match.call(), only.env=only.env, env=env, ...), silent = TRUE)
 
 	if("try-error" %in% class(res)){
 		stop(format_error_msg(res, "femlm"))
@@ -1377,9 +1474,8 @@ femlm <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 
 #' @rdname femlm
 fenegbin = function(fml, data, theta.init, start = 0, fixef, offset, panel.id,
-                    na_inf.rm = getFixest_na_inf.rm(), fixef.tol = 1e-5,
-                    fixef.iter = 10000, nthreads = getFixest_nthreads(),
-                    verbose = 0, warn = TRUE, notes = getFixest_notes(), combine.quick, ...){
+                    fixef.tol = 1e-5, fixef.iter = 10000, nthreads = getFixest_nthreads(),
+                    verbose = 0, warn = TRUE, notes = getFixest_notes(), combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
 
     # We control for the problematic argument family
     if("family" %in% names(match.call())){
@@ -1388,7 +1484,7 @@ fenegbin = function(fml, data, theta.init, start = 0, fixef, offset, panel.id,
 
     # This is just an alias
 
-    res = try(feNmlm(fml = fml, data=data, family = "negbin", theta.init = theta.init, start = start, fixef = fixef, offset = offset, panel.id = panel.id, na_inf.rm = na_inf.rm, fixef.tol = fixef.tol, fixef.iter = fixef.iter, nthreads = nthreads, verbose = verbose, warn = warn, notes = notes, combine.quick = combine.quick, origin = "fenegbin", mc_origin_bis = match.call(), ...), silent = TRUE)
+    res = try(feNmlm(fml = fml, data=data, family = "negbin", theta.init = theta.init, start = start, fixef = fixef, offset = offset, panel.id = panel.id, fixef.tol = fixef.tol, fixef.iter = fixef.iter, nthreads = nthreads, verbose = verbose, warn = warn, notes = notes, combine.quick = combine.quick, mem.clean = mem.clean, origin = "fenegbin", mc_origin_bis = match.call(), only.env=only.env, env=env, ...), silent = TRUE)
 
     if("try-error" %in% class(res)){
         stop(format_error_msg(res, "fenegbin"))
@@ -1399,9 +1495,8 @@ fenegbin = function(fml, data, theta.init, start = 0, fixef, offset, panel.id,
 
 #' @rdname feglm
 fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart = NULL, mustart = NULL,
-                  fixef, fixef.tol = 1e-6, fixef.iter = 10000, glm.iter = 25, glm.tol = 1e-8,
-                  na_inf.rm = getFixest_na_inf.rm(), nthreads = getFixest_nthreads(),
-                  warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, ...){
+                  fixef, fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10, glm.iter = 25, glm.tol = 1e-8, nthreads = getFixest_nthreads(),
+                  warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
 
     # We control for the problematic argument family
     if("family" %in% names(match.call())){
@@ -1410,7 +1505,7 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 
     # This is just an alias
 
-    res = try(feglm(fml = fml, data = data, family = "poisson", offset = offset, weights = weights, panel.id = panel.id, start = start, etastart = etastart, mustart = mustart, fixef = fixef, fixef.tol = fixef.tol, fixef.iter = fixef.iter, glm.iter = glm.iter, glm.tol = glm.tol, na_inf.rm = na_inf.rm, nthreads = nthreads, warn = warn, notes = notes, verbose = verbose, combine.quick = combine.quick, origin_bis = "fepois", mc_origin_bis = match.call(), ...), silent = TRUE)
+    res = try(feglm(fml = fml, data = data, family = "poisson", offset = offset, weights = weights, panel.id = panel.id, start = start, etastart = etastart, mustart = mustart, fixef = fixef, fixef.tol = fixef.tol, fixef.iter = fixef.iter, collin.tol = collin.tol, glm.iter = glm.iter, glm.tol = glm.tol, nthreads = nthreads, warn = warn, notes = notes, verbose = verbose, combine.quick = combine.quick, mem.clean = mem.clean, origin_bis = "fepois", mc_origin_bis = match.call(), only.env=only.env, env=env, ...), silent = TRUE)
 
     if("try-error" %in% class(res)){
         stop(format_error_msg(res, "fepois"))
@@ -1436,8 +1531,7 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 #' @param data A data.frame containing the necessary variables to run the model. The variables of the non-linear right hand side of the formula are identified with this \code{data.frame} names. Can also be a matrix.
 #' @param family Character scalar. It should provide the family. The possible values are "poisson" (Poisson model with log-link, the default), "negbin" (Negative Binomial model with log-link), "logit" (LOGIT model with log-link), "gaussian" (Gaussian model).
 #' @param fixef Character vector. The names of variables to be used as fixed-effects. These variables should contain the identifier of each observation (e.g., think of it as a panel identifier). Note that the recommended way to include fixed-effects is to insert them directly in the formula.
-#' @param na_inf.rm Logical, default is \code{TRUE}. If the variables necessary for the estimation contain NA/Infs and \code{na_inf.rm = TRUE}, then all observations containing NA are removed prior to estimation and a note is displayed detailing the number of observations removed. Otherwise, an error is raised.
-#' @param NL.start (For NL models only) A list of starting values for the non-linear parameters. ALL the parameters are to be named and given a staring value. Example: \code{NL.start=list(a=1,b=5,c=0)}. Though, there is an exception: if all parameters are to be given the same starting value, you can use the argument \code{NL.start.init}.
+#' @param NL.start (For NL models only) A list of starting values for the non-linear parameters. ALL the parameters are to be named and given a staring value. Example: \code{NL.start=list(a=1,b=5,c=0)}. Though, there is an exception: if all parameters are to be given the same starting value, you can use a numeric scalar.
 #' @param lower (For NL models only) A list. The lower bound for each of the non-linear parameters that requires one. Example: \code{lower=list(b=0,c=0)}. Beware, if the estimated parameter is at his lower bound, then asymptotic theory cannot be applied and the standard-error of the parameter cannot be estimated because the gradient will not be null. In other words, when at its upper/lower bound, the parameter is considered as 'fixed'.
 #' @param upper (For NL models only) A list. The upper bound for each of the non-linear parameters that requires one. Example: \code{upper=list(a=10,c=50)}. Beware, if the estimated parameter is at his upper bound, then asymptotic theory cannot be applied and the standard-error of the parameter cannot be estimated because the gradient will not be null. In other words, when at its upper/lower bound, the parameter is considered as 'fixed'.
 #' @param NL.start.init (For NL models only) Numeric scalar. If the argument \code{NL.start} is not provided, or only partially filled (i.e. there remain non-linear parameters with no starting value), then the starting value of all remaining non-linear parameters is set to \code{NL.start.init}.
@@ -1446,7 +1540,7 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 #' @param useHessian Logical. Should the Hessian be computed in the optimization stage? Default is \code{TRUE}.
 #' @param hessian.args List of arguments to be passed to function \code{\link[numDeriv]{genD}}. Defaults is missing. Only used with the presence of \code{NL.fml}.
 #' @param opt.control List of elements to be passed to the optimization method \code{\link[stats]{nlminb}}. See the help page of \code{\link[stats]{nlminb}} for more information.
-#' @param nthreads Integer: Number of nthreads to be used (accelerates the algorithm via the use of openMP routines). The default is to use the total number of nthreads available minus two. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.
+#' @param nthreads The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. The default is to use 50\% of all threads. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.
 #' @param verbose Integer, default is 0. It represents the level of information that should be reported during the optimisation process. If \code{verbose=0}: nothing is reported. If \code{verbose=1}: the value of the coefficients and the likelihood are reported. If \code{verbose=2}: \code{1} + information on the computing time of the null model, the fixed-effects coefficients and the hessian are reported.
 #' @param theta.init Positive numeric scalar. The starting value of the dispersion parameter if \code{family="negbin"}. By default, the algorithm uses as a starting value the theta obtained from the model with only the intercept.
 #' @param fixef.tol Precision used to obtain the fixed-effects. Defaults to \code{1e-5}. It corresponds to the maximum absolute difference allowed between two coefficients of successive iterations. Argument \code{fixef.tol} cannot be lower than \code{10000*.Machine$double.eps}. Note that this parameter is dynamically controlled by the algorithm.
@@ -1456,6 +1550,9 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 #' @param warn Logical, default is \code{TRUE}. Whether warnings should be displayed (concerns warnings relating to convergence state).
 #' @param notes Logical. By default, two notes are displayed: when NAs are removed (to show additional information) and when some observations are removed because of only 0 (or 0/1) outcomes in a fixed-effect setup (in Poisson/Neg. Bin./Logit models). To avoid displaying these messages, you can set \code{notes = FALSE}. You can remove these messages permanently by using \code{setFixest_notes(FALSE)}.
 #' @param combine.quick Logical. When you combine different variables to transform them into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}. The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}. Because pasting variables is a costly operation, the internal algorithm may use a numerical trick to hasten the process. The cost of doing so is that you lose the labels. If you are interested in getting the value of the fixed-effects coefficients after the estimation, you should use \code{combine.quick = FALSE}. By default it is equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE} otherwise.
+#' @param only.env (Advanced users.) Logical, default is \code{FALSE}. If \code{TRUE}, then only the environment used to make the estimation is returned.
+#' @param mem.clean Logical, default is \code{FALSE}. Only to be used if the data set is large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as much as possible and \code{\link[base]{gc}} is run before each substantial C++ section in the internal code to avoid memory issues.
+#' @param env (Advanced users.) A \code{fixest} environment created by a \code{fixest} estimation with \code{only.env = TRUE}. Default is missing. If provided, the data from this environment will be used to perform the estimation.
 #' @param ... Not currently used.
 #'
 #' @details
@@ -1552,21 +1649,21 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 #' # Estimating the same 'linear' relation using a 'non-linear' call
 #' est1_NL = feNmlm(z1 ~ 1, base, NL.fml = ~a*log(x)+b*log(y), NL.start = list(a=0, b=0))
 #' # we compare the estimates with the function esttable (they are identical)
-#' esttable(est1_L, est1_NL)
+#' etable(est1_L, est1_NL)
 #'
 #' # Now generating a non-linear relation (E(z2) = x + y + 1):
 #' z2 = rpois(n, x + y) + rpois(n, 1)
 #' base$z2 = z2
 #'
 #' # Estimation using this non-linear form
-#' est2_NL = feNmlm(z2~0, base, NL.fml = ~log(a*x + b*y),
-#'                NL.start = list(a=1, b=2), lower = list(a=0, b=0))
+#' est2_NL = feNmlm(z2 ~ 0, base, NL.fml = ~log(a*x + b*y),
+#'                NL.start = 2, lower = list(a=0, b=0))
 #' # we can't estimate this relation linearily
 #' # => closest we can do:
-#' est2_L = femlm(z2~log(x)+log(y), base)
+#' est2_L = femlm(z2 ~ log(x) + log(y), base)
 #'
 #' # Difference between the two models:
-#' esttable(est2_L, est2_NL)
+#' etable(est2_L, est2_NL)
 #'
 #' # Plotting the fits:
 #' plot(x, z2, pch = 18)
@@ -1574,11 +1671,22 @@ fepois = function(fml, data, offset, weights, panel.id, start = NULL, etastart =
 #' points(x, fitted(est2_NL), col = 4, pch = 2)
 #'
 #'
-feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), NL.fml, fixef, na_inf.rm = getFixest_na_inf.rm(), NL.start, lower, upper, NL.start.init, offset, panel.id, start = 0, jacobian.method="simple", useHessian = TRUE, hessian.args = NULL, opt.control = list(), nthreads = getFixest_nthreads(), verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000, deriv.tol = 1e-4, deriv.iter = 1000, warn = TRUE, notes = getFixest_notes(), combine.quick, ...){
+feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), NL.fml, fixef, NL.start, lower, upper, NL.start.init, offset, panel.id, start = 0, jacobian.method="simple", useHessian = TRUE, hessian.args = NULL, opt.control = list(), nthreads = getFixest_nthreads(), verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000, deriv.tol = 1e-4, deriv.iter = 1000, warn = TRUE, notes = getFixest_notes(), combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
 
 	time_start = proc.time()
 
-	env = try(fixest_env(fml=fml, data=data, family=family, NL.fml=NL.fml, fixef=fixef, na_inf.rm=na_inf.rm, NL.start=NL.start, lower=lower, upper=upper, NL.start.init=NL.start.init, offset=offset, panel.id=panel.id, linear.start=start, jacobian.method=jacobian.method, useHessian=useHessian, opt.control=opt.control, nthreads=nthreads, verbose=verbose, theta.init=theta.init, fixef.tol=fixef.tol, fixef.iter=fixef.iter, deriv.iter=deriv.iter, warn=warn, notes=notes, combine.quick=combine.quick, mc_origin=match.call(), computeModel0=TRUE, ...), silent = TRUE)
+	if(missing(env)){
+	    env = try(fixest_env(fml=fml, data=data, family=family, NL.fml=NL.fml, fixef=fixef, NL.start=NL.start, lower=lower, upper=upper, NL.start.init=NL.start.init, offset=offset, panel.id=panel.id, linear.start=start, jacobian.method=jacobian.method, useHessian=useHessian, opt.control=opt.control, nthreads=nthreads, verbose=verbose, theta.init=theta.init, fixef.tol=fixef.tol, fixef.iter=fixef.iter, deriv.iter=deriv.iter, warn=warn, notes=notes, combine.quick=combine.quick, mem.clean = mem.clean, mc_origin=match.call(), computeModel0=TRUE, ...), silent = TRUE)
+
+	} else if(r <- !is.environment(env) || !isTRUE(env$fixest_env)) {
+	    stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not ", ifelse(r, "an", "a 'fixest'"), " environment.")
+	}
+
+	check_arg(only.env, "logical scalar")
+	if(only.env){
+	    return(env)
+	}
+
 
 	if("try-error" %in% class(env)){
 	    mc = match.call()
@@ -1968,7 +2076,7 @@ format_error_msg = function(x, origin){
 
     if(grepl("^Error (in|:|: in) (fe|fixest)[^\n]+\n", x)){
         res = gsub("^Error (in|:|: in) (fe|fixest)[^\n]+\n *(.+)", "\\3", x)
-    } else if(grepl("[Oo]bject '.+' not found", x)) {
+    } else if(grepl("[Oo]bject '.+' not found", x) || grepl("memory|cannot allocate", x)) {
         res = x
     } else {
        res = paste0(x, "\nThis error was unforeseen by the author of the function ", origin, ". If you think your call to the function is legitimate, could you report?")

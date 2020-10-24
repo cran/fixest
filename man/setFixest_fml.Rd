@@ -15,7 +15,7 @@ getFixest_fml()
 \arguments{
 \item{fml}{A formula containing macros variables. The macro variables can be set globally using \code{setFixest_fml}, or can be defined in \code{...}.}
 
-\item{...}{Definition of the macro variables. Each argument name corresponds to the name of the macro variable. It is required that each macro variable name starts with two dots (e.g. \code{..ctrl}). The value of each argument must be a one-sided formula, it is the definition of the macro variable. Example of a valid call: \code{setFixest_fml(..ctrl = ~ var1 + var2)}. In the function \code{xpd}, the default macro variables are taken from \code{getFixest_fml}, any variable in \code{...} will replace these values.}
+\item{...}{Definition of the macro variables. Each argument name corresponds to the name of the macro variable. It is required that each macro variable name starts with two dots (e.g. \code{..ctrl}). The value of each argument must be a one-sided formula or a character vector, it is the definition of the macro variable. Example of a valid call: \code{setFixest_fml(..ctrl = ~ var1 + var2)}. In the function \code{xpd}, the default macro variables are taken from \code{getFixest_fml}, any variable in \code{...} will replace these values.}
 
 \item{reset}{A logical scalar, defaults to \code{FALSE}. If \code{TRUE}, all macro variables are first reset (i.e. deleted).}
 }
@@ -47,6 +47,46 @@ a <- feols(Ozone ~ Wind + ..ctrl, airquality)
 b <- feols(Ozone ~ Wind + ..ctrl_long, airquality)
 etable(a, b, keep = "Int|Win")
 
+#
+# You can use xpd for stepwise estimations
+#
+
+# we want to look at the effect of x1 on y
+# controlling for different variables
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+
+# We first create a matrix with all possible combinations of variables
+my_args = lapply(names(base)[-(1:2)], function(x) c("", x))
+(all_combs = as.matrix(do.call("expand.grid", my_args)))
+
+res_all = list()
+for(i in 1:nrow(all_combs)){
+  res_all[[i]] = feols(xpd(y ~ x1 + ..v, ..v = all_combs[i, ]), base)
+}
+
+etable(res_all)
+coefplot(res_all, group = list(Species = "^^species"))
+
+#
+# You can use macros to grep variables in your data set
+#
+
+data(longley)
+setFixest_fml(..many_vars = grep("GNP|ployed", names(longley), value = TRUE))
+feols(Armed.Forces ~Population + ..many_vars, longley)
+
+#
+# You can also put numbers in macros
+#
+
+res_all = list()
+for(p in 1:3){
+  res_all[[p]] = feols(xpd(Ozone ~ Wind + poly(Temp, ..p), ..p = p), airquality)
+}
+
+etable(res_all)
 
 
 }

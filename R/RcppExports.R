@@ -61,12 +61,12 @@ update_deriv_single <- function(n_vars, nb_coef, r_ll_d2, r_jacob_vector, r_dum_
     .Call(`_fixest_update_deriv_single`, n_vars, nb_coef, r_ll_d2, r_jacob_vector, r_dum_vector)
 }
 
-cpp_demean <- function(y, X_raw, r_weights, iterMax, diffMax, nb_cluster_all, dum_vector, tableCluster_vector, slope_flag, slope_vars, r_init, checkWeight, nthreads, save_fixef = FALSE) {
-    .Call(`_fixest_cpp_demean`, y, X_raw, r_weights, iterMax, diffMax, nb_cluster_all, dum_vector, tableCluster_vector, slope_flag, slope_vars, r_init, checkWeight, nthreads, save_fixef)
+cpp_demean <- function(y, X_raw, n_vars_X, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef = FALSE) {
+    .Call(`_fixest_cpp_demean`, y, X_raw, n_vars_X, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef)
 }
 
-cpp_cholesky <- function(X, nthreads = 1L) {
-    .Call(`_fixest_cpp_cholesky`, X, nthreads)
+cpp_cholesky <- function(X, tol = 1.0/100000.0/100000.0, nthreads = 1L) {
+    .Call(`_fixest_cpp_cholesky`, X, tol, nthreads)
 }
 
 cpp_sparse_products <- function(X, w, y, correct_0w = FALSE, nthreads = 1L) {
@@ -149,8 +149,12 @@ cpp_diag_XUtX <- function(X, U) {
     .Call(`_fixest_cpp_diag_XUtX`, X, U)
 }
 
-get_nb_threads <- function() {
-    .Call(`_fixest_get_nb_threads`)
+cpp_factor_matrix <- function(fact, any_na) {
+    .Call(`_fixest_cpp_factor_matrix`, fact, any_na)
+}
+
+cpp_get_nb_threads <- function() {
+    .Call(`_fixest_cpp_get_nb_threads`)
 }
 
 cpppar_exp <- function(x, nthreads) {
@@ -221,12 +225,16 @@ cpppar_which_na_inf_mat <- function(mat, nthreads) {
     .Call(`_fixest_cpppar_which_na_inf_mat`, mat, nthreads)
 }
 
+cpppar_which_na_inf_df <- function(df, nthreads) {
+    .Call(`_fixest_cpppar_which_na_inf_df`, df, nthreads)
+}
+
 cpppar_cond_means <- function(mat_vars, treat, nthreads = 1L) {
     .Call(`_fixest_cpppar_cond_means`, mat_vars, treat, nthreads)
 }
 
-cpppar_check_only_0 <- function(x_mat, n, nthreads) {
-    .Call(`_fixest_cpppar_check_only_0`, x_mat, n, nthreads)
+cpppar_check_only_0 <- function(x_mat, nthreads) {
+    .Call(`_fixest_cpppar_check_only_0`, x_mat, nthreads)
 }
 
 cpp_quf_str <- function(x) {

@@ -14,8 +14,8 @@ dof(
   adj = TRUE,
   fixef.K = "nested",
   cluster.adj = TRUE,
-  cluster.df = "conventional",
-  t.df = "conventional",
+  cluster.df = "min",
+  t.df = "min",
   fixef.force_exact = FALSE
 )
 
@@ -30,9 +30,9 @@ getFixest_dof
 
 \item{cluster.adj}{Logical scalar, default is \code{TRUE}. How to make the small sample correction when clustering the standard-errors? If \code{TRUE} a \code{G/(G-1)} correction is performed with \code{G} the number of cluster values.}
 
-\item{cluster.df}{Either "conventional" (default) or "min". Only relevant when the variance-covariance matrix is two-way clustered (or higher). It governs how the small sample adjustment for the clusters is to be performed. [Sorry for the jargon that follows.] By default the i-th "sandwich" matrix is adjusted with G_i/(G_i-1) with G_i the number of unique clusters. If \code{cluster.df="min"}, a unique adjustment is made, of the form G_min/(G_min-1) with G_min the smallest G_i.}
+\item{cluster.df}{Either "conventional" or "min" (default). Only relevant when the variance-covariance matrix is two-way clustered (or higher). It governs how the small sample adjustment for the clusters is to be performed. [Sorry for the jargon that follows.] By default a unique adjustment is made, of the form G_min/(G_min-1) with G_min the smallest G_i. If \code{cluster.df="conventional"} then the i-th "sandwich" matrix is adjusted with G_i/(G_i-1) with G_i the number of unique clusters.}
 
-\item{t.df}{Either "conventional" (default) or "min". Only relevant when the variance-covariance matrix is clustered. It governs how the p-values should be computed. By default, the degrees of freedom of the Student t distribution is equal to the number of observations minus the number of estimated variables. If \code{t.df="min"}, then the degrees of freedom of the Student t distribution is equal to the minimum size of the clusters with which the VCOV has been clustered.}
+\item{t.df}{Either "conventional" or "min" (default). Only relevant when the variance-covariance matrix is clustered. It governs how the p-values should be computed. By default, the degrees of freedom of the Student t distribution is equal to the minimum size of the clusters with which the VCOV has been clustered. If \code{t.df="conventional"}, then the degrees of freedom of the Student t distribution is equal to the number of observations minus the number of estimated variables.}
 
 \item{fixef.force_exact}{Logical, default is \code{FALSE}. If there are 2 or more fixed-effects, these fixed-effects they can be irregular, meaning they can provide the same information. If so, the "real" number of parameters should be lower than the total number of fixed-effects. If \code{fixef.force_exact = TRUE}, then \code{\link[fixest]{fixef.fixest}} is first run to determine the exact number of parameters among the fixed-effects. Mostly, panels of the type individual-firm require \code{fixef.force_exact = TRUE} (but it adds computational costs).}
 
@@ -96,25 +96,25 @@ est = feols(y ~ x | fe1 + fe2, base)
 # Default: fixef.K = "nested"
 #  => adjustment K = 1 + 5 (i.e. x + fe2)
 summary(est)
-attributes(vcov(est))[c("dof.type", "dof.K")]
+attributes(vcov(est, attr = TRUE))[c("dof.type", "dof.K")]
 
 
 # fixef.K = FALSE
 #  => adjustment K = 1 (i.e. only x)
 summary(est, dof = dof(fixef.K = "none"))
-attr(vcov(est, dof = dof(fixef.K = "none")), "dof.K")
+attr(vcov(est, dof = dof(fixef.K = "none"), attr = TRUE), "dof.K")
 
 
 # fixef.K = TRUE
 #  => adjustment K = 1 + 3 + 5 - 1 (i.e. x + fe1 + fe2 - 1 restriction)
 summary(est, dof = dof(fixef.K = "full"))
-attr(vcov(est, dof = dof(fixef.K = "full")), "dof.K")
+attr(vcov(est, dof = dof(fixef.K = "full"), attr = TRUE), "dof.K")
 
 
 # fixef.K = TRUE & fixef.force_exact = TRUE
 #  => adjustment K = 1 + 3 + 5 - 2 (i.e. x + fe1 + fe2 - 2 restrictions)
 summary(est, dof = dof(fixef.K = "full", fixef.force_exact = TRUE))
-attr(vcov(est, dof = dof(fixef.K = "full", fixef.force_exact = TRUE)), "dof.K")
+attr(vcov(est, dof = dof(fixef.K = "full", fixef.force_exact = TRUE), attr = TRUE), "dof.K")
 
 # There are two restrictions:
 attr(fixef(est), "references")
@@ -123,10 +123,10 @@ attr(fixef(est), "references")
 # To permanently set the default dof:
 #
 
-# eg to set it a la Stata's reghdfe:
-setFixest_dof(dof(cluster.df = "min", t.df = "min"))
+# eg no small sample adjustment:
+setFixest_dof(dof(adj = FALSE))
 
-# To reset it
+# Factory default
 setFixest_dof()
 
 }

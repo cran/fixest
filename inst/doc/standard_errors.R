@@ -1,6 +1,23 @@
 ## ----setup, include=FALSE-----------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
+knitr::opts_chunk$set(echo = TRUE, 
+                      eval = TRUE,
+                      comment = "#>")
 Sys.setenv(lang = "en")
+
+library(fixest)
+library(sandwich)
+library(plm)
+library(lfe)
+
+## -----------------------------------------------------------------------------
+library(fixest)
+data(trade)
+# OLS estimation
+gravity = feols(log(Euros) ~ log(dist_km) | Destination + Origin + Product + Year, trade)
+# Two-way clustered SEs
+summary(gravity, se = "twoway")
+# Two-way clustered SEs, without DOF correction
+summary(gravity, se = "twoway", dof = dof(adj = FALSE, cluster.adj = FALSE))
 
 ## -----------------------------------------------------------------------------
 # Data generation
@@ -11,7 +28,7 @@ base = data.frame(y = rnorm(N), x = rnorm(N), id = rep(1:n_id, n_time),
 
 
 ## -----------------------------------------------------------------------------
-library(fixest) ; library(sandwich)
+library(sandwich)
 
 # Estimations
 res_lm    = lm(y ~ x, base)
@@ -21,9 +38,9 @@ res_feols = feols(y ~ x, base)
 rbind(se(res_lm), se(res_feols))
 
 # Heteroskedasticity-robust covariance
-se_lm_white    = sqrt(diag(vcovHC(res_lm, type = "HC1")))
-se_feols_white = se(res_feols, se = "white")
-rbind(se_lm_white, se_feols_white)
+se_lm_hc    = sqrt(diag(vcovHC(res_lm, type = "HC1")))
+se_feols_hc = se(res_feols, se = "hetero")
+rbind(se_lm_hc, se_feols_hc)
 
 ## ---- echo = FALSE------------------------------------------------------------
 if(!requireNamespace("plm", quietly = TRUE)){
@@ -61,9 +78,6 @@ se_feols_id = se(est_feols) # By default: clustered according to id
 rbind(se_lm_id, se_plm_id, se_stata_id, se_feols_id)
 
 ## -----------------------------------------------------------------------------
-rbind(r = coeftable(est_feols), stata = coeftable(est_feols, dof = dof(t.df = "min")))
-
-## -----------------------------------------------------------------------------
 # How to get the lm version
 se_feols_id_lm = se(est_feols, dof = dof(fixef.K = "full"))
 rbind(se_lm_id, se_feols_id_lm)
@@ -81,7 +95,7 @@ if(!requireNamespace("lfe", quietly = TRUE)){
 }
 
 ## -----------------------------------------------------------------------------
-library(lfe, quietly = TRUE, warn.conflicts = FALSE)
+library(lfe)
 
 # lfe: clustered by id
 est_lfe = felm(y ~ x | id + time | 0 | id, base)
@@ -94,22 +108,26 @@ rbind(se_lfe_id, se_feols_id)
 my_vcov = vcov(est_feols, dof = dof(adj = FALSE))
 se(est_feols, .vcov = my_vcov * 19/18) # Note that there are 20 observations
 
-# Differently from feols, the SEs are different if time is not a FE:
+# Differently from feols, the SEs in lfe are different if time is not a FE:
 # => now SEs are identical. (The warning is from lfe.)
 rbind(se(felm(y ~ x + factor(time) | id | 0 | id, base))["x"],
       se(feols(y ~ x + factor(time) | id, base))["x"])
 
 # Now with two-way clustered standard-errors
 est_lfe_2way = felm(y ~ x | id + time | 0 | id + time, base)
-se_lfe_2way = se(est_lfe_2way)
+se_lfe_2way  = se(est_lfe_2way)
 se_feols_2way = se(est_feols, se = "twoway")
 rbind(se_lfe_2way, se_feols_2way)
 
-# To have the same pvalues, you need to use t.df="min"
-rbind(pvalue(est_lfe_2way), pvalue(est_feols, se = "twoway", dof = dof(t.df = "min")))
+# To obtain the same SEs, use cluster.df = "conventional"
+sum_feols_2way_conv = summary(est_feols, se = "twoway", dof = dof(cluster.df = "conv"))
+rbind(se_lfe_2way, se(sum_feols_2way_conv))
+
+# We also obtain the same p-values
+rbind(pvalue(est_lfe_2way), pvalue(sum_feols_2way_conv))
 
 ## -----------------------------------------------------------------------------
-setFixest_dof(dof(cluster.df = "min", t.df = "min"))
+setFixest_dof(dof(adj = FALSE))
 
 ## -----------------------------------------------------------------------------
 setFixest_se(no_FE = "standard", one_FE = "standard", two_FE = "standard")

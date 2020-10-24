@@ -13,7 +13,6 @@ femlm(
   fixef,
   offset,
   panel.id,
-  na_inf.rm = getFixest_na_inf.rm(),
   fixef.tol = 1e-05,
   fixef.iter = 10000,
   nthreads = getFixest_nthreads(),
@@ -22,6 +21,9 @@ femlm(
   notes = getFixest_notes(),
   theta.init,
   combine.quick,
+  mem.clean = FALSE,
+  only.env = FALSE,
+  env,
   ...
 )
 
@@ -33,7 +35,6 @@ fenegbin(
   fixef,
   offset,
   panel.id,
-  na_inf.rm = getFixest_na_inf.rm(),
   fixef.tol = 1e-05,
   fixef.iter = 10000,
   nthreads = getFixest_nthreads(),
@@ -41,6 +42,9 @@ fenegbin(
   warn = TRUE,
   notes = getFixest_notes(),
   combine.quick,
+  mem.clean = FALSE,
+  only.env = FALSE,
+  env,
   ...
 )
 }
@@ -59,13 +63,11 @@ fenegbin(
 
 \item{panel.id}{The panel identifiers. Can either be: i) a one sided formula (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables with \code{^} only inside formulas (see the dedicated section in \code{\link[fixest]{feols}}).}
 
-\item{na_inf.rm}{Logical, default is \code{TRUE}. If the variables necessary for the estimation contain NA/Infs and \code{na_inf.rm = TRUE}, then all observations containing NA are removed prior to estimation and a note is displayed detailing the number of observations removed. Otherwise, an error is raised.}
-
 \item{fixef.tol}{Precision used to obtain the fixed-effects. Defaults to \code{1e-5}. It corresponds to the maximum absolute difference allowed between two coefficients of successive iterations. Argument \code{fixef.tol} cannot be lower than \code{10000*.Machine$double.eps}. Note that this parameter is dynamically controlled by the algorithm.}
 
 \item{fixef.iter}{Maximum number of iterations in fixed-effects algorithm (only in use for 2+ fixed-effects). Default is 10000.}
 
-\item{nthreads}{Integer: Number of nthreads to be used (accelerates the algorithm via the use of openMP routines). The default is to use the total number of nthreads available minus two. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
+\item{nthreads}{The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. The default is to use 50\% of all threads. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
 
 \item{verbose}{Integer, default is 0. It represents the level of information that should be reported during the optimisation process. If \code{verbose=0}: nothing is reported. If \code{verbose=1}: the value of the coefficients and the likelihood are reported. If \code{verbose=2}: \code{1} + information on the computing time of the null model, the fixed-effects coefficients and the hessian are reported.}
 
@@ -77,6 +79,12 @@ fenegbin(
 
 \item{combine.quick}{Logical. When you combine different variables to transform them into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}. The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}. Because pasting variables is a costly operation, the internal algorithm may use a numerical trick to hasten the process. The cost of doing so is that you lose the labels. If you are interested in getting the value of the fixed-effects coefficients after the estimation, you should use \code{combine.quick = FALSE}. By default it is equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE} otherwise.}
 
+\item{mem.clean}{Logical, default is \code{FALSE}. Only to be used if the data set is large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as much as possible and \code{\link[base]{gc}} is run before each substantial C++ section in the internal code to avoid memory issues.}
+
+\item{only.env}{(Advanced users.) Logical, default is \code{FALSE}. If \code{TRUE}, then only the environment used to make the estimation is returned.}
+
+\item{env}{(Advanced users.) A \code{fixest} environment created by a \code{fixest} estimation with \code{only.env = TRUE}. Default is missing. If provided, the data from this environment will be used to perform the estimation.}
+
 \item{...}{Not currently used.}
 }
 \value{
@@ -86,15 +94,15 @@ A \code{fixest} object.
 \item{call}{The call of the function.}
 \item{method}{The method used to estimate the model.}
 \item{family}{The family used to estimate the model.}
-\item{fml_full}{[where relevant] The "full" formula containing the linear part and the fixed-effects.}
+\item{fml_full}{(When relevant.) The "full" formula containing the linear part and the fixed-effects.}
 \item{nparams}{The number of parameters of the model.}
 \item{fixef_vars}{The names of each fixed-effect dimension.}
 \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
 \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
 \item{convStatus}{Logical, convergence status.}
 \item{message}{The convergence message from the optimization procedures.}
-\item{obsRemoved}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
-\item{fixef_removed}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
+\item{obsRemoved}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
+\item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 \item{coefficients}{The named vector of estimated coefficients.}
 \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
 \item{loglik}{The log-likelihood.}
@@ -112,8 +120,8 @@ A \code{fixest} object.
 \item{scores}{The matrix of the scores (first derivative for each observation).}
 \item{residuals}{The difference between the dependent variable and the expected predictor.}
 \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
-\item{offset}{[where relevant] The offset formula.}
-\item{weights}{[where relevant] The weights formula.}
+\item{offset}{(When relevant.) The offset formula.}
+\item{weights}{(When relevant.) The weights formula.}
 }
 \description{
 This function estimates maximum likelihood models with any number of fixed-effects.
@@ -169,23 +177,23 @@ data(trade)
 
 # We estimate the effect of distance on trade => we account for 3 fixed-effects
 # 1) Poisson estimation
-est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
+est_pois = femlm(Euros ~ log(dist_km) | Origin + Destination + Product, trade)
 
 # 2) Log-Log Gaussian estimation (with same FEs)
-est_gaus = update(est_pois, log(Euros+1) ~ ., family="gaussian")
+est_gaus = update(est_pois, log(Euros+1) ~ ., family = "gaussian")
 
 # Comparison of the results using the function esttable
-esttable(est_pois, est_gaus)
+etable(est_pois, est_gaus)
 # Now using two way clustered standard-errors
-esttable(est_pois, est_gaus, se = "twoway")
+etable(est_pois, est_gaus, se = "twoway")
 
 # Comparing different types of standard errors
-sum_white    = summary(est_pois, se = "white")
+sum_hetero    = summary(est_pois, se = "hetero")
 sum_oneway   = summary(est_pois, se = "cluster")
 sum_twoway   = summary(est_pois, se = "twoway")
 sum_threeway = summary(est_pois, se = "threeway")
 
-esttable(sum_white, sum_oneway, sum_twoway, sum_threeway)
+etable(sum_hetero, sum_oneway, sum_twoway, sum_threeway)
 
 
 

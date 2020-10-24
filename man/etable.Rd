@@ -10,9 +10,11 @@
 \usage{
 etable(
   ...,
-  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  .vcov,
+  .vcov_args = NULL,
   digits = 4,
   tex,
   fitstat,
@@ -43,14 +45,18 @@ etable(
   notes = NULL,
   group = NULL,
   extraline = NULL,
-  tablefoot = TRUE
+  tablefoot = TRUE,
+  placement = "htbp",
+  drop.section = NULL
 )
 
 esttex(
   ...,
-  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  .vcov,
+  .vcov_args = NULL,
   digits = 4,
   fitstat,
   coefstat = c("se", "tstat", "confint"),
@@ -79,14 +85,18 @@ esttex(
   notes = NULL,
   group = NULL,
   tablefoot = TRUE,
-  extraline = NULL
+  extraline = NULL,
+  placement = "htbp",
+  drop.section = NULL
 )
 
 esttable(
   ...,
-  se = c("standard", "white", "cluster", "twoway", "threeway", "fourway"),
+  se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  .vcov,
+  .vcov_args = NULL,
   coefstat = c("se", "tstat", "confint"),
   ci = 0.95,
   depvar,
@@ -129,6 +139,8 @@ setFixest_etable(
   group = NULL,
   extraline = NULL,
   tablefoot = TRUE,
+  placement = "htbp",
+  drop.section = NULL,
   reset = FALSE
 )
 
@@ -137,17 +149,21 @@ getFixest_etable()
 \arguments{
 \item{...}{Used to capture different \code{fixest} estimation objects (obtained with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). Note that any other type of element is discarded. Note that you can give a list of \code{fixest} objects.}
 
-\item{se}{Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{White}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "standard"}. Note that this argument can be implicitly deduced from the argument \code{cluster}.}
+\item{se}{Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{hetero}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "standard"}. Note that this argument can be implicitly deduced from the argument \code{cluster}.}
 
 \item{dof}{An object of class \code{dof.type} obtained with the function \code{\link[fixest]{dof}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{dof}} for this argument. The arguments and defaults of the function \code{\link[fixest]{dof}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "conventional"}, \code{t.df = "conventional"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{dof}} for details.}
 
-\item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1, "var2")]}, \code{cluster = c("var1, "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster).}
+\item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster).}
+
+\item{.vcov}{A function to be used to compute the standard-errors of each fixest object. You can pass extra arguments to this function using the argument \code{.vcov_args}. See the example.}
+
+\item{.vcov_args}{A list containing arguments to be passed to the function \code{.vcov}.}
 
 \item{digits}{Integer, default is 4. The number of digits to be displayed.}
 
 \item{tex}{Logical: whether the results should be a data.frame or a Latex table. By default, this argument is \code{TRUE} if the argument \code{file} (used for exportation) is not missing; it is equal to \code{FALSE} otherwise.}
 
-\item{fitstat}{A character vector or a one sided formula. A vector listing which fit statistics to display. The valid types are 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). The default value depends on the models to display. Example of use: \code{fitstat=c('sq.cor', 'ar2', 'war2')}, or \code{fitstat=~sq.cor+ar2+war2} using a formula.}
+\item{fitstat}{A character vector or a one sided formula (both with only lowercase letters). A vector listing which fit statistics to display. The valid types are 'n', 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). Also accepts valid types from the function \code{\link[fixest]{fitstat}}. The default value depends on the models to display. Example of use: \code{fitstat=c('n', 'sq.cor', 'ar2', 'war2')}, or \code{fitstat=~n+sq.cor+ar2+war2} using a formula. You can use the dot to refer to default values:\code{ ~ . + ll} would add the log-likelihood to the default fit statistics.}
 
 \item{title}{(Tex only.) Character scalar. The title of the Latex table.}
 
@@ -163,7 +179,7 @@ getFixest_etable()
 
 \item{order}{Character vector. This element is used if the user wants the variables to be ordered in a certain way. This should be a vector of regular expressions (see \code{\link[base]{regex}} help for more info). The variables satisfying the first regular expression will be placed first, then the order follows the sequence of regular expressions. This argument is applied post aliasing (see argument \code{dict}). Example: you have the following variables: \code{month1} to \code{month6}, then \code{x1} to \code{x5}, then \code{year1} to \code{year6}. If you want to display first the x's, then the years, then the months you could use: \code{order = c("x", "year")}. If the first character is an exclamation mark, the effect is reversed (e.g. order = "!Intercept" means: every variable that does not contain \dQuote{Intercept} goes first).  See details.}
 
-\item{dict}{A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, if Tex output is requested or if argument \code{file} is not missing, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. The default is not to change names if a \code{data.frame} is requested (i.e. \code{tex = FALSE}); if so, you can use \code{dict = TRUE} to use the dictionary you've set globally with \code{setFixest_dict()}.}
+\item{dict}{A named character vector or a logical scalar. It changes the original variable names to the ones contained in the \code{dict}ionary. E.g. to change the variables named \code{a} and \code{b3} to (resp.) \dQuote{$log(a)$} and to \dQuote{$bonus^3$}, use \code{dict=c(a="$log(a)$",b3="$bonus^3$")}. By default, it is equal to \code{getFixest_dict()}, a default dictionary which can be set with \code{\link[fixest]{setFixest_dict}}. You can use \code{dict = FALSE} to disable it..}
 
 \item{file}{A character scalar. If provided, the Latex (or data frame) table will be saved in a file whose path is \code{file}. If you provide this argument, then a Latex table will be exported, to export a regular \code{data.frame}, use argument \code{tex = FALSE}.}
 
@@ -205,6 +221,10 @@ getFixest_etable()
 
 \item{tablefoot}{Logical, default is \code{TRUE}. Whether to display the table footer containing the information on the way the standard-errors where computed and the meaning of the significance codes.}
 
+\item{placement}{(Tex only.) Character string giving the position of the float in Latex. Default is "htbp". It must consist of only the characters 'h', 't', 'b', 'p', 'H' and '!'. Reminder: h: here; t: top; b: bottom; p: float page; H: definitely here; !: prevents Latex to look for other positions. Note that it can be equal to the empty string (and you'll get the default placement).}
+
+\item{drop.section}{(Tex only.) Character vector which can be of length 0 (i.e. equal to \code{NULL}). Can contain the values "fixef", "slopes" or "stats". It would drop, respectively, the fixed-effects section, the variables with varying slopes section or the fit statistics section.}
+
 \item{reset}{(\code{setFixest_etable} only.) Logical, default is \code{FALSE}. If \code{TRUE}, this will reset all the default values that were already set by the user in previous calls.}
 }
 \value{
@@ -239,7 +259,7 @@ Although you can combine several regular expressions in a single character strin
 
 You can use the special character "!" (exclamation mark) to reverse the effect of the regular expression (this feature is specific to this fonction). For example \code{drop = "!Wind"} would drop any variable that does not contain "Wind".
 
-You can use the special character "%" (percentage) to make reference to the original variable name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you want to delete that variable, you can use either \code{drop="June"}, or \code{drop="%Month6"} (which makes reference to its original name).
+You can use the special character "\%" (percentage) to make reference to the original variable name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you want to delete that variable, you can use either \code{drop="June"}, or \code{drop="\%Month6"} (which makes reference to its original name).
 
 The argument \code{order} takes in a vector of regular expressions, the order will follow the elments of this vector. The vector gives a list of priorities, on the left the elements with highest priority. For example, order = c("Wind", "!Inter", "!Temp") would give highest priorities to the variables containing "Wind" (which would then appear first), second highest priority is the variables not containing "Inter", last, with lowest priority, the variables not containing "Temp". If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
 }
@@ -247,49 +267,54 @@ The argument \code{order} takes in a vector of regular expressions, the order wi
 \examples{
 
 aq = airquality
-aq$Month = factor(aq$Month)
 
-est1 = feols(Ozone ~ Month / Wind + Temp, data = aq)
-est2 = feols(Ozone ~ Wind + Temp | Month, data = aq)
+est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = aq)
+est2 = feols(Ozone ~ i(Wind, Month) + Temp | Month, data = aq)
 
 # Displaying the two results in a single table
 etable(est1, est2)
 
 # keep/drop: keeping only interactions
-etable(est1, est2, keep = ":")
+etable(est1, est2, keep = " x ")
 # or using drop  (see regexp help):
-etable(est1, est2, drop = "^[[:alnum:]]+$")
+etable(est1, est2, drop = "^(Month|Temp|\\\\()")
 
 # keep/drop: dropping interactions
-etable(est1, est2, drop = ":")
+etable(est1, est2, drop = " x ")
 # or using keep ("!" reverses the effect):
-etable(est1, est2, keep = "!:")
+etable(est1, est2, keep = "! x ")
 
-# order: Wind variable first, intercept last
-etable(est1, est2, order = c("Wind", "Month"))
-etable(est1, est2, order = c("^Wind", "Wind", "Month"))
-# Interactions, then Intercept, last ("!" reverses the effect)
-etable(est1, est2, order = c("!Int", "!:"))
+# order: Wind variable first, intercept last (note the "!" to reverse the effect)
+etable(est1, est2, order = c("Wind", "!Inter"))
+# Month, then interactions, then the rest
+etable(est1, est2, order = c("^Month", " x "))
 
-# dict + keep/drop/order: using "\%" to match the original names
-dict = c("Month5"="May", "Month6"="Jun", "Month7"="Jul",
-         "Month8"="Aug", "Month9"="Sep")
-etable(est1, est2, tex = TRUE, dict = dict)
-# keeping only June and July
-etable(est1, est2, tex = TRUE, dict = dict, keep = c("\%Month6", "Jul"))
-# All months variabes first
-etable(est1, est2, tex = TRUE, dict = dict, order = c("\%Month"))
+#
+# dict
+#
 
+# You can rename variables with dict = c(var1 = alias1, var2 = alias2, etc)
+# You can also rename values taken by factors.
+# Here's a full example:
+dict = c(Temp = "Temperature", "Month::5"="May", "6"="Jun")
+etable(est1, est2, dict = dict)
+# Note the difference of treatment between Jun and May
+
+# Assume the following dictionnary:
+dict = c("Month::5"="May", "Month::6"="Jun", "Month::7"="Jul",
+         "Month::8"="Aug", "Month::9"="Sep")
+
+# We would like to keep only the Months, but now the names are all changed...
+# How to do?
+# We can use the special character '\%' to make reference to the original names.
+
+etable(est1, est2, dict = dict, keep = "\%Month")
+
+#
 # signifCode
-etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1,
-                                  " D"=0.15, " F"=1))
+#
 
-# fitstat
-etable(est1, est2, fitstat = ~r2+ar2+apr2+war2)
-
-# Adding a dictionnary (Tex only)
-dict = c(Month5="May", Month6="Jun", Month7="Jul", Month8="Aug", Month9="Sep")
-etable(est1, est2, dict = dict, tex = TRUE)
+etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1, " D"=0.15, " F"=1))
 
 #
 # Using the argument style to customize Latex exports
@@ -344,6 +369,31 @@ etable(est_c0, est_c1, est_c2, tex = TRUE, group = list("{where:stats}Controls" 
 etable(est_all, est_sub1, est_sub2, est_sub3, tex = TRUE,
        extraline = list("{title:\\\\midrule}Sub-sample" =
                           c("All", "May-June", "Jul.-Aug.", "Sept.")))
+
+
+#
+# Using custom functions to compute the standard errors
+#
+
+# You can customize the way you compute the SEs with the argument .vcov
+# Let's use some covariances from the sandwich package
+
+etable(est_c0, est_c1, est_c2, .vcov = sandwich::vcovHC)
+
+# To add extra arguments to vcovHC, you need to use .vcov_args
+etable(est_c0, est_c1, est_c2, .vcov = sandwich::vcovHC, .vcov_args = list(type = "HC0"))
+
+#
+# Customize which fit statistic to display
+#
+
+# You can change the fit statistics with the argument fitstat
+# and you can rename them with the dictionnary
+etable(est1, est2, fitstat = ~ r2 + n + G)
+
+# If you use a formula, '.' means the default:
+etable(est1, est2, fitstat = ~ ll + .)
+
 
 }
 \seealso{

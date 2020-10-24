@@ -1,5 +1,5 @@
 ## ----setup, include=FALSE-----------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, comment = "#>")
 
 ## -----------------------------------------------------------------------------
 library(fixest)
@@ -11,15 +11,16 @@ est_noFE = feols(Ozone ~ Solar.R + Wind + Temp, airquality)
 est_1FE  = feols(Ozone ~ Solar.R + Wind + Temp | Day, airquality)
 est_2FE  = feols(Ozone ~ Solar.R + Wind + Temp | Day + Month , airquality)
 est_poly = feols(Ozone ~ Solar.R + Wind + poly(Temp, 3) | Day + Month, airquality)
+est_slopes = feols(Ozone ~ Solar.R + Wind | Day + Month[Temp], airquality)
 
-## ---- eval = FALSE------------------------------------------------------------
-#  # Dictionary => set only once per session
-#  setFixest_dict(c(Ozone = "Ozone (ppb)", Solar.R = "Solar Radiation (Langleys)",
-#                   Wind = "Wind Speed (mph)", Temp = "Temperature"))
-#  
-#  etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", file = file,
-#         group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
-#  
+## ---- eval = TRUE, results = "hide"-------------------------------------------
+# Dictionary => set only once per session
+setFixest_dict(c(Ozone = "Ozone (ppb)", Solar.R = "Solar Radiation (Langleys)",
+                 Wind = "Wind Speed (mph)", Temp = "Temperature"))
+
+etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", tex = TRUE,
+       group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
+
 
 ## -----------------------------------------------------------------------------
 new_style = list(lines = "top:\\toprule; bottom:\\bottomrule",
@@ -34,7 +35,7 @@ new_style = list(lines = "top:\\toprule; bottom:\\bottomrule",
 setFixest_etable(fitstat = ~r2, signifCode = NA, yesNo = "$\\checkmark$",
                  tablefoot = FALSE, style = new_style)
 
-## ---- eval = FALSE------------------------------------------------------------
-#  etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", file = file,
-#         group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
+## ---- results = 'hide'--------------------------------------------------------
+etable(est_noFE, est_1FE, est_2FE, est_poly, est_slopes, cluster = "Day", tex = TRUE,
+       group = list("Temperature (cubic)" = "poly"), notes = "Estimation of 5 models.")
 

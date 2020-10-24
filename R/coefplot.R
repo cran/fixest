@@ -55,7 +55,7 @@
 #' @param ci.join.par A list of parameters to be passed to \code{\link[graphics]{lines}}. Only used if \code{ci.join=TRUE}. By default it is equal to \code{list(lwd = lwd, col = col, lty = 2)}.
 #' @param ci.fill Logical default to \code{FALSE}. Whether to fille the confidence intervals with a color. If \code{TRUE}, then you can set the graphical parameters with the argument \code{ci.fill.par}.
 #' @param ci.fill.par A list of parameters to be passed to \code{\link[graphics]{polygon}}. Only used if \code{ci.fill=TRUE}. By default it is equal to \code{list(col = "lightgray", alpha = 0.5)}. Note that \code{alpha} is a special parameter that adds transparency to the color (ranges from 0 to 1).
-#' @param group A list, default is missing. Each element of the list reports the coefficients to be grouped while the name of the element is the group name. Each element of the list can be either: i) a character vector of length 1, ii) of length 2, or ii) a numeric vector. If equal to: i) then it is interpreted as a pattern: all element fitting the regular expression will be grouped, if ii) it corrsponds to the first and last elements to be grouped, if iii) it corresponds to the coefficients numbers to be grouped. If equal to a character vector, you can use a percentage to tell the algorithm to look at the coefficients before aliasing (e.g. \code{"\%varname"}). Example of valid uses: \code{group=list(group_name=\"pattern\")}, \code{group=list(group_name=c(\"var_start\", \"var_end\"))}, \code{group=list(group_name=1:2))}. See details.
+#' @param group A list, default is missing. Each element of the list reports the coefficients to be grouped while the name of the element is the group name. Each element of the list can be either: i) a character vector of length 1, ii) of length 2, or ii) a numeric vector. If equal to: i) then it is interpreted as a pattern: all element fitting the regular expression will be grouped (note that you can use the special character "^^" to clean the beginning of the names, see example), if ii) it corrsponds to the first and last elements to be grouped, if iii) it corresponds to the coefficients numbers to be grouped. If equal to a character vector, you can use a percentage to tell the algorithm to look at the coefficients before aliasing (e.g. \code{"\%varname"}). Example of valid uses: \code{group=list(group_name=\"pattern\")}, \code{group=list(group_name=c(\"var_start\", \"var_end\"))}, \code{group=list(group_name=1:2))}. See details.
 #' @param group.par A list of parameters controlling the display of the group. The parameters controlling the line are: \code{lwd}, \code{tcl} (length of the tick), \code{line.adj} (adjustment of the position, default is 0), \code{tick} (whether to add the ticks), \code{lwd.ticks}, \code{col.ticks}. Then the parameters controlling the text: \code{text.adj} (adjustment of the position, default is 0), \code{text.cex}, \code{text.font}, \code{text.col}.
 #' @param pt.bg The background color of the point estimate (when the \code{pt.pch} is in 21 to 25). Defaults to NULL.
 #' @param lab.cex The size of the labels of the coefficients. Default is missing. It is automatically set by an internal algorithm which can go as low as \code{lab.min.cex} (another argument).
@@ -197,6 +197,26 @@
 #' # To reset to the default settings:
 #' setFixest_coefplot(reset = TRUE)
 #' coefplot(est)
+#'
+#' #
+#' # Example 4: group + cleaning
+#' #
+#'
+#' # You can use the argument group to group variables
+#' # You can further use the special character "^^" to clean
+#' #  the beginning of the coef. name: particularly useful for factors
+#'
+#' est = feols(Petal.Length ~ Petal.Width + Sepal.Length +
+#'                 Sepal.Width + Species, iris)
+#'
+#' # No grouping:
+#' coefplot(est)
+#'
+#' # now we group by Sepal and Species
+#' coefplot(est, group = list(Sepal = "Sepal", Species = "Species"))
+#'
+#' # now we group + clean the beginning of the names using the special character ^^
+#' coefplot(est, group = list(Sepal = "^^Sepal.", Species = "^^Species"))
 #'
 #'
 coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, horiz = FALSE, dict = getFixest_dict(), keep, drop, order, ci.width="1%", ci_level = 0.95, add = FALSE, pt.pch = 20, pt.bg = NULL, cex = 1, pt.cex = cex, col = 1:8, pt.col = col, ci.col = col, lwd = 1, pt.lwd = lwd, ci.lwd = lwd, ci.lty = 1, grid = TRUE, grid.par = list(lty=3, col = "gray"), zero = TRUE, zero.par = list(col="black", lwd=1), pt.join = FALSE, pt.join.par = list(col = pt.col, lwd=lwd), ci.join = FALSE, ci.join.par = list(lwd = lwd, col = col, lty = 2), ci.fill = FALSE, ci.fill.par = list(col = "lightgray", alpha = 0.5), ref = "auto", ref.line = "auto", ref.line.par = list(col = "black", lty = 2), lab.cex, lab.min.cex = 0.85, lab.max.mar = 0.25, lab.fit = "auto", xlim.add, ylim.add, only.params = FALSE, only.inter = TRUE, sep, as.multiple = FALSE, bg, group = "auto", group.par = list(lwd=2, line=3, tcl=0.75), main = "Effect on __depvar__", value.lab = "Estimate and __ci__ Conf. Int.", ylab = NULL, xlab = NULL, sub = NULL){
@@ -360,22 +380,31 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
             tx_inter = table(x_inter)
             qui_auto = names(tx_inter)[tx_inter >= 2]
 
+            # browser()
+
             group = list()
 
             for(i in seq_along(qui_auto)){
                 var_left = qui_auto[i]
-                qui_select = grepl(paste0(var_left, ":"), x_labels_raw, fixed = TRUE)
+                qui_select = substr(x_labels_raw, 1, nchar(var_left)) == var_left
 
                 # we require to be next to each other
                 if(!all(diff(which(qui_select)) == 1)) next
 
                 x_select = x_labels_raw[qui_select]
 
+                is_inter = TRUE
                 if(all(grepl(":.+::", x_select))){
                     # This is a fixest call
                     first_part = strsplit(x_select[1], "::")[[1]][1]
                     var_right = gsub(".+:", "", first_part)
                     n_max = nchar(first_part) + 2
+
+                } else if(all(grepl("::", x_select))) {
+                    is_inter = FALSE
+                    # This is a fixest factor
+                    n_max = nchar(var_left) + 2
+
                 } else {
                     # we need to find out by ourselves...
                     n = min(nchar(x_select[1:2]))
@@ -395,11 +424,20 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
                     var_right = gsub(".+:", "", substr(x_select[1], 1, n_max))
                 }
 
-                v_name = dict_apply(c(var_left, var_right), dict)
-                # group_name = paste0("&substitute(x %*% (y == ldots), list(x = \"", v_name[1], "\", y = \"", v_name[2], "\"))")
-                group_name = replace_and_make_callable("__x__ %*% (__y__ == ldots)", list(x = v_name[1], y = v_name[2]), text_as_expr = TRUE)
+                if(is_inter){
+                    v_name = dict_apply(c(var_left, var_right), dict)
+                    group_name = replace_and_make_callable("__x__ %*% (__y__ == ldots)", list(x = v_name[1], y = v_name[2]), text_as_expr = TRUE)
 
-                group[[group_name]] = escape_regex(paste0("%", var_left, ":", var_right))
+                    group[[group_name]] = escape_regex(paste0("%", var_left, ":", var_right))
+
+                } else {
+                    v_name = dict_apply(var_left, dict)
+                    group_name = replace_and_make_callable("__x__", list(x = v_name), text_as_expr = TRUE)
+
+                    group[[group_name]] = paste0("%^", escape_regex(var_left))
+
+                }
+
 
                 # We update the labels
                 x_labels[qui_select] = substr(x_select, n_max + 1, nchar(x_select))
@@ -440,6 +478,34 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
         }
 
         group.height = (0.5 + tcl + text.cex + text.adj + line.adj)
+
+        # We perform basic checks on the group
+        if(!is.list(group)) stop("Argument 'group' must be a list.")
+
+        # We just take care of the special group + cleaning case
+        # when group starts with ^^
+
+        for(i in seq_along(group)){
+            my_group = group[[i]]
+            if(! (length(my_group) == 1 && is.character(my_group) && substr(my_group, 1, 2) == "^^") ) next
+
+            if(grepl("^%", my_group)){
+                qui = grepl(gsub("^%", "", my_group), x_labels_raw)
+            } else {
+                qui = grepl(my_group, x_labels)
+            }
+
+            if(!any(qui)){
+                warning("In argument 'group', the pattern: \"", my_group, "\", did not match any coefficient name.")
+                group[[i]] = NULL
+                if(length(group) == 0) IS_GROUP = FALSE
+                next
+            }
+
+            group[[i]] = range(which(qui))
+            x_labels = gsub(my_group, "", x_labels)
+        }
+
 
     } else {
         group.height = 0
@@ -563,6 +629,8 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
             op = par(mai = new_mai)
             on.exit(par(op))
         }
+
+        my_xlim = rev(my_xlim)
 
     } else {
         # We adjust the margin only if there are groups and they
@@ -794,35 +862,6 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
         }
 
         box()
-
-        # if(horiz){
-        #     axis(1)
-        # } else {
-        #     axis(2)
-        # }
-        #
-        # side = 1 + horiz
-        #
-        # if(AXIS_AS_NUM){
-        #     axis(side, las = 1)
-        # } else {
-        #     if(any(grepl("^&", x_labels))){
-        #         # means we call expression()
-        #         # drawback => expressions can overlap
-        #         qui = grepl("^&", x_labels)
-        #         if(any(!qui)){
-        #             axis(side, at = x_at[!qui], labels = x_labels[!qui], las = 1)
-        #         }
-        #
-        #         for(i in which(qui)){
-        #             axis(side, at = x_at[i], labels = expr_builder(x_labels[i]), las = 1)
-        #         }
-        #
-        #     } else {
-        #         # easy case: only character
-        #         axis(side, at = x_at, labels = x_labels, las = 1)
-        #     }
-        # }
 
 
         if(horiz){
@@ -1273,6 +1312,7 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
                         warning("In argument 'group', the pattern: \"", my_group, "\", did not match any coefficient name.")
                         next
                     }
+
                 } else {
                     # This is a pattern
                     check = c(FALSE, FALSE)
@@ -1438,24 +1478,32 @@ coefplot_prms = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict,
         all_estimates = all_estimates[base::order(all_estimates$id_order, all_estimates$est_nb), ]
 
         # we rescale
-        if(missing(sep)){
-            all_sep = c(0.2, 0.2, 0.18, 0.16)
-            if(length(all_sep) < nb_est - 1){
-                sep = 1 / (n-1) * 0.7
-            }
-            sep = all_sep[nb_est - 1]
-        } else {
-            n_sep = length(sep)
-            if(n_sep > 1){
-                if(n_sep < nb_est - 1){
-                    sep = sep[n_sep]
+
+        if(nb_est > 1){
+            if(missing(sep)){
+                all_sep = c(0.2, 0.2, 0.18, 0.16)
+                if(length(all_sep) < nb_est - 1){
+                    sep = 1 / (nb_est-1) * 0.7
                 } else {
-                    sep = sep[nb_est - 1]
+                    sep = all_sep[nb_est - 1]
+                }
+
+            } else {
+                n_sep = length(sep)
+                if(n_sep > 1){
+                    if(n_sep < nb_est - 1){
+                        sep = sep[n_sep]
+                    } else {
+                        sep = sep[nb_est - 1]
+                    }
                 }
             }
-        }
 
-        all_estimates$x_new = all_estimates$id_order + ((all_estimates$est_nb - 1) / (nb_est - 1) - 0.5) * ((nb_est - 1) * sep)
+            all_estimates$x_new = all_estimates$id_order + ((all_estimates$est_nb - 1) / (nb_est - 1) - 0.5) * ((nb_est - 1) * sep)
+        } else {
+            sep = 0
+            all_estimates$x_new = all_estimates$id_order
+        }
 
         # The coefficients
 
@@ -1561,7 +1609,7 @@ coefplot_prms = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict,
         ref_id = NA
         if(only.inter && !is.null(names(estimate))){
             all_vars = names(estimate)
-            if(any(grepl("::", all_vars))){
+            if(any(grepl(":.+::", all_vars))){
 
                 IS_INTER = TRUE
 
@@ -1613,16 +1661,23 @@ coefplot_prms = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict,
                     if(identical(ref, "auto")){
                         # We add the reference used in the estimation
 
-                        if(!is.null(object$collin.var)){
-                            all_inter_names = paste0(root_interaction, "::", items)
-                            qui_keep = !all_inter_names %in% object$collin.var
-                            is_ref = is_ref[qui_keep]
-                            items = items[qui_keep]
-                        }
+                        # if(!is.null(object$collin.var)){
+                        #     all_inter_names = paste0(root_interaction, "::", items)
+                        #     qui_keep = !all_inter_names %in% object$collin.var
+                        #     is_ref = is_ref[qui_keep]
+                        #     items = items[qui_keep]
+                        # }
+                        #
+                        # if(length(inter_values) != sum(!is_ref)){
+                        #     warning("Internal error regarding the lengths of vectors of coefficients.")
+                        # }
 
-                        if(length(inter_values) != sum(!is_ref)){
-                            stop("Internal error regarding the lengths of vectors of coefficients. Could you report to the author of the fixest package?")
-                        }
+                        # We take care of removed variables
+                        all_inter_names = paste0(root_interaction, "::", items)
+                        all_inter_current = paste0(root_interaction, "::", c(inter_values, items[is_ref]))
+                        qui_keep = all_inter_names %in% all_inter_current
+                        is_ref = is_ref[qui_keep]
+                        items = items[qui_keep]
 
                         if(any(is_ref)){
                             ref_id = which(is_ref)

@@ -19,14 +19,17 @@ feglm(
   fixef,
   fixef.tol = 1e-06,
   fixef.iter = 10000,
+  collin.tol = 1e-14,
   glm.iter = 25,
   glm.tol = 1e-08,
-  na_inf.rm = getFixest_na_inf.rm(),
   nthreads = getFixest_nthreads(),
   warn = TRUE,
   notes = getFixest_notes(),
   verbose = 0,
   combine.quick,
+  mem.clean = FALSE,
+  only.env = FALSE,
+  env,
   ...
 )
 
@@ -42,13 +45,16 @@ feglm.fit(
   mustart = NULL,
   fixef.tol = 1e-06,
   fixef.iter = 10000,
+  collin.tol = 1e-10,
   glm.iter = 25,
   glm.tol = 1e-08,
-  na_inf.rm = getFixest_na_inf.rm(),
   nthreads = getFixest_nthreads(),
   warn = TRUE,
   notes = getFixest_notes(),
+  mem.clean = FALSE,
   verbose = 0,
+  only.env = FALSE,
+  env,
   ...
 )
 
@@ -64,14 +70,17 @@ fepois(
   fixef,
   fixef.tol = 1e-06,
   fixef.iter = 10000,
+  collin.tol = 1e-10,
   glm.iter = 25,
   glm.tol = 1e-08,
-  na_inf.rm = getFixest_na_inf.rm(),
   nthreads = getFixest_nthreads(),
   warn = TRUE,
   notes = getFixest_notes(),
   verbose = 0,
   combine.quick,
+  mem.clean = FALSE,
+  only.env = FALSE,
+  env,
   ...
 )
 }
@@ -100,13 +109,13 @@ fepois(
 
 \item{fixef.iter}{Maximum number of iterations in fixed-effects algorithm (only in use for 2+ fixed-effects). Default is 10000.}
 
+\item{collin.tol}{Numeric scalar, default is \code{1e-14}. Threshold decising when variables should be considered collinear and subsequently removed from the estimation. Higher values means more variables will be removed (if there is presence of collinearity). One signal of presence of collinearity is t-stats that are extremely low (for instance when t-stats < 1e-3).}
+
 \item{glm.iter}{Number of iterations of the glm algorithm. Default is 25.}
 
 \item{glm.tol}{Tolerance level for the glm algorithm. Default is \code{1e-8}.}
 
-\item{na_inf.rm}{Logical, default is \code{TRUE}. If the variables necessary for the estimation contain NA/Infs and \code{na_inf.rm = TRUE}, then all observations containing NA are removed prior to estimation and a note is displayed detailing the number of observations removed. Otherwise, an error is raised.}
-
-\item{nthreads}{Integer: Number of nthreads to be used (accelerates the algorithm via the use of openMP routines). The default is to use the total number of nthreads available minus two. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
+\item{nthreads}{The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. The default is to use 50\% of all threads. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
 
 \item{warn}{Logical, default is \code{TRUE}. Whether warnings should be displayed (concerns warnings relating to convergence state).}
 
@@ -115,6 +124,12 @@ fepois(
 \item{verbose}{Integer. Higher values give more information. In particular, it can detail the number of iterations in the demeaning algoritmh (the first number is the left-hand-side, the other numbers are the right-hand-side variables). It can also detail the step-halving algorithm.}
 
 \item{combine.quick}{Logical. When you combine different variables to transform them into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}. The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}. Because pasting variables is a costly operation, the internal algorithm may use a numerical trick to hasten the process. The cost of doing so is that you lose the labels. If you are interested in getting the value of the fixed-effects coefficients after the estimation, you should use \code{combine.quick = FALSE}. By default it is equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE} otherwise.}
+
+\item{mem.clean}{Logical, default is \code{FALSE}. Only to be used if the data set is large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as much as possible and \code{\link[base]{gc}} is run before each substantial C++ section in the internal code to avoid memory issues.}
+
+\item{only.env}{(Advanced users.) Logical, default is \code{FALSE}. If \code{TRUE}, then only the environment used to make the estimation is returned.}
+
+\item{env}{(Advanced users.) A \code{fixest} environment created by a \code{fixest} estimation with \code{only.env = TRUE}. Default is missing. If provided, the data from this environment will be used to perform the estimation.}
 
 \item{...}{Not currently used.}
 
@@ -131,16 +146,16 @@ A \code{fixest} object.
 \item{call}{The call of the function.}
 \item{method}{The method used to estimate the model.}
 \item{family}{The family used to estimate the model.}
-\item{fml_full}{[where relevant] The "full" formula containing the linear part and the fixed-effects.}
+\item{fml_full}{(When relevant.) The "full" formula containing the linear part and the fixed-effects.}
 \item{nparams}{The number of parameters of the model.}
 \item{fixef_vars}{The names of each fixed-effect dimension.}
 \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
 \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
-\item{y}{[where relevant] The dependent variable (used to compute the within-R2 when fixed-effects are present).}
+\item{y}{(When relevant.) The dependent variable (used to compute the within-R2 when fixed-effects are present).}
 \item{convStatus}{Logical, convergence status of the IRWLS algorithm.}
 \item{irls_weights}{The weights of the last iteration of the IRWLS algorithm.}
-\item{obsRemoved}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
-\item{fixef_removed}{[where relevant] In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
+\item{obsRemoved}{(When relevant.) Vector of observations that were removed because of NA values or because of only 0/1 outcome within a fixed-effect (depends on the family though).}
+\item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 \item{coefficients}{The named vector of estimated coefficients.}
 \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
 \item{loglik}{The loglikelihood.}
@@ -159,10 +174,10 @@ A \code{fixest} object.
 \item{scores}{The matrix of the scores (first derivative for each observation).}
 \item{residuals}{The difference between the dependent variable and the expected predictor.}
 \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
-\item{offset}{[where relevant] The offset formula.}
-\item{weights}{[where relevant] The weights formula.}
-\item{collin.var}{[where relevant] Vector containing the variables removed because of collinearity.}
-\item{collin.coef}{[where relevant] Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
+\item{offset}{(When relevant.) The offset formula.}
+\item{weights}{(When relevant.) The weights formula.}
+\item{collin.var}{(When relevant.) Vector containing the variables removed because of collinearity.}
+\item{collin.coef}{(When relevant.) Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
 }
 \description{
 Estimates GLM models with any number of fixed-effects.

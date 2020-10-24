@@ -14,15 +14,35 @@
 
 #include <Rcpp.h>
 #include <cmath>
+#include <math.h>
 #ifdef _OPENMP
     #include <omp.h>
 #else
     #define omp_get_thread_num() 0
-    #define omp_get_num_threads() 1
 #endif
 using namespace Rcpp;
 
 // [[Rcpp::plugins(openmp)]]
+
+
+std::vector<int> set_parallel_scheme(int N, int nthreads){
+    // => this concerns only the parallel application on a 1-Dimensional matrix
+    // takes in the nber of observations of the vector and the nber of threads
+    // gives back a vector of the length the nber of threads + 1 giving the start/stop of each threads
+
+    std::vector<int> res(nthreads + 1, 0);
+    double N_rest = N;
+
+    for(int i=0 ; i<nthreads ; ++i){
+        res[i + 1] = ceil(N_rest / (nthreads - i));
+        N_rest -= res[i + 1];
+        res[i + 1] += res[i];
+    }
+
+    return res;
+}
+
+
 
 void invert_tri(NumericMatrix &R, int K, int nthreads = 1){
 
@@ -40,7 +60,17 @@ void invert_tri(NumericMatrix &R, int K, int nthreads = 1){
         R(i, i) = 1/R(i, i);
     }
 
+    // Check for interrupts
+    // number of computations is (K - b) * (b + 1) => max is (K + 1)**2 / 2
+    double flop = (K + 1) * (K + 1) / 2.0;
+    int iterSecond = ceil(2000000000 / flop / 2); // nber iter per 1/2 second
+
     for(int b=1 ; b<K ; ++b){
+
+        if(b % iterSecond == 0){
+            // Rprintf("check\n");
+            R_CheckUserInterrupt();
+        }
 
         #pragma omp parallel for num_threads(nthreads) schedule(static, 1)
         for(int i=0 ; i<K-b ; ++i){
@@ -66,8 +96,21 @@ void tproduct_tri(NumericMatrix &RRt, NumericMatrix &R, int nthreads = 1){
         }
     }
 
+    // Check for interrupts
+    // we do the same as for the invert_tri
+    double flop = (K + 1) * (K + 1) / 2.0;
+    int iterSecond = ceil(2000000000 / flop / 2); // nber iter per 1/2 second
+    int n_iter_main = 0;
+
     #pragma omp parallel for num_threads(nthreads) schedule(static, 1)
     for(int i=0 ; i<K ; ++i){
+
+        if(omp_get_thread_num() == 0 && n_iter_main % iterSecond == 0){
+            // Rprintf("check\n");
+            R_CheckUserInterrupt();
+            ++n_iter_main;
+        }
+
         for(int j=i ; j<K ; ++j){
 
             double value = 0;
@@ -84,7 +127,7 @@ void tproduct_tri(NumericMatrix &RRt, NumericMatrix &R, int nthreads = 1){
 
 
 // [[Rcpp::export]]
-List cpp_cholesky(NumericMatrix X, int nthreads = 1){
+List cpp_cholesky(NumericMatrix X, double tol = 1.0/100000.0/100000.0, int nthreads = 1){
     // X est symetrique, semi definie positive
     // rank-revealing on-the-fly
 
@@ -95,9 +138,20 @@ List cpp_cholesky(NumericMatrix X, int nthreads = 1){
     NumericMatrix R(K, K);
     LogicalVector id_excl(K);
     int n_excl = 0;
-    double tol = 1.0/100000.0/100000.0;
+
+    // we check for interrupt every 1s when it's the most computationnaly intensive
+    // at each iteration we have K * (j+1) - j**2 - 2*j - 1 multiplications
+    // max => K**2/4
+    double flop = K * K / 4.0;
+    int iterSecond = ceil(2000000000 / flop / 2); // nber iter per 1/2 second
+    double min_norm = X(0, 0);
 
     for(int j=0 ; j<K ; ++j){
+
+        if(j % iterSecond == 0){
+            // Rprintf("check\n");
+            R_CheckUserInterrupt();
+        }
 
         // implicit pivoting (it's like 0-rank variables are stacked in the end)
 
@@ -124,6 +178,8 @@ List cpp_cholesky(NumericMatrix X, int nthreads = 1){
 
             continue;
         }
+
+        if(min_norm > R_jj) min_norm = R_jj;
 
         R_jj = sqrt(R_jj);
 
@@ -181,6 +237,7 @@ List cpp_cholesky(NumericMatrix X, int nthreads = 1){
 
     res["XtX_inv"] = XtX_inv;
     res["id_excl"] = id_excl;
+    res["min_norm"] = min_norm;
 
     return res;
 }
@@ -319,21 +376,22 @@ void mp_XtX(NumericMatrix &XtX, const NumericMatrix &X, const NumericMatrix &wX,
 
     // specific scheme for large N and K == 1
     if(K == 1){
+
         std::vector<double> all_values(nthreads, 0);
-        #pragma omp parallel num_threads(nthreads)
-        {
-            int i = omp_get_thread_num()*N/omp_get_num_threads();
-            int stop = (omp_get_thread_num()+1)*N/omp_get_num_threads();
+        std::vector<int> bounds = set_parallel_scheme(N, nthreads);
+
+        #pragma omp parallel for num_threads(nthreads)
+        for(int t=0 ; t<nthreads ; ++t){
             double val = 0;
-            for(; i<stop ; ++i){
+            for(int i=bounds[t]; i<bounds[t + 1] ; ++i){
                 val += X(i, 0) * wX(i, 0);
             }
-            all_values[omp_get_thread_num()] = val;
+            all_values[t] = val;
         }
 
         double value = 0;
-        for(int m=0 ; m<nthreads ; ++m){
-            value += all_values[m];
+        for(int t=0 ; t<nthreads ; ++t){
+            value += all_values[t];
         }
 
         XtX(0, 0) = value;
@@ -349,7 +407,7 @@ void mp_XtX(NumericMatrix &XtX, const NumericMatrix &X, const NumericMatrix &wX,
             }
         }
 
-        #pragma omp parallel for num_threads(nthreads)
+        #pragma omp parallel for num_threads(nthreads) schedule(static, 1)
         for(int index=0 ; index<nValues ; ++index){
             int k_row = all_i[index];
             int k_col = all_j[index];
@@ -373,21 +431,22 @@ void mp_Xty(NumericVector &Xty, const NumericMatrix &X, const NumericVector y, i
     int K = X.ncol();
 
     if(K == 1){
+
         std::vector<double> all_values(nthreads, 0);
-        #pragma omp parallel num_threads(nthreads)
-        {
-            int i = omp_get_thread_num()*N/omp_get_num_threads();
-            int stop = (omp_get_thread_num()+1)*N/omp_get_num_threads();
+        std::vector<int> bounds = set_parallel_scheme(N, nthreads);
+
+        #pragma omp parallel for num_threads(nthreads)
+        for(int t=0 ; t<nthreads ; ++t){
             double val = 0;
-            for(; i<stop ; ++i){
-                val += X(i, 0) * y[i];
+            for(int i=bounds[t]; i<bounds[t + 1] ; ++i){
+                val += X(i, 0) * y(i);
             }
-            all_values[omp_get_thread_num()] = val;
+            all_values[t] = val;
         }
 
         double value = 0;
-        for(int m=0 ; m<nthreads ; ++m){
-            value += all_values[m];
+        for(int t=0 ; t<nthreads ; ++t){
+            value += all_values[t];
         }
 
         Xty[0] = value;

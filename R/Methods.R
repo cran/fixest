@@ -89,6 +89,10 @@ deviance.fixest = function(object, ...){
     w = object[["weights"]]
     if(is.null(w)) w = rep(1, length(r))
 
+    if(is.null(r) && !method %in% c("fepois", "feglm")){
+        stop("The method 'deviance.fixest' cannot be applied to a 'lean' summary. Please apply it to the estimation object directly.")
+    }
+
     if(method == "feols" || (method %in% c("femlm", "feNmlm") && family == "gaussian")){
         res = sum(w * r**2)
 
@@ -154,10 +158,13 @@ hatvalues.fixest = function(model, ...){
     method = model$method
     family = model$family
 
+    msg = "hatvalues.fixest: 'hatvalues' is not implemented for estimations with fixed-effects."
+
     if(method == "feols"){
 
         if(!is.null(model$fixef_id)){
-            stop("'hatvalues' is not implemented when the estimation contains fixed-effects.")
+            message(msg)
+            return(rep(NA_real_, model$nobs))
         }
 
         X = model.matrix(model)
@@ -167,7 +174,8 @@ hatvalues.fixest = function(model, ...){
     } else if(method %in% c("fepois", "feglm")){
 
         if(!is.null(model$fixef_id)){
-            stop("'hatvalues' is not implemented when the estimation contains fixed-effects.")
+            message(msg)
+            return(rep(NA_real_, model$nobs))
         }
 
         XW = model.matrix(model) * sqrt(model$irls_weights)

@@ -14,7 +14,7 @@
 .datatable.aware = TRUE
 
 
-panel_setup = function(data, panel.id, time.step = "unitary", duplicate.method = "none", DATA_MISSING = FALSE, from_fixest = FALSE){
+panel_setup = function(data, panel.id, time.step = NULL, duplicate.method = "none", DATA_MISSING = FALSE, from_fixest = FALSE){
     # Function to setup the panel.
     # Used in lag.formula, panel, and fixest_env (with argument panel.id and panel.args)
     # DATA_MISSING: arg used in lag.formula
@@ -75,7 +75,29 @@ panel_setup = function(data, panel.id, time.step = "unitary", duplicate.method =
     }
 
     # time.step
-    check_arg_plus(time.step, "numeric scalar GT{0} | match(unitary, consecutive, within.consecutive)")
+    if(is.null(time.step)){
+
+        if(is.numeric(time)){
+            time.step = "unitary"
+        } else {
+            time.step = "consecutive"
+
+            if(any(grepl("(?i)date", class(time)))){
+                time_new = tryCatch(as.numeric(time), warning = function(x) x)
+                if(!is.numeric(time_new)){
+                    warning("When setting the panel: the time variable is a 'date' but could not be converted to numeric. Its character counterpart is used => please check it makes sense.")
+                    time = as.character(time)
+                } else {
+                    time = time_new
+                }
+            }
+
+        }
+
+    } else {
+        check_arg_plus(time.step, "numeric scalar GT{0} | match(unitary, consecutive, within.consecutive)")
+    }
+
 
     # unitary time.step: conversion to numeric before quf
     if(time.step == "unitary") {
@@ -126,19 +148,26 @@ panel_setup = function(data, panel.id, time.step = "unitary", duplicate.method =
     if(time.step %in% c("consecutive", "within.consecutive")){
         # for within.consecutive, we deal with it after sorting
         time = time_full$x
+
     } else if(time.step == "unitary"){
         time_unik = time_full$items
-        all_steps = unique(diff(time_unik))
-        my_step = cpp_pgcd(unique(all_steps))
 
-        # we rescale time_unik
-        time_unik_new = (time_unik - min(time_unik)) / my_step
-        time = time_unik_new[time_full$x]
+        if(length(time_unik) == 1){
+            my_step = 1
+            time = rep(0, length(time_full$x))
 
-        if(my_step != 1){
-            message("NOTE: unitary time step taken: ", my_step, ".")
+        } else {
+            all_steps = unique(diff(time_unik))
+            my_step = cpp_pgcd(unique(all_steps))
+
+            # we rescale time_unik
+            time_unik_new = (time_unik - min(time_unik)) / my_step
+            time = time_unik_new[time_full$x]
+
+            if(my_step != 1){
+                message("NOTE: unitary time step taken: ", my_step, ".")
+            }
         }
-
 
     } else {
         time_unik = time_full$items
@@ -199,6 +228,11 @@ f = function(x, lead = 1, fill = NA){
     l(x, -lead, fill)
 }
 
+#' @describeIn l Creates differences (i.e. x - lag(x)) in a \code{fixest} estimation
+d = function(x, lag = 1, fill = NA){
+    x - l(x, lag, fill)
+}
+
 
 #' Lags a variable in a \code{fixest} estimation
 #'
@@ -220,16 +254,17 @@ f = function(x, lead = 1, fill = NA){
 #' data(base_did)
 #'
 #' # Setting a data set as a panel...
-#' pdat = panel(base_did, ~id+period)
+#' pdat = panel(base_did, ~ id + period)
 #'
 #' # ...then using the functions l and f
-#' est1 = feols(y~l(x1, 0:1), pdat)
-#' est2 = feols(f(y)~l(x1, -1:1), pdat)
-#' est3 = feols(l(y)~l(x1, 0:3), pdat)
-#' etable(est1, est2, est3, order = c("f", "^x"), drop="Int")
+#' est1 = feols(y ~ l(x1, 0:1), pdat)
+#' est2 = feols(f(y) ~ l(x1, -1:1), pdat)
+#' est3 = feols(l(y) ~ l(x1, 0:3), pdat)
+#' etable(est1, est2, est3, order = c("f", "^x"), drop = "Int")
 #'
 #' # or using the argument panel.id
-#' feols(f(y)~l(x1, -1:1), base_did, panel.id = ~id+period)
+#' feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id + period)
+#' feols(d(y) ~ d(x1), base_did, panel.id = ~id + period)
 #'
 #' # l() and f() can also be used within a data.table:
 #' if(require("data.table")){
@@ -237,6 +272,7 @@ f = function(x, lead = 1, fill = NA){
 #'   # Now since pdat_dt is also a data.table
 #'   #   you can create lags/leads directly
 #'   pdat_dt[, x1_l1 := l(x1)]
+#'   pdat_dt[, x1_d1 := d(x1)]
 #'   pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 #' }
 #'
@@ -337,7 +373,7 @@ l = function(x, lag = 1, fill = NA){
 }
 
 
-l_expand = function(x, k=1, fill){
+l__expand = function(x, k = 1, fill){
 
     mc = match.call()
 
@@ -369,7 +405,7 @@ l_expand = function(x, k=1, fill){
 }
 
 # same as l_expand, but opposite sign
-f_expand = function(x, k=1, fill){
+f__expand = function(x, k = 1, fill){
 
     mc = match.call()
 
@@ -392,6 +428,34 @@ f_expand = function(x, k=1, fill){
                 mc_new[[1]] = as.name("f")
                 mc_new$k = as.numeric(k[i])
             }
+
+            res[i] = gsub("x = |k = ", "", deparse_long(mc_new))
+        }
+    }
+
+
+    res
+}
+
+# The diff operator
+d__expand = function(x, k = 1, fill){
+
+    mc = match.call()
+
+    if(missing(x)) stop("Argument 'x' cannot be missing.")
+    check_arg(k, "integer vector no na")
+    check_arg(fill, "NA | numeric scalar")
+
+    mc_new = mc
+
+    res = c()
+    for(i in 1:length(k)){
+
+        if(k[i] == 0){
+            res[i] = deparse_long(mc_new$x)
+        } else {
+            mc_new[[1]] = as.name("d")
+            mc_new$k = as.numeric(k[i])
 
             res[i] = gsub("x = |k = ", "", deparse_long(mc_new))
         }
@@ -484,7 +548,7 @@ f_expand = function(x, k=1, fill){
 #'
 #'
 #'
-lag.formula = function(x, k = 1, data, time.step = "unitary", fill = NA, duplicate.method = c("none", "first"), ...){
+lag.formula = function(x, k = 1, data, time.step = NULL, fill = NA, duplicate.method = c("none", "first"), ...){
     # Arguments:
     # time.step: default: "consecutive", other option: "unitary" (where you find the most common step and use it -- if the data is numeric), other option: a number, of course the time must be numeric
 
@@ -583,7 +647,7 @@ lag.formula = function(x, k = 1, data, time.step = "unitary", fill = NA, duplica
 #'
 #' @param data A data.frame.
 #' @param panel.id The panel identifiers. Can either be: i) a one sided formula (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables with \code{^} only inside formulas (see the dedicated section in \code{\link[fixest]{feols}}).
-#' @param time.step The method to compute the lags. Can be equal to: \code{"unitary"} (default), \code{"consecutive"}, \code{"within.consecutive"}, or to a number. If \code{"unitary"}, then the largest common divisor between consecutive time periods is used (typically if the time variable represents years, it will be 1). This method can apply only to integer (or convertible to integer) variables. If \code{"consecutive"}, then the time variable can be of any type: two successive time periods represent a lag of 1. If \code{"witihn.consecutive"} then **within a given id**, two successive time periods represent a lag of 1. Finally, if the time variable is numeric, you can provide your own numeric time step.
+#' @param time.step The method to compute the lags, default is \code{NULL} (which means automatically set). Can be equal to: \code{"unitary"}, \code{"consecutive"}, \code{"within.consecutive"}, or to a number. If \code{"unitary"}, then the largest common divisor between consecutive time periods is used (typically if the time variable represents years, it will be 1). This method can apply only to integer (or convertible to integer) variables. If \code{"consecutive"}, then the time variable can be of any type: two successive time periods represent a lag of 1. If \code{"witihn.consecutive"} then **within a given id**, two successive time periods represent a lag of 1. Finally, if the time variable is numeric, you can provide your own numeric time step.
 #' @param duplicate.method If several observations have the same id and time values, then the notion of lag is not defined for them. If \code{duplicate.method = "none"} (default) and duplicate values are found, this leads to an error. You can use \code{duplicate.method = "first"} so that the first occurrence of identical id/time observations will be used as lag.
 #'
 #' @details
@@ -638,7 +702,7 @@ lag.formula = function(x, k = 1, data, time.step = "unitary", fill = NA, duplica
 #' }
 #'
 #'
-panel = function(data, panel.id, time.step = "unitary", duplicate.method = c("none", "first")){
+panel = function(data, panel.id, time.step = NULL, duplicate.method = c("none", "first")){
 
     if(missing(data)){
         stop("You must provide the argument 'data'.")
@@ -781,7 +845,7 @@ unpanel = function(x){
         # data.table is really hard to handle....
         # Not very elegant... but that's life!
 
-        # When modifications are too risky, I dissolve the
+        # When modifications are too risky, I dissolve the panel
 
         mc_new = mc
         mc_new[[1]] = as.name('[')
@@ -792,11 +856,11 @@ unpanel = function(x){
             jvalue = mc$j
             jtext = deparse_long(jvalue)
             # we check if f() or l() is used
-            if(grepl("[^\\._[:alnum:]](l|f)\\(", jtext)){
+            if(grepl("[^\\._[:alnum:]](l|f|d)\\(", jtext)){
                 # We authorize it but only in 'simple' variable creation
                 if(any(!names(mc) %in% c("", "x", "j"))){
                     # We don't allow i either
-                    stop("When creating lags (resp. leads) with the function l() (resp. f()) within a data.table, only the argument 'j' is allowed.\nExample: 'data[, x_lag := l(x)]' is OK, while 'data[x>0, x_lag := l(x)]' is NOT ok.")
+                    stop("When creating lags (resp. leads or diffs) with the function l() (resp. f() or d()) within a data.table, only the argument 'j' is allowed.\nExample: 'data[, x_lag := l(x)]' is OK, while 'data[x>0, x_lag := l(x)]' is NOT ok.")
                 }
                 options(fixest_fl_authorized = TRUE)
                 on.exit(options(fixest_fl_authorized = FALSE))
@@ -903,7 +967,7 @@ terms_hat = function(fml, fastCombine = TRUE){
 
 check_lag = function(fml){
     fml_txt = deparse_long(fml)
-    grepl("((^)|[^\\._[:alnum:]])(l|f)\\(", fml_txt)
+    grepl("((^)|[^\\._[:alnum:]])(l|f|d)\\(", fml_txt)
 }
 
 
@@ -912,22 +976,19 @@ reformulate_terms = function(x){
 
     res = x
 
-    if(any(grepl("\\b(l|f)\\(", x))){
+    if(any(grepl("\\b(l|f|d)\\(", x))){
         # Means lagging required
 
-        term_all_expand = gsub("^l\\(", "l_expand(", x)
-        term_all_expand = gsub("([^\\._[:alnum:]])l\\(", "\\1l_expand(", term_all_expand)
+        term_all_expand = gsub("^(l|f|d)\\(", "\\1__expand(", x)
+        term_all_expand = gsub("([^\\._[:alnum:]])(l|f|d)\\(", "\\1\\2__expand(", term_all_expand)
 
-        term_all_expand = gsub("^f\\(", "f_expand(", term_all_expand)
-        term_all_expand = gsub("([^\\._[:alnum:]])f\\(", "\\1f_expand(", term_all_expand)
-
-        qui_expand = which(grepl("(l|f)_expand", term_all_expand))
+        qui_expand = which(grepl("__expand", term_all_expand))
 
         if(length(qui_expand) > 0){
             terms_all_list = as.list(x)
 
             # we select only the first function
-            end_l_expand = function(x){
+            find_closing = function(x){
                 x_split = strsplit(x, "")[[1]]
                 open = x_split == "("
                 close = x_split == ")"
@@ -936,20 +997,21 @@ reformulate_terms = function(x){
 
             for(k in qui_expand){
 
-                terms_split = strsplit(term_all_expand[k], "(f|l)_expand")[[1]]
-                is_l = strsplit(term_all_expand[k], "_expand")[[1]]
-                is_l = grepl("l$", is_l[-length(is_l)])
+                terms_split = strsplit(term_all_expand[k], "(l|f|d)__expand")[[1]]
+                terms_split_bis = strsplit(term_all_expand[k], "__expand")[[1]]
+                key = substr(terms_split_bis, nchar(terms_split_bis), nchar(terms_split_bis))
 
                 slice = terms_split[1]
                 for(i in 1:(length(terms_split) - 1)){
 
                     val = terms_split[i + 1]
 
-                    end = end_l_expand(val)
+                    end = find_closing(val)
                     if(end == nchar(val)){
-                        quoi = eval(parse(text = paste0(ifelse(is_l[i], "l", "f"), "_expand", val)))
+                        quoi = eval(parse(text = paste0(key[i], "__expand", val)))
+
                     } else {
-                        what = paste0(ifelse(is_l[i], "l", "f"), "_expand", substr(val, 1, end))
+                        what = paste0(key[i], "__expand", substr(val, 1, end))
                         end_text = substr(val, end + 1, nchar(val))
                         quoi = paste0(eval(parse(text = what)), end_text)
                     }

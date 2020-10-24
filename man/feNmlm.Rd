@@ -10,7 +10,6 @@ feNmlm(
   family = c("poisson", "negbin", "logit", "gaussian"),
   NL.fml,
   fixef,
-  na_inf.rm = getFixest_na_inf.rm(),
   NL.start,
   lower,
   upper,
@@ -32,6 +31,9 @@ feNmlm(
   warn = TRUE,
   notes = getFixest_notes(),
   combine.quick,
+  mem.clean = FALSE,
+  only.env = FALSE,
+  env,
   ...
 )
 }
@@ -46,9 +48,7 @@ feNmlm(
 
 \item{fixef}{Character vector. The names of variables to be used as fixed-effects. These variables should contain the identifier of each observation (e.g., think of it as a panel identifier). Note that the recommended way to include fixed-effects is to insert them directly in the formula.}
 
-\item{na_inf.rm}{Logical, default is \code{TRUE}. If the variables necessary for the estimation contain NA/Infs and \code{na_inf.rm = TRUE}, then all observations containing NA are removed prior to estimation and a note is displayed detailing the number of observations removed. Otherwise, an error is raised.}
-
-\item{NL.start}{(For NL models only) A list of starting values for the non-linear parameters. ALL the parameters are to be named and given a staring value. Example: \code{NL.start=list(a=1,b=5,c=0)}. Though, there is an exception: if all parameters are to be given the same starting value, you can use the argument \code{NL.start.init}.}
+\item{NL.start}{(For NL models only) A list of starting values for the non-linear parameters. ALL the parameters are to be named and given a staring value. Example: \code{NL.start=list(a=1,b=5,c=0)}. Though, there is an exception: if all parameters are to be given the same starting value, you can use a numeric scalar.}
 
 \item{lower}{(For NL models only) A list. The lower bound for each of the non-linear parameters that requires one. Example: \code{lower=list(b=0,c=0)}. Beware, if the estimated parameter is at his lower bound, then asymptotic theory cannot be applied and the standard-error of the parameter cannot be estimated because the gradient will not be null. In other words, when at its upper/lower bound, the parameter is considered as 'fixed'.}
 
@@ -70,7 +70,7 @@ feNmlm(
 
 \item{opt.control}{List of elements to be passed to the optimization method \code{\link[stats]{nlminb}}. See the help page of \code{\link[stats]{nlminb}} for more information.}
 
-\item{nthreads}{Integer: Number of nthreads to be used (accelerates the algorithm via the use of openMP routines). The default is to use the total number of nthreads available minus two. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
+\item{nthreads}{The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. The default is to use 50\% of all threads. You can set permanently the number of threads used within this package using the function \code{\link[fixest]{setFixest_nthreads}}.}
 
 \item{verbose}{Integer, default is 0. It represents the level of information that should be reported during the optimisation process. If \code{verbose=0}: nothing is reported. If \code{verbose=1}: the value of the coefficients and the likelihood are reported. If \code{verbose=2}: \code{1} + information on the computing time of the null model, the fixed-effects coefficients and the hessian are reported.}
 
@@ -89,6 +89,12 @@ feNmlm(
 \item{notes}{Logical. By default, two notes are displayed: when NAs are removed (to show additional information) and when some observations are removed because of only 0 (or 0/1) outcomes in a fixed-effect setup (in Poisson/Neg. Bin./Logit models). To avoid displaying these messages, you can set \code{notes = FALSE}. You can remove these messages permanently by using \code{setFixest_notes(FALSE)}.}
 
 \item{combine.quick}{Logical. When you combine different variables to transform them into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}. The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}. Because pasting variables is a costly operation, the internal algorithm may use a numerical trick to hasten the process. The cost of doing so is that you lose the labels. If you are interested in getting the value of the fixed-effects coefficients after the estimation, you should use \code{combine.quick = FALSE}. By default it is equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE} otherwise.}
+
+\item{mem.clean}{Logical, default is \code{FALSE}. Only to be used if the data set is large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as much as possible and \code{\link[base]{gc}} is run before each substantial C++ section in the internal code to avoid memory issues.}
+
+\item{only.env}{(Advanced users.) Logical, default is \code{FALSE}. If \code{TRUE}, then only the environment used to make the estimation is returned.}
+
+\item{env}{(Advanced users.) A \code{fixest} environment created by a \code{fixest} estimation with \code{only.env = TRUE}. Default is missing. If provided, the data from this environment will be used to perform the estimation.}
 
 \item{...}{Not currently used.}
 }
@@ -204,21 +210,21 @@ est1_L = femlm(z1 ~ log(x) + log(y), base)
 # Estimating the same 'linear' relation using a 'non-linear' call
 est1_NL = feNmlm(z1 ~ 1, base, NL.fml = ~a*log(x)+b*log(y), NL.start = list(a=0, b=0))
 # we compare the estimates with the function esttable (they are identical)
-esttable(est1_L, est1_NL)
+etable(est1_L, est1_NL)
 
 # Now generating a non-linear relation (E(z2) = x + y + 1):
 z2 = rpois(n, x + y) + rpois(n, 1)
 base$z2 = z2
 
 # Estimation using this non-linear form
-est2_NL = feNmlm(z2~0, base, NL.fml = ~log(a*x + b*y),
-               NL.start = list(a=1, b=2), lower = list(a=0, b=0))
+est2_NL = feNmlm(z2 ~ 0, base, NL.fml = ~log(a*x + b*y),
+               NL.start = 2, lower = list(a=0, b=0))
 # we can't estimate this relation linearily
 # => closest we can do:
-est2_L = femlm(z2~log(x)+log(y), base)
+est2_L = femlm(z2 ~ log(x) + log(y), base)
 
 # Difference between the two models:
-esttable(est2_L, est2_NL)
+etable(est2_L, est2_NL)
 
 # Plotting the fits:
 plot(x, z2, pch = 18)

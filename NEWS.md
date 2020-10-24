@@ -1,7 +1,125 @@
 
 # News for the R Package `fixest`
 
-## Changes in version 0.6.0
+## Changes in version 0.7.0
+
+#### Bugs
+
+ - Major bug when fixed-effects were combined with `^` and they contained NAs (thanks to @poliquin [#35](https://github.com/lrberge/fixest/issues/35)).
+ 
+ - Bug when using lead/lags in estimations. The bug was due to a bug in a dependency ([dreamerr](https://cran.r-project.org/package=dreamerr)) and was fixed. Now fixest requires **dreamerr** version >= 1.2.1. Bug spotted by @seunghoon001 ([#44](https://github.com/lrberge/fixest/issues/44)).
+ 
+ - Major bug when n_obs x n_vars > 2B or n_obs x n_fixed-effects > 2B. In such cases estimations could just not be done, even leading R to crash when using nthreads > 1. The algorithm was fixed to allow datasets with up to 2B observations to be estimated in all circumstances. Bug reported, and many help for checking provided, by Howard Zihao Zhang.
+ 
+ - `coefplot`: Problem regarding interactions when observations, and hence coefficients, were removed from the estimation. Now the coefficients are removed from the plot. Bug reported by @phisherblack [#45](https://github.com/lrberge/fixest/issues/45).
+ 
+ - `coefplot`: Corrected various bugs when asked for the plotting of several estimations. 
+ 
+ - Fix the stack imbalance warning (report by @shoonlee, [#46](https://github.com/lrberge/fixest/issues/46)).
+ 
+#### Internal improvements
+
+ - Brand new internal algorithm which now uses closed form solutions when dealing with variables with varying slopes. This means that when variables with varying slopes are present, the algorithm is incomparably faster and more accurate.
+
+ - Two deep copies of some data are now avoided in the demeaning function. This improves the performance in terms of memory footprint, and also makes the algorithm faster. 
+ 
+#### Standard-errors, important changes
+  
+ - New default values for standard-errors (only concerns multiway clustering). They become similar to `reghdfe` to increase cross-software comparability. Computing the standard-errors the old way is still possible using the argument `dof`. See the dedicated vignette: [On standard errors](https://cran.r-project.org/package=fixest/vignettes/standard_errors.html).
+ 
+ - Name change in `summary`/`vcov`/`etable`: To get heteroskedasticity-robust standard-errors, `se = "hetero"` now replaces `se = "white"` to enhance clarity. Note that `se = "white"` still works.
+ 
+#### New function: `fitstat` 
+
+  - New function `fitsat` that computes various fit statistics. It is integrated with `etable` and can be invoked with the argument `fitstat`. So far only two fit statistics are included, but more will come.
+ 
+#### New features in `interact()`
+
+  - You can now use `i(var)` to treat the variable `var` as a factor. You can select which values to drop/keep with the respective arguments. 
+  
+  - Using `i(var)` leads to a special treatment of these variables in the functions `coefplot` and `etable`.
+ 
+#### New features in `etable`
+
+  - New argument `placement` to define the position of the float in Latex (suggestion by Caleb Kwon).
+  
+  - New argument `drop.section`, with which you can drop a) the fixed-effects, b) the variables with varying slopes, or c) the statistics, sections (suggestion by Caleb Kwon).
+  
+  - Fix glitch in help pages regarding the use of the '%' (percentage) character in regular expressions.
+  
+  - Two new arguments `.vcov` and `.vcov_args` to compute the standard-errors with custom functions.
+  
+  - The number of observations (`n`) is now treated as a regular statistic and can be placed where one wants.
+  
+  - The statistics can now have custom aliases using the argument `dict`.
+  
+  - The overdispersion becomes a regular fit statistic that can be included (or not) using `fitstat`.
+  
+  - The dictionnary now applies to the factors of interactions, and the values of factors.
+
+#### User visible changes
+
+ - Argument `nthreads`:
+ 
+  * The new default of argument `nthreads` is 50% of all available threads. 
+  * Accepts new values: a) 0 means all available threads, b) a number strictly between 0 and 1 will represent the fraction of all threads to use.
+  
+  - When setting formula macros:
+  
+    * The functions `xpd` and `setFixest_fml` now accept character vectors and numeric scalars on top of formulas.
+  
+  - `demean`:
+  
+    * speed improvement.
+  
+  - `coefplot`:
+  
+    * The argument `group` now accepts a special character `"^^"`, when used, it cleans the beginning of the coefficient name. Very useful for, e.g., factors although factors created with `i()` need not that.
+    
+     * When `horiz = TRUE`, the order of the coefficients is not reversed any more.
+
+ - Improved display of numbers in `print` method.
+ 
+ - Added variables names to `X_demeaned` from `feols`.
+ 
+ - Lagging functions:
+ 
+  * Now `time.step = NULL` by default, which means that the choice of how to lag is automatically set. This means that the default behavior for time variables equal to Dates or character values should be appropriate.
+  
+  * New operator `d` which is the difference operator.
+ 
+ - In all estimations: 
+ 
+    * new argument `mem.clean`: internally, intermediary objects are removed as much as possible and `gc()` is called before each memory intensive C++ section. Only useful when you're at the edge of reaching the memory limit.
+    * new output: `collin.min_norm`, this value informs on the possible presence of collinearity in the system of variables.
+    * new arguments `only.env` and `env`:
+      * The first, `only.env`, allows to recover only the environment used to perform the estimation (i.e. all the preprocessing done before the estimation).
+      * The second, `env`, accepts a fixest environment created by `only.env`, and performs the estimation using this environment--all other arguments are ignored. 
+      * These changes are a prerequisite to the efficient implementation of bootstraping (since, by applying modifications directly in `env`, we cut all preprocessing).
+    
+
+ - In non-linear estimations: 
+ 
+    * non-numeric variables can now be used. 
+    * argument `NL.start` now accepts numeric scalars, initializing all coefficients to the same value (avoids the use of the other argument `NL.start.init`).
+    
+  - `summary.fixest`:
+  
+    * argument `.vcov` now accepts functions that compute the vcov. This ensures convenient compatibility with the `sandwich` package (compatibility is still not full though: bootstraped SEs don't work yet).
+    
+  - `update.fixest`:
+  
+    * new argument `evaluate` to ensure consistency with the `update` method from stats.
+    
+  - `feols` & `feglm`:
+  
+    * the Cholesky decomposition now checks for user interrupts (matters for models with MANY variables to estimate).
+  
+#### Deprecation
+
+ - Argument `na_inf.rm` has been removed. It was present for historical reasons, and is removed to increase code clarity.
+
+## Changes in version 0.6.0 (13-07-2020)
 
 #### Bugs
 
@@ -61,7 +179,7 @@
  
  - the `estfun` from `sandwich` has been implemented.
 
-## Changes in version 0.5.1 (18-06-2018)
+## Changes in version 0.5.1 (18-06-2020)
 
 #### Hotfix
  
