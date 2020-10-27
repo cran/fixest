@@ -2486,8 +2486,8 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 #'
 #' Treat a variable as a factor, or interacts a variable with another treated as a factor. Values to be dropped/kept from the factor can be easily set.
 #'
-#' @param var A vector. If the other argument \code{f} is missing, then this vector will be treated as a factor.
-#' @param f A vector (of any type) that will be treated as a factor. Must be of the same length as \code{var}.
+#' @param var A vector to be interacted with \code{f}. If the other argument \code{f} is missing, then this vector will be treated as the argument \code{f}.
+#' @param f A vector (of any type) that will be treated as a factor. Must be of the same length as \code{var} if \code{var} is not missing.
 #' @param ref A single value that belongs to the interacted variable (\code{f}). Can be missing.
 #' @param drop A vector of values that belongs to the factor variable (\code{f}). If provided, all values from \code{f} that match \code{drop} will be removed.
 #' @param keep A vector of values that belongs to the factor variable (\code{f}). If provided, only the values from \code{f} that match \code{keep} will be kept.
@@ -2509,13 +2509,18 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 #' # Simple illustration
 #' #
 #'
-#' x = rnorm(10)
+#' x = 1:10
 #' y = rep(1:4, 3)[1:10]
 #'
 #' # interaction
 #' cbind(x, y, i(x, y, 1))
+#'
 #' # without interaction
 #' cbind(x, y, i(y, ref = 1))
+#'
+#' # You can interact factors too
+#' z = rep(c("a", "b", "c"), c(5, 3, 2))
+#' data.frame(z, y, i(z, y))
 #'
 #' #
 #' # In fixest estimations
@@ -2539,6 +2544,9 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 #'
 i = interact = function(var, f, ref, drop, keep){
     # Used to create interactions
+
+    # gt = function(x) cat(sfill(x, 20), ": ", -(t0 - (t0<<-proc.time()))[3], "s\n", sep = "")
+    # t0 = proc.time()
 
     mc = match.call()
 
@@ -2579,38 +2587,53 @@ i = interact = function(var, f, ref, drop, keep){
         }
     }
 
-    # The NAs
-    is_na_fe = is.na(f)
+    # The NAs + recreation of f if necessary
+    IS_FACTOR_INTER = FALSE
+    if(IS_INTER){
 
-    if(is.factor(f)){
-        # we respect the fact that f is a factor => we will keep its ordering
-        is_na_fe = is.na(f)
-        fe_no_na = f[!is_na_fe, drop = TRUE]
-        items = levels(fe_no_na)
-        fe_num = rep(NA, length(f))
-        fe_num[!is_na_fe] = as.vector(unclass(fe_no_na))
-    } else {
-        if(any(is_na_fe)){
-            quf = quickUnclassFactor(f[!is_na_fe], addItem = TRUE, sorted = TRUE)
-            fe_num = rep(NA, length(f))
-            fe_num[!is_na_fe] = quf$x
-        } else {
-            quf = quickUnclassFactor(f, addItem = TRUE, sorted = TRUE)
-            fe_num = quf$x
+        is_na_all = is.na(var) | is.na(f)
+
+        if(!is.numeric(var)){
+            IS_FACTOR_INTER = TRUE
+            # It's an interaction between factors
+            f_new = rep(NA_character_, length(f))
+            f_new[!is_na_all] = paste0(var[!is_na_all], "__%%__", f[!is_na_all])
+            f = f_new
+            IS_INTER = FALSE
         }
 
-        items = quf$items
+    } else {
+        is_na_all = is.na(f)
     }
 
-    check_arg(ref, "charin", .choices = items, .message = paste0("Argument 'ref' must be a single element of the variable '", fe_name, "'."))
+    if(!IS_INTER){
+        # neutral var in C code
+        var = 1
+    }
+
+    # QUFing
+
+    info = to_integer(f, add_items = TRUE, items.list = TRUE, sorted = TRUE)
+    fe_num = info$x
+    items = info$items
+
+    check_arg(ref, "logical scalar | charin", .choices = items, .message = paste0("Argument 'ref' must be a single element of the variable '", fe_name, "'."))
     check_arg(drop, keep, "multi charin", .choices = items, .message = paste0("Argument '__ARG__' must consist of elements of the variable '", fe_name, "'."))
 
     no_rm = TRUE
     any_ref = FALSE
     id_drop = c()
     if(!missing(ref)){
-        any_ref = TRUE
-        id_drop = ref = which(items %in% ref)
+        if(is.logical(ref)){
+            if(ref == TRUE){
+                # We always delete the first value
+                any_ref = TRUE
+                id_drop = ref = which(items == items[1])
+            }
+        } else {
+            any_ref = TRUE
+            id_drop = ref = which(items %in% ref)
+        }
     }
 
     if(!missing(drop)){
@@ -2624,23 +2647,14 @@ i = interact = function(var, f, ref, drop, keep){
     if(length(id_drop) > 0){
         id_drop = unique(sort(id_drop))
         if(length(id_drop) == length(items)) stop("All items from the interaction have been removed.")
+        who_is_dropped = id_drop
         no_rm = FALSE
-    }
-
-    res = cpp_factor_matrix(fe_num, any(is_na_fe))
-
-    if(no_rm){
-        if(IS_INTER){
-            res = res * var
-        }
     } else {
-        if(IS_INTER){
-            res = res[, -id_drop, drop = FALSE] * var
-        } else {
-            res = res[, -id_drop, drop = FALSE]
-        }
+        # -1 is neutral
+        who_is_dropped = -1
     }
 
+    # The column names
 
     if(length(id_drop) > 0){
         items_name = items[-id_drop]
@@ -2649,17 +2663,40 @@ i = interact = function(var, f, ref, drop, keep){
     }
 
     if(FROM_FIXEST){
-        if(IS_INTER){
-            colnames(res) = paste0("__CLEAN__", var_name, ":", fe_name, "::", items_name)
+        # Pour avoir des jolis noms c'est un vrai gloubiboulga,
+        # mais j'ai pas trouve plus simple...
+        if(IS_FACTOR_INTER){
+            name_split = strsplit(items_name, "__%%__", fixed = TRUE)
+            var_items = sapply(name_split, function(x) x[1])
+            f_items = sapply(name_split, function(x) x[2])
+            col_names = paste0("__CLEAN__", var_name, "::", var_items, ":", fe_name, "::", f_items)
+
+        } else if(IS_INTER){
+            col_names = paste0("__CLEAN__", var_name, ":", fe_name, "::", items_name)
+
         } else {
-            colnames(res) = paste0("__CLEAN__", fe_name, "::", items_name)
+            col_names = paste0("__CLEAN__", fe_name, "::", items_name)
         }
     } else {
-        colnames(res) = items_name
+
+        if(IS_FACTOR_INTER){
+            name_split = strsplit(items_name, "__%%__", fixed = TRUE)
+            items_name = sapply(name_split, paste, collapse = ":")
+        }
+
+        col_names = items_name
     }
 
+    res = cpp_factor_matrix(fe_num, is_na_all, who_is_dropped, var, col_names)
+    # res => matrix with...
+    #  - NAs where appropriate
+    #  - appropriate number of columns
+    #  - interacted if needed
+    #
+
+
     # We send the information on the reference
-    if(IS_INTER){
+    if(FROM_FIXEST && IS_INTER){
         opt = getOption("fixest_interaction_ref")
         if(is.null(opt)){
 
@@ -2692,6 +2729,19 @@ i = interact = function(var, f, ref, drop, keep){
 #' @rdname i
 "interact"
 
+i_ref = function(var, f, ref, drop, keep){
+
+    mc = match.call()
+
+    mc[[1]] = as.name("i")
+
+    if(!all(c("var", "f") %in% names(mc)) && !any(c("ref", "drop", "keep") %in% names(mc))){
+        mc$ref = TRUE
+    }
+
+    return(deparse_long(mc))
+}
+
 
 #' @rdname setFixest_fml
 xpd = function(fml, ...){
@@ -2723,7 +2773,7 @@ xpd = function(fml, ...){
 #' @param sorted Logical, default is \code{FALSE}. Whether the integer vector should make reference to sorted values?
 #' @param add_items Logical, default is \code{FALSE}. Whether to add the unique values of the original vector(s). If requested, an attribute \code{items} is created containing the values (alternatively, they can appear in a list if \code{items.list=TRUE}).
 #' @param items.list Logical, default is \code{FALSE}. Only used if \code{add_items=TRUE}. If \code{TRUE}, then a list of length 2 is returned with \code{x} the integer vector and \code{items} the vector of items.
-#' @param multi.join Logical, or character, scalar, defaults to \code{FALSE}. Only used if multiple vectors are to be transformed into integers. If \code{multi.join} is not \code{FALSE}, the the values of the different vectors will be collated using \code{\link[base]{paste}} with \code{collapse=multi.join}.
+#' @param multi.join Logical, or character, scalar, defaults to \code{FALSE}. Only used if multiple vectors are to be transformed into integers. If \code{multi.join} is not \code{FALSE}, then the values of the different vectors will be collated using \code{\link[base]{paste}} with \code{collapse=multi.join}.
 #'
 #' @details
 #' If multiple vectors have to be combined and \code{add_items=TRUE}, to have user readable values in the items, you should add the argument \code{multi.join} so that the values of the vectors are combined in a "user-readable" way. Note that in the latter case, the algorithm is much much slower.
@@ -2820,7 +2870,17 @@ to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE
     }
 
     if(Q == 1){
-        res = quickUnclassFactor(dots[[1]], addItem = add_items, sorted = sorted)
+        if(sorted && is.factor(dots[[1]])){
+            # Special treatment for factors => we keep their order
+            f = dots[[1]][drop = TRUE]
+            res = quickUnclassFactor(unclass(f), addItem = add_items, sorted = sorted)
+            if(add_items){
+                res$items = levels(f)[res$items]
+            }
+
+        } else {
+            res = quickUnclassFactor(dots[[1]], addItem = add_items, sorted = sorted)
+        }
 
     } else {
 
@@ -2877,8 +2937,6 @@ to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE
         attr(res_tmp, "items") = res$items
         res = res_tmp
     }
-
-
 
     res
 }
@@ -3417,15 +3475,14 @@ prepare_matrix = function(fml, base){
 
     all_var_names = attr(t, "term.labels")
 
-
     # We take care of interactions: references can be multiple, then ':' is legal
     all_vars = gsub(":", "*", all_var_names)
 
     if(any(qui_inter <- (grepl("^i(nteract)?\\(", all_var_names) & grepl(":", all_var_names, fixed = TRUE)))){
-        # beware of in drop/keep":"!!!
+        # beware of ":" in drop/keep!!!
 
-        for(arg in c("ref", "drop", "keep")){
-            if(any(qui_ref <- grepl(paste0(arg, " =.+:"), all_var_names[qui_inter]))){
+        for(arg in c("drop", "keep")){
+            if(any(qui_ref <- grepl(paste0(arg, " =[^\\)]+:"), all_var_names[qui_inter]))){
                 var_inter_ref = all_var_names[qui_inter][qui_ref]
                 var_inter_ref_split = strsplit(var_inter_ref, paste0(arg, " = "))
                 fun2apply = function(x) paste(gsub(":", "*", x[1]), x[2], sep = paste0(arg, " = "))
@@ -3491,23 +3548,62 @@ fixest_model_matrix = function(fml, data){
     # then either apply a model.matrix
     # either applies an evaluation (which can be faster)
 
+    # fml = ~a*b+c+i(x1)+Temp:i(x2)+i(x3)/Wind
+
     # Modify the formula to add interactions
-    if(grepl("::", deparse_long(fml[[3]]))){
+    if(grepl("::", deparse_long(fml[[3]]), fixed = TRUE)){
         fml = interact_fml(fml)
     }
 
+    #
     # Evaluation
+    #
 
-    # we look at whether there are factor-like variables to be evaluated
-    # if there is factors => model.matrix
-    dataNames = names(data)
-    linear.varnames = all.vars(fml[[3]])
-    is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
-    if(length(is_num) == 0 || any(!is_num) || grepl("factor", deparse_long(fml))){
-        useModel.matrix = TRUE
-    } else {
-        useModel.matrix = FALSE
+    t_fml = terms(fml)
+    tl = attr(t_fml, "term.labels")
+
+    # We check for calls to i()
+    qui_inter <- grepl("(^|[^[:alnum:]_\\.])i(nteract)?\\(", tl)
+    IS_INTER = any(qui_inter)
+    if(IS_INTER){
+        # OMG... why do I always have to reinvent the wheel???
+        is_intercept = attr(t_fml,"intercept") == 1
+        i_naked = which(is_naked_inter(tl[qui_inter]))
+
+        for(i in seq_along(i_naked)){
+            if(!is_intercept && i == 1) next
+
+            j = i_naked[i]
+            txt = gsub("(^|(?<=[^[:alnum:]\\._]))i(nteract)?\\(", "i_ref(", tl[qui_inter][j], perl = TRUE)
+            tl[qui_inter][j] = eval(parse(text = txt))
+        }
+
+        fml_no_inter = as.formula(paste0("y ~ ", paste(c(1, tl[!qui_inter]), collapse = "+")))
+        fml = as.formula(paste0("y ~ ", paste(tl, collapse = "+")))
+
     }
+
+    # Are there factors NOT in i()? If so => model.matrix is used
+    dataNames = names(data)
+
+    if(IS_INTER){
+        linear.varnames = all.vars(fml_no_inter[[3]])
+        is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
+        if(length(is_num) > 0 && (any(!is_num) || grepl("factor", deparse_long(fml_no_inter)))){
+            useModel.matrix = TRUE
+        } else {
+            useModel.matrix = FALSE
+        }
+    } else {
+        linear.varnames = all.vars(fml[[3]])
+        is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
+        if(length(is_num) == 0 || any(!is_num) || grepl("factor", deparse_long(fml))){
+            useModel.matrix = TRUE
+        } else {
+            useModel.matrix = FALSE
+        }
+    }
+
 
     if(useModel.matrix){
         # to catch the NAs, model.frame needs to be used....
@@ -4103,6 +4199,37 @@ clean_interact_names = function(x){
 
     return(res)
 }
+
+is_naked_inter = function(x){
+    # Why is it always so complicated... There must be an easier way
+    # x = c("i(x1)", "i(I(x3))", "interact(x3, x4, TRUE, drop = c(1, 3:5))", "Temp:i(x2)", "i(x3):Wind")
+
+    x_split = strsplit(x, "(^|(?<=[^[:alnum:]\\._]))i(nteract)?\\(", perl = TRUE)
+
+    left = sapply(x_split, function(x) x[1])
+    right = sapply(x_split, function(x) x[2])
+
+    right_naked = function(r){
+
+        if(!grepl("(", r, fixed = TRUE) && grepl("\\)$", r)){
+            return(TRUE)
+        }
+
+        letter_vec = strsplit(r, "")[[1]]
+        open = 1 + cumsum(letter_vec == "(")
+        close = cumsum(letter_vec == ")")
+        which.max(close - open == 0) == length(letter_vec)
+    }
+
+    left_ok  = nchar(left) == 0
+    right_ok = rep(FALSE, length(right))
+    if(any(left_ok)){
+        right_ok[left_ok] = sapply(right[left_ok], right_naked)
+    }
+
+    left_ok & right_ok
+}
+
 
 
 #### ................. ####
@@ -4843,14 +4970,15 @@ format_se_type_latex = function(x, dict = c(), inline = FALSE){
     fe_format = paste(all_fe_format, collapse = " \\& ")
 
     # Full string
-    nb = c("One", "Two", "Three", "Four")
-    nway = paste0(nb[n_fe], "-way")
-
-    if(inline){
-        se_formatted = paste0(nway, ": ", fe_format)
-    } else {
-        se_formatted = paste0(nway, " (", fe_format, ")")
-    }
+    # nb = c("One", "Two", "Three", "Four")
+    # nway = paste0(nb[n_fe], "-way")
+    #
+    # if(inline){
+    #     se_formatted = paste0(nway, ": ", fe_format)
+    # } else {
+    #     se_formatted = paste0(nway, " (", fe_format, ")")
+    # }
+    se_formatted = fe_format
 
     escape_latex(se_formatted)
 }
@@ -6394,8 +6522,11 @@ vcov.fixest = function(object, se, cluster, dof = getFixest_dof(), attr = FALSE,
 
 	}
 
-	if(any(diag(vcov)<0)){
-		warning("Some variances are negative (likely problem of collinearity).")
+	if(any(diag(vcov) < 0)){
+	    # We 'fix' it
+	    e = eigen(vcov)
+	    vcov = tcrossprod(e$vectors %*% diag(pmax(e$values, 1e-8)), e$vectors)
+	    message("Variance contained negative values in the diagonal and was 'fixed' (a la Cameron, Gelbach & Miller 2011).")
 	}
 
 	sd.dict = c("standard" = "Standard", "hetero"="Heteroskedasticity-robust", "cluster"="Clustered", "twoway"="Two-way", "threeway"="Three-way", "fourway"="Four-way")
@@ -7015,6 +7146,157 @@ model.matrix.fixest = function(object, data, na.rm = TRUE, ...){
 #'
 terms.fixest = function(x, ...){
     terms(formula(x, type = "linear"))
+}
+
+
+
+#' Replicates fixest objects
+#'
+#' Simple function that replicates fixest objects while (optionally) computing different standard-errors. Useful mostly in combination with \code{\link[fixest]{etable}} or \code{\link[fixest]{coefplot}}.
+#'
+#' @param x Either a fixest object, either a list of fixest objects created with \code{.l()}.
+#' @param times Integer vector giving the number of repetitions of the vector of elements. By default \code{times = 1}. It must be either of length 1, either of the same length as the argument \code{x}.
+#' @param each Integer scalar indicating the repetition of each element. Default is 1.
+#' @param cluster A list containing the types of standard-error to be computed, default is missing. If not missing, it must be of the same length as \code{times}, \code{each}, or the final vector. Note that if the arguments \code{times} and \code{each} are missing, then \code{times} becomes equal to the length of \code{cluster}. (Note that \code{cluster} accepts the character values \code{"standard"} or \code{"hetero"} to compute non-clustered SEs.)
+#' @param ... In \code{.l()}: \code{fixest} objects. In \code{rep()}: not currently used.
+#'
+#' @details
+#' To apply \code{rep.fixest} on a list of fixest objects, it is absolutely necessary to use \code{.l()} and not \code{list()}.
+#'
+#' @return
+#' Returns a list of the appropriate length. Each element of the list is a fixest object.
+#'
+#' @examples
+#'
+#' # Let's show results with different standard-errors
+#'
+#' est = feols(Ozone ~ Solar.R + Wind + Temp, data = airquality)
+#'
+#' my_cluster = list("Month", "Day", ~ Day + Month)
+#'
+#' etable(rep(est, cluster = my_cluster))
+#'
+#' coefplot(rep(est, cluster = my_cluster), drop = "Int")
+#'
+#' #
+#' # To rep multiple objects, you need to use .l()
+#' #
+#'
+#' est_bis = feols(Ozone ~ Solar.R + Wind + Temp | Month, airquality)
+#'
+#' etable(rep(.l(est, est_bis), cluster = my_cluster))
+#'
+#' # using each
+#' etable(rep(.l(est, est_bis), each = 3, cluster = my_cluster))
+#'
+#'
+rep.fixest = function(x, times = 1, each = 1, cluster, ...){
+    # each is applied first, then times
+    # x can be either a list of fixest objects, either a fixest object
+
+    check_arg(x, "class(fixest, fixest_list) mbt")
+    check_arg(times, "integer scalar GE{1} | integer vector no na GE{0}")
+    check_arg(each, "integer scalar GE{1}")
+    check_arg(cluster, "class(list)")
+
+    validate_dots(suggest_args = c("times", "each"), stop = TRUE)
+
+    # Checking the arguments
+    IS_LIST = FALSE
+    if("fixest_list" %in% class(x)){
+        IS_LIST = TRUE
+        class(x) = "list"
+
+        n = length(x)
+
+    } else {
+        n = 1
+    }
+
+    IS_MULTI_CLUST = !missing(cluster)
+    if(IS_MULTI_CLUST){
+        n_clu = length(cluster)
+
+        if(times == 1 && each == 1){
+            times = n_clu
+        }
+    }
+
+    res_int = rep(1:n, times = times, each = each)
+    n_res = length(res_int)
+
+    if(IS_MULTI_CLUST){
+        # Checking and expanding
+
+        cluster_mapping = 1:n_res
+        if(times == 1){
+            if(n_clu != each && n_clu != n_res){
+                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", each, " or of length ", n_res, ".")
+            }
+
+            if(n_clu == each) cluster_mapping = rep(1:each, times = n)
+
+        } else if(each == 1){
+            if(n_clu != times && n_clu != n_res){
+                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", times, " or of length ", n_res, ".")
+            }
+
+            if(n_clu == times) cluster_mapping = rep(1:n_clu, each = n)
+
+        } else {
+            if(n_clu != n_res){
+                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", n_res, ".")
+            }
+        }
+
+        se_all = vector("list", n_clu)
+        for(m in 1:n_clu){
+            if(identical(cluster[[m]], "standard")){
+                se_all[[m]] = "standard"
+            } else if(identical(cluster[[m]], "hetero")){
+                se_all[[m]] = "hetero"
+            }
+        }
+
+    }
+
+    res = vector("list", length(res_int))
+
+    if(IS_MULTI_CLUST){
+        for(i in 1:n_res){
+            if(IS_LIST){
+                res[[i]] = summary(x[[res_int[i]]], se = se_all[[cluster_mapping[i]]], cluster = cluster[[cluster_mapping[i]]])
+            } else {
+                res[[i]] = summary(x, se = se_all[[cluster_mapping[i]]], cluster = cluster[[cluster_mapping[i]]])
+            }
+        }
+
+    } else {
+        for(i in unique(res_int)){
+            if(IS_LIST){
+                res[res_int == i] = x[[i]]
+            } else {
+                res[res_int == i] = list(x)
+            }
+        }
+    }
+
+    res
+}
+
+#' @rdname rep.fixest
+rep.fixest_list = function(x, times = 1, each = 1, cluster, ...){
+    rep.fixest(x, times = times, each = each, cluster = cluster, ...)
+}
+
+#' @rdname rep.fixest
+.l = function(...){
+
+    check_arg(..., "mbt class(fixest)")
+
+    res = list(...)
+    class(res) = "fixest_list"
+    res
 }
 
 #### ............... ####

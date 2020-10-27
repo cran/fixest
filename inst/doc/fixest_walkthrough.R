@@ -4,6 +4,9 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
+library(fixest)
+setFixest_nthreads(1)
+
 ## ----echo=TRUE----------------------------------------------------------------
 library(fixest)
 data(trade)

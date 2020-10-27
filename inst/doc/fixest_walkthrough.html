@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2020-10-24" />
+<meta name="date" content="2020-10-26" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -1518,7 +1518,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2020-10-24</h4>
+<h4 class="date">2020-10-26</h4>
 
 </div>
 
@@ -1764,7 +1764,7 @@ summary(gravity_simple, cluster = ~Origin+Destination)
 <td align="left">OLS</td>
 </tr>
 <tr class="even">
-<td align="left">S.E. type: Two-way</td>
+<td align="left">S.E. type: Clustered</td>
 <td align="left">by: Orig. &amp; Dest.</td>
 <td align="left">by: Orig. &amp; Dest.</td>
 <td align="left">by: Orig. &amp; Dest.</td>
@@ -1810,13 +1810,13 @@ for(i in 0:3){
 }</code></pre>
 <p>The previous code performs 4 estimations with an increasing number of fixed-effects and store their results into the list named <code>gravity_subfe</code>. To show the results of all 4 estimations, it’s easy:</p>
 <pre class="r"><code>etable(gravity_subfe, cluster = ~Origin+Destination)</code></pre>
-<table>
+<table style="width:100%;">
 <colgroup>
 <col width="21%"></col>
 <col width="18%"></col>
-<col width="20%"></col>
-<col width="20%"></col>
-<col width="20%"></col>
+<col width="19%"></col>
+<col width="19%"></col>
+<col width="19%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -1878,7 +1878,7 @@ for(i in 0:3){
 <td align="left">__________________</td>
 </tr>
 <tr class="even">
-<td align="left">S.E. type: Two-way</td>
+<td align="left">S.E. type: Clustered</td>
 <td align="left">by: Orig. &amp; Dest.</td>
 <td align="left">by: Orig. &amp; Dest.</td>
 <td align="left">by: Orig. &amp; Dest.</td>
@@ -2267,12 +2267,12 @@ base = data.frame(x, y, z)</code></pre>
 #&gt; Observations: 1,000 
 #&gt; Standard-errors: Standard 
 #&gt;   Estimate Std. Error z value  Pr(&gt;|z|)    
-#&gt; a   2.0239   0.011256  179.80 &lt; 2.2e-16 ***
-#&gt; b   3.0237   0.012528  241.35 &lt; 2.2e-16 ***
+#&gt; a   1.9989   0.011184  178.73 &lt; 2.2e-16 ***
+#&gt; b   3.0116   0.013060  230.60 &lt; 2.2e-16 ***
 #&gt; ---
 #&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-#&gt; Log-likelihood: -3,562.92   Adj. Pseudo-R2: 0.94098 
-#&gt;            BIC:  7,139.65     Squared Cor.: 0.99369</code></pre>
+#&gt; Log-likelihood: -3,556.82   Adj. Pseudo-R2: 0.93506 
+#&gt;            BIC:  7,127.45     Squared Cor.: 0.99283</code></pre>
 <p>We can see that we obtain coefficients close to the generating values.</p>
 <div id="adding-fixed-effects-to-non-linear-in-parameters-models" class="section level3">
 <h3><span class="header-section-number">2.5.1</span> Adding fixed-effects to non-linear in parameters models</h3>
@@ -2298,18 +2298,18 @@ result_NL_fe = feNmlm(z_bis~0|id, base, NL.fml = ~ log(2*x + b*y), NL.start = li
 # The coef should be around 3
 coef(result_NL_fe)
 #&gt;        b 
-#&gt; 2.995128
+#&gt; 2.975035
 # the gamma and the exponential of the fixed-effects should be similar
 rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
-#&gt;               1          2         3        4        5           6         7
-#&gt; gamma 0.2047578 0.06663797 0.6042268 3.091425 2.639743 0.002930298 0.8581211
-#&gt;       0.2120162 0.07475512 0.6210947 3.064627 2.615978 0.008079797 0.8700546
-#&gt;               8         9       10         11        12         13        14
-#&gt; gamma 0.7514043 0.3828140 3.554526 0.01860672 0.3892520 0.04906869 0.1285867
-#&gt;       0.7752298 0.3799936 3.554336 0.03357162 0.3916401 0.05089588 0.1363845
-#&gt;              15        16       17       18        19         20
-#&gt; gamma 0.5796769 0.1344186 1.573986 6.609405 0.3619319 0.02259633
-#&gt;       0.5980813 0.1386357 1.577066 6.616489 0.3718622 0.03311564</code></pre>
+#&gt;              1         2          3        4         5           6           7
+#&gt; gamma 1.017741 0.4426457 0.02994132 3.233363 0.8944920 0.005907603 0.009774859
+#&gt;       1.029722 0.4416873 0.03866418 3.255532 0.9043453 0.017437022 0.019488853
+#&gt;               8         9         10        11       12        13         14
+#&gt; gamma 0.9160180 0.4441121 0.01101281 0.6440943 1.350129 0.1901544 0.04547693
+#&gt;       0.9181751 0.4518397 0.01680742 0.6563649 1.369498 0.2041706 0.05809933
+#&gt;               15      16        17        18         19         20
+#&gt; gamma 0.01309697 1.65621 0.7077164 0.3957582 0.02125913 0.05370238
+#&gt;       0.01869468 1.69500 0.7206407 0.4079690 0.02948742 0.06352638</code></pre>
 <p>As we can see, we obtain the “right” estimates.</p>
 </div>
 </div>

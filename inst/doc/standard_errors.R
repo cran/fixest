@@ -9,6 +9,8 @@ library(sandwich)
 library(plm)
 library(lfe)
 
+setFixest_nthreads(1)
+
 ## -----------------------------------------------------------------------------
 library(fixest)
 data(trade)
