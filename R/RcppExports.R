@@ -61,8 +61,12 @@ update_deriv_single <- function(n_vars, nb_coef, r_ll_d2, r_jacob_vector, r_dum_
     .Call(`_fixest_update_deriv_single`, n_vars, nb_coef, r_ll_d2, r_jacob_vector, r_dum_vector)
 }
 
-cpp_demean <- function(y, X_raw, n_vars_X, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef = FALSE) {
-    .Call(`_fixest_cpp_demean`, y, X_raw, n_vars_X, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef)
+cpp_demean <- function(y, X_raw, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef = FALSE) {
+    .Call(`_fixest_cpp_demean`, y, X_raw, r_weights, iterMax, diffMax, r_nb_id_Q, fe_id_list, table_id_I, slope_flag_Q, slope_vars_list, r_init, nthreads, save_fixef)
+}
+
+cpp_which_na_inf <- function(x, nthreads) {
+    .Call(`_fixest_cpp_which_na_inf`, x, nthreads)
 }
 
 cpp_cholesky <- function(X, tol = 1.0/100000.0/100000.0, nthreads = 1L) {
@@ -79,6 +83,18 @@ cpppar_crossprod <- function(X, w, nthreads) {
 
 cpp_mat_reconstruct <- function(X, id_excl) {
     .Call(`_fixest_cpp_mat_reconstruct`, X, id_excl)
+}
+
+cpp_iv_products <- function(X, y, Z, u, w, nthreads) {
+    .Call(`_fixest_cpp_iv_products`, X, y, Z, u, w, nthreads)
+}
+
+cpp_iv_product_completion <- function(XtX, Xty, X, y, U, w, nthreads) {
+    .Call(`_fixest_cpp_iv_product_completion`, XtX, Xty, X, y, U, w, nthreads)
+}
+
+cpp_iv_resid <- function(resid_2nd, coef, resid_1st, is_int, nthreads) {
+    .Call(`_fixest_cpp_iv_resid`, resid_2nd, coef, resid_1st, is_int, nthreads)
 }
 
 cpp_lgamma <- function(x) {
@@ -109,12 +125,12 @@ cpp_get_fe_gnl <- function(Q, N, sumFE, dumMat, cluster_sizes, obsCluster) {
     .Call(`_fixest_cpp_get_fe_gnl`, Q, N, sumFE, dumMat, cluster_sizes, obsCluster)
 }
 
-cpp_ssr_null <- function(y) {
-    .Call(`_fixest_cpp_ssr_null`, y)
+cpp_ssr_null <- function(y, w = numeric(0)) {
+    .Call(`_fixest_cpp_ssr_null`, y, w)
 }
 
-cpp_ssq <- function(x) {
-    .Call(`_fixest_cpp_ssq`, x)
+cpp_ssq <- function(x, w = numeric(0)) {
+    .Call(`_fixest_cpp_ssq`, x, w)
 }
 
 cpp_isConstant <- function(x) {
@@ -237,15 +253,11 @@ cpppar_check_only_0 <- function(x_mat, nthreads) {
     .Call(`_fixest_cpppar_check_only_0`, x_mat, nthreads)
 }
 
-cpp_quf_str <- function(x) {
-    .Call(`_fixest_cpp_quf_str`, x)
-}
-
 cpp_quf_gnl <- function(x) {
     .Call(`_fixest_cpp_quf_gnl`, x)
 }
 
-cpppar_quf_table_sum <- function(x, y, do_sum_y, type, only_slope, nthreads) {
-    .Call(`_fixest_cpppar_quf_table_sum`, x, y, do_sum_y, type, only_slope, nthreads)
+cpppar_quf_table_sum <- function(x, y, do_sum_y, rm_0, rm_1, rm_single, only_slope, nthreads, do_refactor, r_x_sizes, obs2keep) {
+    .Call(`_fixest_cpppar_quf_table_sum`, x, y, do_sum_y, rm_0, rm_1, rm_single, only_slope, nthreads, do_refactor, r_x_sizes, obs2keep)
 }
 

@@ -13,6 +13,7 @@ etable(
   se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  stage = 2,
   .vcov,
   .vcov_args = NULL,
   digits = 4,
@@ -32,22 +33,25 @@ etable(
   signifCode,
   label,
   float,
-  subtitles,
+  subtitles = list("auto"),
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
-  yesNo = "Yes",
   keepFactors = TRUE,
   family,
   powerBelow = -5,
   interaction.combine = " $\\\\times $ ",
-  depvar,
-  style = list(),
+  depvar = TRUE,
+  style.tex = NULL,
+  style.df = NULL,
   notes = NULL,
   group = NULL,
   extraline = NULL,
-  tablefoot = TRUE,
   placement = "htbp",
-  drop.section = NULL
+  drop.section = NULL,
+  poly_dict = c("", " square", " cube"),
+  postprocess.tex = NULL,
+  postprocess.df = NULL,
+  fit_format = "__var__"
 )
 
 esttex(
@@ -55,6 +59,7 @@ esttex(
   se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  stage = 2,
   .vcov,
   .vcov_args = NULL,
   digits = 4,
@@ -73,21 +78,20 @@ esttex(
   convergence,
   signifCode = c(`***` = 0.01, `**` = 0.05, `*` = 0.1),
   label,
-  subtitles,
+  subtitles = list("auto"),
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
-  yesNo = "Yes",
   keepFactors = TRUE,
   family,
   powerBelow = -5,
   interaction.combine = " $\\\\times $ ",
-  style = list(),
+  style.tex = NULL,
   notes = NULL,
   group = NULL,
-  tablefoot = TRUE,
   extraline = NULL,
   placement = "htbp",
-  drop.section = NULL
+  drop.section = NULL,
+  poly_dict = c("", " square", " cube")
 )
 
 esttable(
@@ -95,11 +99,13 @@ esttable(
   se = c("standard", "hetero", "cluster", "twoway", "threeway", "fourway"),
   dof = getFixest_dof(),
   cluster,
+  stage = 2,
   .vcov,
   .vcov_args = NULL,
   coefstat = c("se", "tstat", "confint"),
   ci = 0.95,
   depvar,
+  style.df = NULL,
   keep,
   drop,
   dict,
@@ -108,11 +114,12 @@ esttable(
   fitstat,
   convergence,
   signifCode = c(`***` = 0.001, `**` = 0.01, `*` = 0.05, . = 0.1),
-  subtitles,
+  subtitles = list("auto"),
   keepFactors = FALSE,
   family,
   group = NULL,
-  extraline = NULL
+  extraline = NULL,
+  poly_dict = c("", " square", " cube")
 )
 
 setFixest_etable(
@@ -129,18 +136,20 @@ setFixest_etable(
   float,
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
-  yesNo = c("Yes", "No"),
   family,
   powerBelow = -5,
   interaction.combine = " $\\\\times $ ",
   depvar,
-  style = list(),
+  style.tex = NULL,
+  style.df = NULL,
   notes = NULL,
   group = NULL,
   extraline = NULL,
-  tablefoot = TRUE,
   placement = "htbp",
   drop.section = NULL,
+  postprocess.tex = NULL,
+  postprocess.df = NULL,
+  fit_format = "__var__",
   reset = FALSE
 )
 
@@ -153,7 +162,9 @@ getFixest_etable()
 
 \item{dof}{An object of class \code{dof.type} obtained with the function \code{\link[fixest]{dof}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{dof}} for this argument. The arguments and defaults of the function \code{\link[fixest]{dof}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "conventional"}, \code{t.df = "conventional"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{dof}} for details.}
 
-\item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster).}
+\item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster). You can interact two variables using \code{^} with the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"}.}
+
+\item{stage}{Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1} and there are multiple endogenous regressors or if \code{stage} is of length 2, then an object of class \code{fixest_multi} is returned.}
 
 \item{.vcov}{A function to be used to compute the standard-errors of each fixest object. You can pass extra arguments to this function using the argument \code{.vcov_args}. See the example.}
 
@@ -163,7 +174,7 @@ getFixest_etable()
 
 \item{tex}{Logical: whether the results should be a data.frame or a Latex table. By default, this argument is \code{TRUE} if the argument \code{file} (used for exportation) is not missing; it is equal to \code{FALSE} otherwise.}
 
-\item{fitstat}{A character vector or a one sided formula (both with only lowercase letters). A vector listing which fit statistics to display. The valid types are 'n', 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). Also accepts valid types from the function \code{\link[fixest]{fitstat}}. The default value depends on the models to display. Example of use: \code{fitstat=c('n', 'sq.cor', 'ar2', 'war2')}, or \code{fitstat=~n+sq.cor+ar2+war2} using a formula. You can use the dot to refer to default values:\code{ ~ . + ll} would add the log-likelihood to the default fit statistics.}
+\item{fitstat}{A character vector or a one sided formula (both with only lowercase letters). A vector listing which fit statistics to display. The valid types are 'n', 'll', 'aic', 'bic' and r2 types like 'r2', 'pr2', 'war2', etc (see all valid types in \code{\link[fixest]{r2}}). Also accepts valid types from the function \code{\link[fixest]{fitstat}}. The default value depends on the models to display. Example of use: \code{fitstat=c('n', 'cor2', 'ar2', 'war2')}, or \code{fitstat=~n+cor2+ar2+war2} using a formula. You can use the dot to refer to default values:\code{ ~ . + ll} would add the log-likelihood to the default fit statistics.}
 
 \item{title}{(Tex only.) Character scalar. The title of the Latex table.}
 
@@ -193,13 +204,11 @@ getFixest_etable()
 
 \item{float}{(Tex only.) Logical. By default, if the argument \code{title} or \code{label} is provided, it is set to \code{TRUE}. Otherwise, it is set to \code{FALSE}.}
 
-\item{subtitles}{Character vector of the same length as the number of models to be displayed. If provided, subtitles are added underneath the dependent variable name.}
+\item{subtitles}{Character vector or list. The elements should be of length 1 or of the same length as the number of models. If a list, the names of the list will be displayed on the leftmost column. By default it is equal to \code{list("auto")} which means that if the object is a split sample estimation, the sample will be automatically added as a sub-title.}
 
 \item{fixef_sizes}{(Tex only.) Logical, default is \code{FALSE}. If \code{TRUE} and fixed-effects were used in the models, then the number of "individuals" per fixed-effect dimension is also displayed.}
 
 \item{fixef_sizes.simplify}{Logical, default is \code{TRUE}. Only used if \code{fixef_sizes = TRUE}. If \code{TRUE}, the fixed-effects sizes will be displayed in parentheses instead of in a separate line if there is no ambiguity (i.e. if the size is constant across models).}
-
-\item{yesNo}{(Tex only.) A character vector of length 1 or 2. Default is \code{c("Yes", "No")}. This is the message displayed when a given fixed-effect is (or is not) included in a regression. If \code{yesNo} is of length 1, then the second element is the empty string.}
 
 \item{keepFactors}{Logical, default is \code{TRUE}. If \code{FALSE}, then factor variables are displayed as fixed-effects and no coefficient is shown.}
 
@@ -209,38 +218,48 @@ getFixest_etable()
 
 \item{interaction.combine}{(Tex only.) Character scalar, defaults to \code{" $\\times$ "}. When the estimation contains interactions, then the variables names (after aliasing) are combined with this argument. For example: if \code{dict = c(x1="Wind", x2="Rain")} and you have the following interaction \code{x1:x2}, then it will be renamed (by default) \code{Wind $\\times$ Rain} -- using \code{interaction.combine = "*"} would lead to \code{Wind*Rain}.}
 
-\item{depvar}{(Data frame only.) Logical, default is missing. Whether a first line containing the dependent variables should be shown. By default, the dependent variables are shown only if they differ across models or if the argumen \code{file} is not missing.}
+\item{depvar}{(Data frame only.) Logical, default is \code{TRUE}. Whether a first line containing the dependent variables should be shown.}
 
-\item{style}{A list. You can change the general style of the table with this argument. It should be of the form \code{style = list(keyword="key1:value1;key2:value2")} etc. The available keywords are \code{lines} (to manage the type of lines appearing in the table), and \code{depvar}, \code{model}, \code{var}, \code{fixef}, \code{slopes}, \code{fixef.sizes}, \code{stats} and \code{notes}. Most of these keywords accept the key \code{title:} which affects the title appearing just before the section. Eg to drop the \emph{Variables} header, just use \code{style=list("title:")}. Note that if you use \code{style=list("title: ")} (note the space after ":"), then an empty line will still be there. The keywords fixef, slopes and fixef.sizes also accept the keys \code{prefix} and \code{suffix}. E.g. if \code{style=list(fixef="suffix: FE")}, then there will be no header showing but the text " FE" will be appended to the ficed-effects variable names. The keys accepted in \code{lines} are \code{top}, \code{bottom}, \code{foot} and \code{sep}.}
+\item{style.tex}{An object created by the function \code{\link[fixest]{style.tex}}. It represents the style of the Latex table, see the documentation of \code{\link[fixest]{style.tex}}.}
+
+\item{style.df}{An object created by the function \code{\link[fixest]{style.df}. }It represents the style of the data frame returned (if \code{tex = FALSE}), see the documentation of \code{\link[fixest]{style.df}}.}
 
 \item{notes}{Character vector. If provided, a \code{"notes"} section will be added at the end right after the end of the table, containing the text of this argument. Note that if it is a vector, it will be collapsed with new lines.}
 
-\item{group}{A list. The list elements should be vectors of regular expressions. For each elements of this list: A new line in the table is created, all variables that are matched by the regular expressions are discarded (same effect as the argument \code{drop}) and \code{TRUE} or \code{FALSE} will appear in the model cell, depending on whether some of the previous variables were found in the model. Example: \code{group=list("Controls: personal traits"=c("gender", "height", "weight"))} will create an new line with \code{"Controls: personal traits"} in the leftmost cell, all three variables gender, height and weight are discared, TRUE appearing in each model containing at least one of the three variables (the style of TRUE/FALSE is governed by the argument \code{yesNo}). You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{group=list("{title:Controls; where:stats}Personal traits"=c("gender", "height", "weight"))} will add an extra line right before with "Control" written in it, and the group information will appear after the statistics. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}.}
+\item{group}{A list. The list elements should be vectors of regular expressions. For each elements of this list: A new line in the table is created, all variables that are matched by the regular expressions are discarded (same effect as the argument \code{drop}) and \code{TRUE} or \code{FALSE} will appear in the model cell, depending on whether some of the previous variables were found in the model. Example: \code{group=list("Controls: personal traits"=c("gender", "height", "weight"))} will create an new line with \code{"Controls: personal traits"} in the leftmost cell, all three variables gender, height and weight are discared, TRUE appearing in each model containing at least one of the three variables (the style of TRUE/FALSE is governed by the argument \code{yesNo}). You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{group=list("{title:Controls; where:stats}Personal traits"=c("gender", "height", "weight"))} will add an extra line right before with "Control" written in it, and the group information will appear after the statistics. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}. Starting the list name with an underscore is equivalent to adding \code{"{where:stats}"}: eg \code{list("_Controls"="x")} is equivalent to \code{list("{where:stats}Controls"="x")}.}
 
-\item{extraline}{A list. The list elements should be either a single logical or a vector of the same length as the number of models. For each elements of this list: A new line in the table is created, the list name being the row name and the vector being the content of the cells. Example: \code{extraline=list("Sub-sample"=c("<20 yo", "all", ">50 yo"))} will create an new line with \code{"Sub-sample"} in the leftmost cell, the vector filling the content of the cells for the three models. You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{group=list("{title:Sub-sample; where:stats}By age"=c("<20 yo", "all", ">50 yo"))} will add an extra line right before with "Sub-sample" written in it, and the extraline information will appear after the statistics section. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}.}
-
-\item{tablefoot}{Logical, default is \code{TRUE}. Whether to display the table footer containing the information on the way the standard-errors where computed and the meaning of the significance codes.}
+\item{extraline}{A list. The list elements should be either a single logical or a vector of the same length as the number of models. For each elements of this list: A new line in the table is created, the list name being the row name and the vector being the content of the cells. Example: \code{extraline=list("Sub-sample"=c("<20 yo", "all", ">50 yo"))} will create an new line with \code{"Sub-sample"} in the leftmost cell, the vector filling the content of the cells for the three models. You can control the style with the \code{title} and \code{where} keywords in curly brackets. For example \code{extraline=list("{title:Sub-sample; where:stats}By age"=c("<20 yo", "all", ">50 yo"))} will add an extra line right before with "Sub-sample" written in it, and the extraline information will appear after the statistics section. The keyword where can be equal to either \code{var} (default), \code{fixef} or \code{stats}. Starting the list name with an underscore is equivalent to adding \code{"{where:stats}"}: eg \code{list("_Controls"=TRUE)} is equivalent to \code{list("{where:stats}Controls"=TRUE)}.}
 
 \item{placement}{(Tex only.) Character string giving the position of the float in Latex. Default is "htbp". It must consist of only the characters 'h', 't', 'b', 'p', 'H' and '!'. Reminder: h: here; t: top; b: bottom; p: float page; H: definitely here; !: prevents Latex to look for other positions. Note that it can be equal to the empty string (and you'll get the default placement).}
 
 \item{drop.section}{(Tex only.) Character vector which can be of length 0 (i.e. equal to \code{NULL}). Can contain the values "fixef", "slopes" or "stats". It would drop, respectively, the fixed-effects section, the variables with varying slopes section or the fit statistics section.}
+
+\item{poly_dict}{Character vector, default is \code{c("", " square", " cube")}. When polynomials are used with the function \code{\link[stats]{poly}}, the variables are automatically renamed and \code{poly_dict} rules the display of the power. For powers greater than the number of elements of the vector, the value displayed is \code{$^{pow}$} in Latex and \code{^ pow} in the R console.}
+
+\item{postprocess.tex}{A function that will postprocess the character vector defining the latex table. Only when \code{tex = TRUE}. By default it is equal to \code{NULL}, meaning that there is no postprocessing. When \code{tex = FALSE}, see the argument \code{postprocess.df}. See details.}
+
+\item{postprocess.df}{A function that will postprocess.tex the resulting data.frame. Only when \code{tex = FALSE}. By default it is equal to \code{NULL}, meaning that there is no postprocessing. When \code{tex = TRUE}, see the argument \code{postprocess.tex}.}
+
+\item{fit_format}{Character scalar, default is \code{"__var__"}. Only used in the presence of IVs. By default the endogenous regressors are named \code{fit_varname} in the second stage. The format of the endogenous regressor to appear in the table is governed by \code{fit_format}. For instance, by default, the prefix \code{"fit_"} is removed, leading to only \code{varname} to appear. If \code{fit_format = "$\\\\hat{__var__}$"}, then \code{"$\\hat{varname}$"} will appear in the table.}
 
 \item{reset}{(\code{setFixest_etable} only.) Logical, default is \code{FALSE}. If \code{TRUE}, this will reset all the default values that were already set by the user in previous calls.}
 }
 \value{
 If \code{tex = TRUE}, the lines composing the Latex table are returned invisibly while the table is directly prompted on the console.
 
-If \code{tex = FALSE}, the data.frame is directly returned. If the argument \code{file} is not missing, the \code{data.frame} is returned invisibly.
+If \code{tex = FALSE}, the data.frame is directly returned. If the argument \code{file} is not missing, the \code{data.frame} is printed and returned invisibly.
 }
 \description{
 Aggregates the results of multiple estimations and displays them in the form of either a Latex table or a \code{data.frame}.
 }
 \details{
-The function \code{esttex} is equivalent to the function \code{etable} with argument \code{tex = TRUE}.
+The function \code{esttex} is equivalent to the function \code{etable} with argument \code{tex = TRUE}. This function is deprecated.
 
-The function \code{esttable} is equivalent to the function \code{etable} with argument \code{tex = FALSE}.
+The function \code{esttable} is equivalent to the function \code{etable} with argument \code{tex = FALSE}. This function is deprecated.
 
-You can permanently change the way your table looks in Latex by using \code{setFixest_etable}. The following vignette gives and example as well as illustrates how to use the argument \code{style}: \href{https://cran.r-project.org/package=fixest/vignettes/exporting_tables.html}{Exporting estimation tables}.
+You can permanently change the way your table looks in Latex by using \code{setFixest_etable}. The following vignette gives an example as well as illustrates how to use the \code{style} and postprocessing functions: \href{https://cran.r-project.org/package=fixest/vignettes/exporting_tables.html}{Exporting estimation tables}.
+
+When the argument \code{postprocessing.tex} is not missing, two additional tags will be included in the character vector returned by \code{etable}: \code{"\%start:tab\\n"} and \code{"\%end:tab\\n"}. These can be used to identify the start and end of the tabular and are useful to insert code within the \code{table} environment.
 }
 \section{Functions}{
 \itemize{
@@ -324,12 +343,17 @@ etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1, " D"=0.15, " F
 # You can modify many parameters with the argument style
 
 # To drop the headers before each section, use:
-style_noHeaders = list(var="", fixef="suffix: FE", stats = "")
-etable(est1, est2, dict = dict, tex = TRUE, style = style_noHeaders)
+# Note that a space adds an extra line
+style_noHeaders = style.tex(var.title = "", fixef.title = "", stats.title = " ")
+etable(est1, est2, dict = dict, tex = TRUE, style.tex = style_noHeaders)
 
-# To change the lines of the table
-style_lines = list(lines = "top:\\\\toprule;bottom:\\\\bottomrule;sep:\\\\midrule;foot:\\\\midrule")
-etable(est1, est2, dict = dict, tex = TRUE, style = style_lines)
+# To change the lines of the table + dropping the table footer
+style_lines = style.tex(line.top = "\\\\toprule", line.bottom = "\\\\bottomrule",
+                    tablefoot = FALSE)
+etable(est1, est2, dict = dict, tex = TRUE, style.tex = style_lines)
+
+# Or you have the predefined type "aer"
+etable(est1, est2, dict = dict, tex = TRUE, style.tex = style.tex("aer"))
 
 #
 # Group and extraline
@@ -341,12 +365,14 @@ etable(est1, est2, dict = dict, tex = TRUE, style = style_lines)
 setFixest_fml(..ctrl = ~ poly(Wind, 2) + poly(Temp, 2))
 est_c0 = feols(Ozone ~ Solar.R, data = aq)
 est_c1 = feols(Ozone ~ Solar.R + ..ctrl, data = aq)
-est_c2 = feols(Ozone ~ Solar.R + I(Solar.R**2) + ..ctrl, data = aq)
+est_c2 = feols(Ozone ~ Solar.R + Solar.R^2 + ..ctrl, data = aq)
 
-etable(est_c0, est_c1, est_c2, group = list(Controls = "poly"))
+etable(est_c0, est_c1, est_c2, group = list(Controls = "\%poly"))
 
-# 'group' here does the same as drop = "poly", but adds an extra line
+# 'group' here does the same as drop = "\%poly", but adds an extra line
 # with TRUE/FALSE where the variables were found
+# Note that the "\%" is needed because polnomials are automatically renamed
+#  so we need to make reference to the original name.
 
 # 'extraline' adds an extra line, where you can add the value for each model
 est_all  = feols(Ozone ~ Solar.R + Temp + Wind, data = aq)
@@ -361,8 +387,9 @@ etable(est_all, est_sub1, est_sub2, est_sub3,
 # Two keywords are allowed: 'title' and 'where'
 # 'title' adds a line just before with the content of 'title' in the leftmost cell
 # 'where' governs the location of the line. It can be equal to 'var', 'stats' or 'fixef'.
-# The syntax is: {title:Controls; where:stats}Group name.
-# Note that starting with curly braces is mandatory.
+# The syntax is: {"{title:Controls; where:stats}Group name"}
+# (the enclosing curly braces are only here to make Rd work, please ignore them)
+# You can use the shortcut "_Group name" which is equivalent to {"{where:stats}Group name"}
 
 # Examples
 etable(est_c0, est_c1, est_c2, tex = TRUE, group = list("{where:stats}Controls" = "poly"))

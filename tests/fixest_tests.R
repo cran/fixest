@@ -4,24 +4,23 @@
 # ~: package sniff tests
 #----------------------------------------------#
 
-# Not all functionnalities are currenlty covered, but I'll improve it over time
-# I should migrate and clean the code from _CHECK_PACKAGE.R
+# Not everything is currently covered, but I'll improve it over time
 
 # Some functions are not trivial to test properly though
 
-library(dreamerr) ; library(Formula) ; library(fixest)
+library(dreamerr) ; library(fixest)
 
+
+test = fixest:::test ; chunk = fixest:::chunk
+vcovClust = fixest:::vcovClust
 
 setFixest_notes(FALSE)
-
-test = fixest:::test
-vcovClust = fixest:::vcovClust
 
 ####
 #### Estimations ####
 ####
 
-cat("ESTIMATION\n\n")
+chunk("ESTIMATION")
 
 set.seed(0)
 
@@ -32,7 +31,7 @@ base$fe_3 = sample(15, 150, TRUE)
 base$constant = 5
 base$y_int = as.integer(base$y)
 base$w = as.vector(unclass(base$species) - 0.95)
-base$offset = unclass(base$species) - 0.95
+base$offset_value = unclass(base$species) - 0.95
 base$y_01 = 1 * ((scale(base$x1) + rnorm(150)) > 0)
 # what follows to avoid removal of fixed-effects (logit is pain in the neck)
 base$y_01[1:5 + rep(c(0, 50, 100), each = 5)] = 1
@@ -49,7 +48,7 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
 
         for(use_offset in c(FALSE, TRUE)){
             my_offset = NULL
-            if(use_offset) my_offset = base$offset
+            if(use_offset) my_offset = base$offset_value
 
             for(id_fe in 0:9){
 
@@ -57,7 +56,7 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
 
                 tol = switch(model, "negbin" = 1e-2, "logit" = 3e-5, 1e-5)
 
-                # Setting up the formula to accomodate FEs
+                # Setting up the formula to accommodate FEs
                 if(id_fe == 0){
                     fml_fixest = fml_stats = y ~ x1
                 } else if(id_fe == 1){
@@ -83,7 +82,7 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
                     fml_fixest = y ~ x1 | species[[x2]] + fe_2[[x3]]
                     fml_stats = y ~ x1 + x2:species + x3:factor(fe_2)
                 } else if(id_fe == 7){
-                    # Combnined clusters
+                    # Combined clusters
                     fml_fixest = y ~ x1 + x2 | species^fe_2
                     fml_stats = y ~ x1 + x2 + paste(species, fe_2)
                 } else if(id_fe == 8){
@@ -96,19 +95,19 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
 
                 # ad hoc modifications of the formula
                 if(model == "logit"){
-                    fml_fixest = update(Formula(fml_fixest), y_01 ~.)
-                    fml_stats = update(fml_stats, y_01 ~.)
+                    fml_fixest = xpd(y_01 ~ ..rhs, ..rhs = fml_fixest[[3]])
+                    fml_stats = xpd(y_01 ~ ..rhs, ..rhs = fml_stats[[3]])
 
                     # The estimations are OK, conv differences out of my control
                     if(id_fe %in% 8:9) tol = 0.5
 
                 } else if(model == "pois"){
-                    fml_fixest = update(Formula(fml_fixest), y_int_null ~.)
-                    fml_stats = update(fml_stats, y_int_null ~.)
+                    fml_fixest = xpd(y_int_null ~ ..rhs, ..rhs = fml_fixest[[3]])
+                    fml_stats = xpd(y_int_null ~ ..rhs, ..rhs = fml_stats[[3]])
 
                 } else if(model %in% c("negbin", "Gamma")){
-                    fml_fixest = update(Formula(fml_fixest), y_int ~.)
-                    fml_stats = update(fml_stats, y_int ~.)
+                    fml_fixest = xpd(y_int ~ ..rhs, ..rhs = fml_fixest[[3]])
+                    fml_stats = xpd(y_int ~ ..rhs, ..rhs = fml_stats[[3]])
                 }
 
                 adj = 1
@@ -123,11 +122,17 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
                     my_family = switch(model, pois = poisson(), logit = binomial(), Gamma = Gamma())
 
                     res = feglm(fml_fixest, base, family = my_family, weights = my_weight, offset = my_offset)
+
                     if(!is.null(res$obsRemoved)){
                         qui = -res$obsRemoved
-                        res_bis = glm(fml_stats, base[qui, ], family = my_family, weights = my_weight[qui], offset = my_offset[qui])
+
+                        # I MUST do that.... => subset does not work...
+                        base_tmp = base[qui, ]
+                        base_tmp$my_offset = my_offset[qui]
+                        base_tmp$my_weight = my_weight[qui]
+                        res_bis = glm(fml_stats, base_tmp, family = my_family, weights = my_weight, offset = my_offset)
                     } else {
-                        res_bis = glm(fml_stats, base, family = my_family, weights = my_weight, offset = my_offset)
+                        res_bis = glm(fml_stats, data = base, family = my_family, weights = my_weight, offset = my_offset)
                     }
 
                 } else if(model == "negbin"){
@@ -152,10 +157,64 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
 }
 
 ####
+#### Corner cases ####
+####
+
+chunk("Corner cases")
+
+
+# We test the absence of bugs
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "fe1")
+base$fe2 = rep(1:5, 30)
+base$y[1:5] = NA
+base$x1[4:8] = NA
+base$x2[4:21] = NA
+base$x3[110:111] = NA
+base$fe1[110:118] = NA
+base$fe2[base$fe2 == 1] = 0
+base$fe3 = sample(letters[1:5], 150, TRUE)
+base$period = rep(1:50, 3)
+
+res = feols(y ~ 1 | csw(fe1, fe1^fe2), base)
+
+res = feols(y ~ 1 + csw(x1, i(fe1)) | fe2, base)
+
+res = feols(y ~ csw(f(x1, 1:2), x2) | sw0(fe2, fe2^fe3), base, panel.id = ~ fe1 + period)
+
+
+res = feols(c(y, x1) ~ 1 | fe1 | x2 ~ x3, base)
+
+####
+#### Fit methods ####
+####
+
+chunk("Fit methods")
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+base$y_int = as.integer(base$y)
+base$y_log = sample(c(TRUE, FALSE), 150, TRUE)
+
+res = feglm.fit(base$y, base[, 2:4])
+res_bis = feglm(y ~ -1 + x1 + x2 + x3, base)
+test(coef(res), coef(res_bis))
+
+res = feglm.fit(base$y_int, base[, 2:4])
+res_bis = feglm(y_int ~ -1 + x1 + x2 + x3, base)
+test(coef(res), coef(res_bis))
+
+res = feglm.fit(base$y_log, base[, 2:4])
+res_bis = feglm(y_log ~ -1 + x1 + x2 + x3, base)
+test(coef(res), coef(res_bis))
+
+
+####
 #### Standard-errors ####
 ####
 
-cat("STANDARD ERRORS\n\n")
+chunk("STANDARD ERRORS")
 
 #
 # Fixed-effects corrections
@@ -437,7 +496,7 @@ test(se(est_pois, se = "fourway", cluster = ~Origin+Destination+Product), "err")
 #### Residuals ####
 ####
 
-cat("RESIDUALS\n\n")
+chunk("RESIDUALS")
 
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
@@ -492,7 +551,7 @@ cat("\n")
 #### fixef ####
 ####
 
-cat("FIXEF\n\n")
+chunk("FIXEF")
 
 set.seed(0)
 base = iris
@@ -606,7 +665,7 @@ test(c4, m_fe[["fe_bis[[x3]]"]][names(c4)], "~", tol = 2e-4)
 #### To Integer ####
 ####
 
-cat("TO_INTEGER\n\n")
+chunk("TO_INTEGER")
 
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
@@ -684,6 +743,9 @@ cat("\n")
 #### Interact ####
 ####
 
+
+chunk("Interact")
+
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
 base$fe_2 = round(rnorm(150))
@@ -713,7 +775,7 @@ test(ncol(d), 2)
 #### demean ####
 ####
 
-cat("DEMEAN\n\n")
+chunk("DEMEAN")
 
 data(trade)
 
@@ -724,30 +786,52 @@ base$ln_dist = log(base$dist_km)
 X = base[, c("ln_euros", "ln_dist")]
 fe = base[, c("Origin", "Destination")]
 
-X_demean = demean(X, fe)
-base_new = as.data.frame(X_demean)
+base_new = demean(X, fe)
 
 a = feols(ln_euros ~ ln_dist, base_new)
 b = feols(ln_euros ~ ln_dist | Origin + Destination, base, demeaned = TRUE)
 
 test(coef(a)[-1], coef(b), "~", 1e-12)
 
-test(X_demean[, 1], b$y_demeaned)
-test(X_demean[, -1], b$X_demeaned)
+test(base_new$ln_euros, b$y_demeaned)
+test(base_new$ln_dist, b$X_demeaned)
+
+# Now we just check there's no error
 
 # NAs
 X_NA = X
-fe_NA =fe
-X_NA[sample(nrow(X_NA), 50), 1] = NA
-fe_NA[sample(nrow(fe_NA), 50), 1] = NA
-X_demean = demean(X_NA, fe_NA)
+fe_NA = fe
+X_NA[1:5, 1] = NA
+fe_NA[6:10, 1] = NA
+X_demean = demean(X_NA, fe_NA, na.rm = FALSE)
+test(nrow(X_demean), nrow(X))
 
+# integer
+X_int = X
+X_int[[1]] = as.integer(X_int[[1]])
+X_demean = demean(X_int, fe)
+
+# matrix/DF
+X_demean = demean(X_int, fe, as.matrix = TRUE)
+test(is.matrix(X_demean), TRUE)
+
+X_demean = demean(as.matrix(X_int), fe, as.matrix = FALSE)
+test(!is.matrix(X_demean), TRUE)
+
+# fml
+X_demean = demean(ln_dist ~ Origin + Destination, data = base)
+
+# slopes
+X_dm_slopes = demean(ln_dist ~ Origin + Destination[ln_euros], data = base)
+X_dm_slopes_bis = demean(base$ln_dist, fe, slope.vars = base$ln_euros, slope.flag = c(0, 1))
+
+test(X_dm_slopes[[1]], X_dm_slopes_bis)
 
 ####
 #### fixef ####
 ####
 
-cat("FIXEF\n\n")
+chunk("FIXEF")
 
 data(trade)
 
@@ -801,7 +885,7 @@ test(sd(fe_fixest_origin[names(fe_lm_origin)] - fe_lm_origin), 0, "~")
 ####
 
 
-cat("HATVALUES\n\n")
+chunk("HATVALUES")
 
 set.seed(0)
 x = sin(1:10)
@@ -822,7 +906,7 @@ test(hatvalues(fgm), hatvalues(gm))
 #### sandwich ####
 ####
 
-cat("SANDWICH\n\n")
+chunk("SANDWICH")
 
 # Compatibility with sandwich
 
@@ -855,7 +939,7 @@ test(vcov(est_pois, cluster = ~id, dof = dof(adj = FALSE)), vcovCL(est_pois, clu
 
 # We check that there's no problem when using the environment
 
-cat("ONLY ENV\n\n")
+chunk("ONLY ENV")
 
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
@@ -884,7 +968,7 @@ feNmlm(env = env)
 #### Non linear tests ####
 ####
 
-cat("NON LINEAR\n\n")
+chunk("NON LINEAR")
 
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
@@ -914,7 +998,7 @@ test(coef(est_nl), coef(est_lin)[c(3, 4, 1, 2)], "~")
 # 1) check no error in wide variety of situations
 # 2) check consistency
 
-cat("LAGGING\n\n")
+chunk("LAGGING")
 
 data(base_did)
 base = base_did
@@ -924,8 +1008,8 @@ n = nrow(base)
 set.seed(0)
 base$y_na = base$y ; base$y_na[sample(n, 50)] = NA
 base$period_txt = letters[base$period]
-ten_dates = c("1jan1960", "2jan1960", "31mar1960", "5apr1960", "12may1960", "25may1960", "20jun1960", "30jul1960", "2jan1965", "5dec2002")
-base$period_date = as.Date(ten_dates, "%d%b%Y")[base$period]
+ten_dates = c("1960-01-15", "1960-01-16", "1960-03-31", "1960-04-05", "1960-05-12", "1960-05-25", "1960-06-20", "1960-07-30", "1965-01-02", "2002-12-05")
+base$period_date = as.Date(ten_dates, "%Y-%m-%d")[base$period]
 base$y_0 = base$y**2 ; base$y_0[base$id == 1] = 0
 
 # We compute the lags "by hand"
@@ -1007,42 +1091,273 @@ for(depvar in c("y", "y_na", "y_0")){
     }
 }
 
-cat("done.\n")
+cat("done.\n\n")
 
 
 
 
+####
+#### predict ####
+####
+
+chunk("PREDICT")
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+base$fe_bis = sample(letters, 150, TRUE)
+
+#
+# Same generative data
+#
+
+# Predict with fixed-effects
+res = feols(y ~ x1 | species + fe_bis, base)
+test(predict(res), predict(res, base))
+
+res = fepois(y ~ x1 | species + fe_bis, base)
+test(predict(res), predict(res, base))
+
+res = femlm(y ~ x1 | species + fe_bis, base)
+test(predict(res), predict(res, base))
+
+
+# Predict with varying slopes -- That's normal that precision is high (because FEs are computed with low precision)
+res = feols(y ~ x1 | species + fe_bis[x3], base)
+test(predict(res), predict(res, base), "~", tol = 1e-4)
+
+res = fepois(y ~ x1 | species + fe_bis[x3], base)
+test(predict(res), predict(res, base), "~", tol = 1e-3)
+
+
+# Prediction with factors
+res = feols(y ~ x1 + i(species), base)
+test(predict(res), predict(res, base))
+
+res = feols(y ~ x1 + i(species) + i(fe_bis), base)
+test(predict(res), predict(res, base))
+
+quoi = head(base[, c("y", "x1", "species", "fe_bis")])
+test(head(predict(res)), predict(res, quoi))
+
+quoi$species = as.character(quoi$species)
+quoi$species[1:3] = "zz"
+test(head(predict(res)), predict(res, quoi))
+
+# prediction with lags
+data(base_did)
+res = feols(y ~ x1 + l(x1), base_did, panel.id = ~ id + period)
+test(predict(res, na.rm = FALSE), predict(res, base_did))
+
+qui = sample(which(base_did$id %in% 1:5))
+base_bis = base_did[qui, ]
+test(predict(res, na.rm = FALSE)[qui], predict(res, base_bis))
 
 
 
 
+####
+#### subset ####
+####
+
+chunk("SUBSET")
+
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+base$fe_bis = sample(letters, 150, TRUE)
+base$x4 = rnorm(150)
+base$x1[sample(150, 5)] = NA
+
+# Errors
+test(feols(fml, base, subset = ~species), "err")
+test(feols(fml, base, subset = -1:15), "err")
+test(feols(fml, base, subset = integer(0)), "err")
+test(feols(fml, base, subset = c(TRUE, TRUE, FALSE)), "err")
+
+# Valid use
+for(id_fun in 1:6){
+    estfun = switch(as.character(id_fun),
+                    "1" = feols,
+                    "2" = feglm,
+                    "3" = fepois,
+                    "4" = femlm,
+                    "5" = fenegbin,
+                    "6" = feNmlm)
+
+    for(id_fe in 1:5){
+
+        cat(".")
+
+        fml = switch(as.character(id_fe),
+                     "1" = y ~ x1 + x2,
+                     "2" = y ~ x1 + x2 | species,
+                     "3" = y ~ x1 + x2 | fe_bis,
+                     "4" = y ~ x1 + x2 + i(fe_bis),
+                     "5" = y ~ x1 + x2 | fe_bis[x3])
+
+        if(id_fe == 5 && id_fun %in% 4:6) next
+
+        if(id_fun == 6){
+            res_sub_a = estfun(fml, base, subset = ~species == "setosa", NL.fml = ~ a*x4, NL.start = 0)
+            res_sub_b = estfun(fml, base, subset = base$species == "setosa", NL.fml = ~ a*x4, NL.start = 0)
+            res_sub_c = estfun(fml, base, subset = which(base$species == "setosa"), NL.fml = ~ a*x4, NL.start = 0)
+            res       = estfun(fml, base[base$species == "setosa", ], NL.fml = ~ a*x4, NL.start = 0)
+        } else {
+            res_sub_a = estfun(fml, base, subset = ~species == "setosa")
+            res_sub_b = estfun(fml, base, subset = base$species == "setosa")
+            res_sub_c = estfun(fml, base, subset = which(base$species == "setosa"))
+            res       = estfun(fml, base[base$species == "setosa", ])
+        }
+
+        test(coef(res_sub_a), coef(res))
+        test(coef(res_sub_b), coef(res))
+        test(coef(res_sub_c), coef(res))
+        test(se(res_sub_c, cluster = "fe_bis"), se(res, cluster = "fe_bis"))
+    }
+    cat("|")
+}
+cat("\n")
 
 
 
+####
+#### Multiple estimations ####
+####
+
+chunk("Multiple")
+
+base = iris
+names(base) = c("y1", "x1", "x2", "x3", "species")
+base$y2 = 10 + rnorm(150) + 0.5 * base$x1
+base$x4 = rnorm(150) + 0.5 * base$y1
+base$fe2 = rep(letters[1:15], 10)
+base$fe2[50:51] = NA
+base$y2[base$fe2 == "a" & !is.na(base$fe2)] = 0
+base$x2[1:5] = NA
+base$x3[6] = NA
+base$fe3 = rep(letters[1:10], 15)
 
 
+for(id_fun in 1:5){
+    estfun = switch(as.character(id_fun),
+                    "1" = feols,
+                    "2" = feglm,
+                    "3" = fepois,
+                    "4" = femlm,
+                    "5" = feNmlm)
 
 
+    est_multi = estfun(c(y1, y2) ~ x1 + sw(x2, x3), base, split = ~species)
+
+    k = 1
+    for(s in c("setosa", "versicolor", "virginica")){
+        for(lhs in c("y1", "y2")){
+            for(rhs in c("x2", "x3")){
+                res = estfun(xpd(..lhs ~ x1 + ..rhs, ..lhs = lhs, ..rhs = rhs), base[base$species == s, ], notes = FALSE)
+
+                test(coef(est_multi[[k]]), coef(res))
+                test(se(est_multi[[k]], cluster = "fe3"), se(res, cluster = "fe3"))
+                k = k + 1
+            }
+        }
+    }
+
+    cat("__")
+
+    est_multi = estfun(c(y1, y2) ~ x1 + csw0(x2, x3) + x4 | species + fe2, base, fsplit = ~species)
+    k = 1
+    all_rhs = c("", "x2", "x3")
+    for(s in c("all", "setosa", "versicolor", "virginica")){
+        for(lhs in c("y1", "y2")){
+            for(n_rhs in 1:3){
+                if(s == "all"){
+                    res = estfun(xpd(..lhs ~ x1 + ..rhs + x4 | species + fe2, ..lhs = lhs, ..rhs = all_rhs[1:n_rhs]), base, notes = FALSE)
+                } else {
+                    res = estfun(xpd(..lhs ~ x1 + ..rhs + x4 | species + fe2, ..lhs = lhs, ..rhs = all_rhs[1:n_rhs]), base[base$species == s, ], notes = FALSE)
+                }
+
+                vname = names(coef(res))
+                test(coef(est_multi[[k]])[vname], coef(res), "~" , 1e-6)
+                test(se(est_multi[[k]], cluster = "fe3")[vname], se(res, cluster = "fe3"), "~" , 1e-6)
+                k = k + 1
+            }
+        }
+    }
+
+    cat("|")
+}
+cat("\n")
 
 
+####
+#### IV ####
+####
+
+chunk("IV")
+
+base = iris
+names(base) = c("y", "x1", "x_endo_1", "x_inst_1", "fe")
+set.seed(2)
+base$x_inst_2 = 0.2 * base$y + 0.2 * base$x_endo_1 + rnorm(150, sd = 0.5)
+base$x_endo_2 = 0.2 * base$y - 0.2 * base$x_inst_1 + rnorm(150, sd = 0.5)
+
+# Checking a basic estimation
+
+setFixest_se(all = "standard")
+
+est_iv = feols(y ~ x1 | x_endo_1 + x_endo_2 ~ x_inst_1 + x_inst_2, base)
+
+res_f1 = feols(x_endo_1 ~ x1 + x_inst_1 + x_inst_2, base)
+res_f2 = feols(x_endo_2 ~ x1 + x_inst_1 + x_inst_2, base)
+
+base$fit_x_endo_1 = predict(res_f1)
+base$fit_x_endo_2 = predict(res_f2)
+
+res_2nd = feols(y ~ fit_x_endo_1 + fit_x_endo_2 + x1, base)
+
+# the coef
+test(coef(est_iv), coef(res_2nd))
+
+# the SE
+resid_iv = base$y - predict(res_2nd, data.frame(x1 = base$x1, fit_x_endo_1 = base$x_endo_1, fit_x_endo_2 = base$x_endo_2))
+sigma2_iv = sum(resid_iv**2) / (res_2nd$nobs - res_2nd$nparams)
+
+sum_2nd = summary(res_2nd, .vcov = res_2nd$cov.unscaled / res_2nd$sigma2 * sigma2_iv)
+
+test(se(sum_2nd), se(est_iv))
+
+# check no bug
+etable(summary(est_iv, stage = 1:2))
 
 
+####
+#### model.matrix ####
+####
 
+chunk("Model matrix")
 
+base = iris
+names(base) = c("y1", "x1", "x2", "x3", "species")
+base$y2 = 10 + rnorm(150) + 0.5 * base$x1
+base$x4 = rnorm(150) + 0.5 * base$y1
+base$fe2 = rep(letters[1:15], 10)
+base$fe2[50:51] = NA
+base$y2[base$fe2 == "a" & !is.na(base$fe2)] = 0
+base$x2[1:5] = NA
+base$x3[6] = NA
+base$fe3 = rep(letters[1:10], 15)
 
+res = feols(y1 ~ x1 + x2 + x3, base)
+m1 = model.matrix(res, type = "lhs")
+test(nrow(m1), res$nobs)
 
+m1_na = model.matrix(res, type = "lhs", na.rm = FALSE)
+test(nrow(m1_na), res$nobs_origin)
+test(max(abs(m1_na - base$y1), na.rm = TRUE), 0)
 
-
-
-
-
-
-
-
-
-
-
-
-
+y = model.matrix(res, type = "lhs", data = base, na.rm = FALSE)
+X = model.matrix(res, type = "rhs", data = base, na.rm = FALSE)
+res_bis = lm.fit(X[-res$obsRemoved, ], y[-res$obsRemoved,])
+test(res_bis$coefficients, res$coefficients)
 
 

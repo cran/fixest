@@ -4,12 +4,12 @@
 \alias{formula.fixest}
 \title{Extract the formula of a \code{fixest} fit}
 \usage{
-\method{formula}{fixest}(x, type = c("full", "linear", "NL"), ...)
+\method{formula}{fixest}(x, type = c("full", "linear", "iv", "NL"), ...)
 }
 \arguments{
 \item{x}{An object of class \code{fixest}. Typically the result of a \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}} estimation.}
 
-\item{type}{A character scalar. Default is \code{type = "full"} which gives back a formula containing the linear part of the model along with the fixed-effects (if any) and the non-linear in parameters part (if any). If \code{type = "linear"} then only the linear formula is returned. If \code{type = "NL"} then only the non linear in parameters part is returned.}
+\item{type}{A character scalar. Default is \code{type = "full"} which gives back a formula containing the linear part of the model along with the fixed-effects (if any) and the IV part (if any). If \code{type = "linear"} then only the linear formula is returned. If \code{type = "NL"} then only the non linear in parameters part is returned.}
 
 \item{...}{Not currently used.}
 }

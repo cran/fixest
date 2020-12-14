@@ -5,9 +5,10 @@ knitr::opts_chunk$set(echo = TRUE,
 Sys.setenv(lang = "en")
 
 library(fixest)
-library(sandwich)
-library(plm)
-library(lfe)
+
+if(requireNamespace("plm", quietly = TRUE)) library(plm)
+
+if(requireNamespace("sandwich", quietly = TRUE)) library(sandwich)
 
 setFixest_nthreads(1)
 
@@ -29,6 +30,14 @@ base = data.frame(y = rnorm(N), x = rnorm(N), id = rep(1:n_id, n_time),
                   time = rep(1:n_time, each = n_id))
 
 
+## ---- echo = FALSE------------------------------------------------------------
+if(!requireNamespace("sandwich", quietly = TRUE)){
+    knitr::opts_chunk$set(eval = FALSE)
+    cat("Evaluation of the next chunks requires 'sandwich', which is not present.")
+} else {
+    knitr::opts_chunk$set(eval = TRUE)
+}
+
 ## -----------------------------------------------------------------------------
 library(sandwich)
 
@@ -48,6 +57,8 @@ rbind(se_lm_hc, se_feols_hc)
 if(!requireNamespace("plm", quietly = TRUE)){
     knitr::opts_chunk$set(eval = FALSE)
     cat("Evaluation of the next chunks requires 'plm', which is not present.")
+} else {
+    knitr::opts_chunk$set(eval = TRUE)
 }
 
 ## -----------------------------------------------------------------------------
@@ -88,45 +99,54 @@ rbind(se_lm_id, se_feols_id_lm)
 se_feols_id_plm = se(est_feols, dof = dof(fixef.K = "none", cluster.adj = FALSE))
 rbind(se_plm_id, se_feols_id_plm)
 
-## ---- echo = FALSE------------------------------------------------------------
-if(!requireNamespace("lfe", quietly = TRUE)){
-    knitr::opts_chunk$set(eval = FALSE)
-    cat("Evaluation of the next chunk requires 'lfe', which is not present.")
-} else {
-    knitr::opts_chunk$set(eval = TRUE)
-}
-
-## -----------------------------------------------------------------------------
-library(lfe)
-
-# lfe: clustered by id
-est_lfe = felm(y ~ x | id + time | 0 | id, base)
-se_lfe_id = se(est_lfe)
-
-# The two are different, and it cannot be directly replicated by feols
-rbind(se_lfe_id, se_feols_id)
-
-# You have to provide a custom VCOV to replicate lfe's VCOV
-my_vcov = vcov(est_feols, dof = dof(adj = FALSE))
-se(est_feols, .vcov = my_vcov * 19/18) # Note that there are 20 observations
-
-# Differently from feols, the SEs in lfe are different if time is not a FE:
-# => now SEs are identical. (The warning is from lfe.)
-rbind(se(felm(y ~ x + factor(time) | id | 0 | id, base))["x"],
-      se(feols(y ~ x + factor(time) | id, base))["x"])
-
-# Now with two-way clustered standard-errors
-est_lfe_2way = felm(y ~ x | id + time | 0 | id + time, base)
-se_lfe_2way  = se(est_lfe_2way)
-se_feols_2way = se(est_feols, se = "twoway")
-rbind(se_lfe_2way, se_feols_2way)
-
-# To obtain the same SEs, use cluster.df = "conventional"
-sum_feols_2way_conv = summary(est_feols, se = "twoway", dof = dof(cluster.df = "conv"))
-rbind(se_lfe_2way, se(sum_feols_2way_conv))
-
-# We also obtain the same p-values
-rbind(pvalue(est_lfe_2way), pvalue(sum_feols_2way_conv))
+## ---- eval = FALSE------------------------------------------------------------
+#  library(lfe)
+#  
+#  # lfe: clustered by id
+#  est_lfe = felm(y ~ x | id + time | 0 | id, base)
+#  se_lfe_id = se(est_lfe)
+#  
+#  # The two are different, and it cannot be directly replicated by feols
+#  rbind(se_lfe_id, se_feols_id)
+#  #>                     x
+#  #> se_lfe_id   0.1458559
+#  #> se_feols_id 0.1653850
+#  
+#  # You have to provide a custom VCOV to replicate lfe's VCOV
+#  my_vcov = vcov(est_feols, dof = dof(adj = FALSE))
+#  se(est_feols, .vcov = my_vcov * 19/18) # Note that there are 20 observations
+#  #>         x
+#  #> 0.1458559
+#  
+#  # Differently from feols, the SEs in lfe are different if time is not a FE:
+#  # => now SEs are identical.
+#  rbind(se(felm(y ~ x + factor(time) | id | 0 | id, base))["x"],
+#        se(feols(y ~ x + factor(time) | id, base))["x"])
+#  #>             x
+#  #> [1,] 0.165385
+#  #> [2,] 0.165385
+#  
+#  # Now with two-way clustered standard-errors
+#  est_lfe_2way = felm(y ~ x | id + time | 0 | id + time, base)
+#  se_lfe_2way  = se(est_lfe_2way)
+#  se_feols_2way = se(est_feols, se = "twoway")
+#  rbind(se_lfe_2way, se_feols_2way)
+#  #>                       x
+#  #> se_lfe_2way   0.3268584
+#  #> se_feols_2way 0.3080378
+#  
+#  # To obtain the same SEs, use cluster.df = "conventional"
+#  sum_feols_2way_conv = summary(est_feols, se = "twoway", dof = dof(cluster.df = "conv"))
+#  rbind(se_lfe_2way, se(sum_feols_2way_conv))
+#  #>                     x
+#  #> se_lfe_2way 0.3268584
+#  #>             0.3268584
+#  
+#  # We also obtain the same p-values
+#  rbind(pvalue(est_lfe_2way), pvalue(sum_feols_2way_conv))
+#  #>              x
+#  #> [1,] 0.3347851
+#  #> [2,] 0.3347851
 
 ## -----------------------------------------------------------------------------
 setFixest_dof(dof(adj = FALSE))

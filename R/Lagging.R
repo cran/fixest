@@ -49,15 +49,15 @@ panel_setup = function(data, panel.id, time.step = NULL, duplicate.method = "non
             pblm = setdiff(all_vars, ls(parent.frame(2)))
             stop_up("In the argument 'panel.id', the variable", enumerate_items(pblm, "s.is.past.quote"), " not found in the environment.")
         }
-        id = eval(parse(text = var_id_time[1]), parent.frame(2))
-        time = eval(parse(text = var_id_time[2]), parent.frame(2))
+        id = eval(str2lang(var_id_time[1]), parent.frame(2))
+        time = eval(str2lang(var_id_time[2]), parent.frame(2))
     } else {
         if(!all(all_vars %in% names(data))){
             pblm = setdiff(all_vars, names(data))
             stop_up("In the argument 'panel.id', the variable", enumerate_items(pblm, "s.is.quote"), " not in the data set.")
         }
-        id = eval(parse(text = var_id_time[1]), data)
-        time = eval(parse(text = var_id_time[2]), data)
+        id = eval(str2lang(var_id_time[1]), data)
+        time = eval(str2lang(var_id_time[2]), data)
     }
 
     panel.id = as.formula(paste0("~", var_id_time[1], "+", var_id_time[2]))
@@ -328,7 +328,7 @@ l = function(x, lag = 1, fill = NA){
             }
 
             var = gsub("^[^\\(]+\\(|,.+", "", sys_calls[qui])
-            m = eval(parse(text = var), envir = sys.frames()[qui])
+            m = eval(str2lang(var), envir = sys.frames()[qui])
 
             if(!"fixest_panel" %in% class(m)){
                 stop("You can use l() or f() only when the data set is of class 'fixest_panel', you can use function panel() to set it.")
@@ -897,7 +897,7 @@ unpanel = function(x){
             # data.table is quite a pain in the neck to handle...
 
             data.table::set(x_dt, j = "x__ID__x", value = 1:nrow(x_dt))
-            select = eval(parse(text = paste0("x_dt[", deparse_long(mc_new$i), "]")))$x__ID__x
+            select = eval(str2lang(paste0("x_dt[", deparse_long(mc_new$i), "]")))$x__ID__x
 
         } else {
             select = i
@@ -967,11 +967,11 @@ terms_hat = function(fml, fastCombine = TRUE){
 
 check_lag = function(fml){
     fml_txt = deparse_long(fml)
-    grepl("((^)|[^\\._[:alnum:]])(l|f|d)\\(", fml_txt)
+    grepl("(^|[^\\._[:alnum:]])(l|f|d)\\(", fml_txt)
 }
 
 
-reformulate_terms = function(x){
+expand_lags_internal = function(x){
     # x: a vector of terms: x = attr(terms(fml), "term.labels")
 
     res = x
@@ -1001,6 +1001,8 @@ reformulate_terms = function(x){
                 terms_split_bis = strsplit(term_all_expand[k], "__expand")[[1]]
                 key = substr(terms_split_bis, nchar(terms_split_bis), nchar(terms_split_bis))
 
+                is_in_par = grepl("\\([^\\(]*$", terms_split[1])
+
                 slice = terms_split[1]
                 for(i in 1:(length(terms_split) - 1)){
 
@@ -1008,12 +1010,21 @@ reformulate_terms = function(x){
 
                     end = find_closing(val)
                     if(end == nchar(val)){
-                        quoi = eval(parse(text = paste0(key[i], "__expand", val)))
+                        quoi = eval(str2lang(paste0(key[i], "__expand", val)))
+                        end_text = ""
 
                     } else {
                         what = paste0(key[i], "__expand", substr(val, 1, end))
                         end_text = substr(val, end + 1, nchar(val))
-                        quoi = paste0(eval(parse(text = what)), end_text)
+                        quoi = eval(str2lang(what))
+                    }
+
+                    if(is_in_par){
+                        # We make the sum when found in a parenthesis
+                        quoi = paste0(paste(quoi, collapse = " + "), end_text)
+                    } else {
+                        # otherwise we duplicate
+                        quoi = paste0(quoi, end_text)
                     }
 
                     slice = paste0(rep(slice, each = length(quoi)), quoi)
@@ -1033,25 +1044,70 @@ reformulate_terms = function(x){
 }
 
 
-rewrite_fml = function(x){
+expand_lags = function(fml){
+    # fml = f(y, 1:2) ~ x1 + sw(x2, l(x3, 1:2)) | fe1 + fe2 | c(u1, l(u2)) ~ l(z, 1:3) + z2
 
-    x_FML = Formula(x)
+    fml_parts = fml_split(fml, raw = TRUE)
+    n_parts = length(fml_parts)
 
-    # If the user wants to combine the LHS: so be it...
-    lhs_fml = paste(reformulate_terms(deparse_long(x_FML[[2]])), collapse = "+")
-
-    rhs_terms = attr(terms(formula(x_FML, lhs = 1, rhs = 1)), "term.labels")
-    rhs_fml = paste(reformulate_terms(rhs_terms), collapse = "+")
-
-    if(length(x_FML)[2] > 1){
-        fixef_terms = attr(terms(formula(x_FML, lhs = 1, rhs = 2)), "term.labels")
-        fixef_fml = paste("|", paste(reformulate_terms(fixef_terms), collapse = "+"))
+    # We tolerate multiple LHS and expansion
+    lhs_text = fml_split(fml, 1, text = TRUE, split.lhs = TRUE)
+    if(grepl("^(c|(c?(stepwise|sw)0?)|list)\\(", lhs_text)){
+        lhs_text2eval = gsub("^(c|(c?(stepwise|sw)0?|list))\\(", "stepwise(", lhs_text)
+        lhs_names = eval(str2lang(lhs_text2eval))
     } else {
-        fixef_fml = ""
+        lhs_names = lhs_text
+    }
+
+    lhs_all = expand_lags_internal(lhs_names)
+    if(length(lhs_all) > 1){
+        lhs_fml = paste("c(", paste(lhs_all, collapse = "+"), ")")
+    } else {
+        lhs_fml = lhs_all
+    }
+
+    rhs_terms = attr(terms(fml_parts[[1]]), "term.labels")
+    rhs_fml = paste(expand_lags_internal(rhs_terms), collapse = "+")
+
+    iv_fml = fixef_fml = ""
+
+    if(n_parts > 1){
+
+        is_fe = !is_fml_inside(fml_parts[[2]])
+        if(is_fe){
+            fixef_terms = attr(terms(fml_maker(fml_parts[[2]])), "term.labels")
+            fixef_fml = paste("|", paste(expand_lags_internal(fixef_terms), collapse = "+"))
+        }
+
+        if(n_parts == 3 || !is_fe){
+            iv_tmp = fml_maker(fml_parts[[n_parts]])
+
+            # iv LHS
+            iv_text = fml_split(iv_tmp, 1, text = TRUE, split.lhs = TRUE)
+            if(grepl("^(c|(c?(stepwise|sw)0?)|list)\\(", iv_text)){
+                iv_text2eval = gsub("^(c|(c?(stepwise|sw)0?|list))\\(", "stepwise(", iv_text)
+                iv_names = eval(str2lang(gsub("^list\\(", "stepwise(", iv_text2eval)))
+            } else {
+                iv_names = iv_text
+            }
+
+            iv_all = expand_lags_internal(iv_names)
+            if(length(iv_all) > 1){
+                iv_left = paste("c(", paste(iv_all, collapse = "+"), ")")
+            } else {
+                iv_left = iv_all
+            }
+
+            # iv RHS
+            iv_right_terms = attr(terms(iv_tmp), "term.labels")
+            iv_right = paste(expand_lags_internal(iv_right_terms), collapse = "+")
+
+            iv_fml = paste("|", iv_left, "~", iv_right)
+        }
     }
 
 
-    as.formula(paste0(lhs_fml, "~", rhs_fml, fixef_fml))
+    as.formula(paste0(lhs_fml, "~", rhs_fml, fixef_fml, iv_fml))
 }
 
 

@@ -6,29 +6,30 @@
 #----------------------------------------------#
 
 
-fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), NL.fml,
+fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), NL.fml = NULL,
                        fixef, NL.start, lower, upper, NL.start.init,
-                       offset, linear.start = 0, jacobian.method = "simple",
+                       offset, subset, split = NULL, fsplit = NULL, linear.start = 0, jacobian.method = "simple",
                        useHessian = TRUE, hessian.args = NULL, opt.control = list(),
-                       y, X, fixef_mat, panel.id,
-                       nthreads = getFixest_nthreads(),
+                       cluster, se,
+                       y, X, fixef_mat, panel.id, fixef.rm = "perfect",
+                       nthreads = getFixest_nthreads(), lean = FALSE,
                        verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000, collin.tol = 1e-14,
                        deriv.iter = 5000, deriv.tol = 1e-4, glm.iter = 25, glm.tol = 1e-8,
                        etastart, mustart,
                        warn = TRUE, notes = getFixest_notes(), combine.quick, demeaned = FALSE,
                        origin_bis, origin = "feNmlm", mc_origin, mc_origin_bis, mc_origin_ter,
                        computeModel0 = FALSE, weights,
-                       from_update = FALSE, object, sumFE_init, debug = FALSE, mem.clean = FALSE, ...){
+                       debug = FALSE, mem.clean = FALSE, call_env = NULL, call_env_bis, ...){
 
     # INTERNAL function:
     # the estimation functions need input data in the exact format without any mistake possible (bc of c++)
     # this function takes care of implementing all the checks needed and providing the proper formatting
-    # it also prepare the list returned in the est. funs
+    # it also prepares the list returned in the est. funs
 
     # Only an environment is returned
-    env <- new.env(parent = emptyenv())
+    env = new.env(parent = emptyenv())
 
-    # the function of origin
+    # The function of origin
     if(!missnull(origin_bis)){
         origin = origin_bis
     }
@@ -36,6 +37,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     # The match.call of origin
     if(!missnull(mc_origin_bis)){
         mc_origin = mc_origin_bis
+    }
+
+    if(!missnull(call_env_bis)){
+        call_env = call_env_bis
     }
 
     # NOTE on argument "origin":
@@ -58,12 +63,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     #
     # Arguments control
-    main_args = c("fml", "data", "panel.id", "offset", "fixef.tol", "fixef.iter", "fixef", "nthreads", "verbose", "warn", "notes", "combine.quick", "start", "only.env", "mem.clean")
+    main_args = c("fml", "data", "panel.id", "offset", "subset", "split", "fsplit", "cluster", "se", "fixef.rm", "fixef.tol", "fixef.iter", "fixef", "nthreads", "lean", "verbose", "warn", "notes", "combine.quick", "start", "only.env", "mem.clean")
     femlm_args = c("family", "theta.init", "linear.start", "opt.control", "deriv.tol", "deriv.iter")
     feNmlm_args = c("NL.fml", "NL.start", "lower", "upper", "NL.start.init", "jacobian.method", "useHessian", "hessian.args")
     feglm_args = c("family", "weights", "glm.iter", "glm.tol", "etastart", "mustart", "collin.tol")
     feols_args = c("weights", "demeaned", "collin.tol")
-    internal_args = c("debug", "object", "from_update", "sumFE_init")
+    internal_args = c("debug")
 
     deprec_old_new = c()
 
@@ -110,10 +115,6 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         }
 
     }
-
-    #
-    # IV estimation
-    #
 
     #
     # Internal quirks
@@ -167,7 +168,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         # Family handling
         if(is.character(family)){
-            family <- get(family, mode = "function", envir = parent.frame(2))
+            family = error_sender(get(family, mode = "function", envir = parent.frame(2)), "Problem in the argument family:\n")
         }
 
         if(is.function(family)) {
@@ -199,9 +200,6 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # they concern only logit and poisson (so far)
         #
 
-        # fun_dev = family$dev.resids
-        # family$dev.resids = function(y, mu, eta, wt) sum(fun_dev(y, mu, wt))
-
         dev.resids = family$dev.resids
         family$sum_dev.resids = function(y, mu, eta, wt) sum(dev.resids(y, mu, wt))
 
@@ -219,6 +217,8 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     }
 
     check_arg(demeaned, notes, warn, mem.clean, "logical scalar")
+
+    check_arg_plus(fixef.rm, "match(singleton, perfect, both, none)")
 
     check_arg(collin.tol, "numeric scalar GT{0}")
 
@@ -251,11 +251,17 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
 
     #
-    # Formatting data ####
+    # Formula handling ####
     #
 
     fml_no_xpd = NULL # will be returned if expansion is performed
     isPanel = FALSE
+    do_iv = FALSE
+    multi_fixef = FALSE
+    fake_intercept = FALSE
+    fml_fixef = fml_iv = NULL
+    fixef_terms_full = NULL
+    complete_vars = c()
     if(isFit){
         isFixef = !missnull(fixef_mat)
     } else {
@@ -287,25 +293,89 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         #
         # The fml => controls + setup
         if(missing(fml)) stop("You must provide the argument 'fml' (currently it is missing).")
-        check_value(fml, "ts formula", .arg_name = "fml")
+        check_arg(fml, "ts formula")
 
-        if(!"formula" %in% class(fml)) stop("The argument 'fml' must be a formula.")
         fml = formula(fml) # we regularize the formula to check it
-        # if(length(fml) != 3) stop("The formula must be two sided: e.g. y~x1+x2, or y~x1+x2|fe1+fe2.")
 
         # We apply expand for macros => we return fml_no_xpd
-        if(length(getFixest_fml()) > 0){
+        if(length(getFixest_fml()) > 0 || ".." %in% all.vars(fml, functions = TRUE)){
             fml_no_xpd = fml
-            fml = xpd(fml)
+            fml = .xpd(fml, data = dataNames)
         }
 
         #
-        # Panel setup
+        # Checking the validity of the formula
         #
 
-        if(check_lag(fml)){
+        fml_parts = fml_split(fml, raw = TRUE)
+        n_parts = length(fml_parts)
+
+        # checking iv
+        if(n_parts > 2){
+            if(!origin_type == "feols"){
+                stop("The argument 'fml' cannot contain more than two parts separated by a pipe ('|').\nThe syntax is: DEP VAR ~ EXPL VARS | FIXED EFFECTS.")
+            } else {
+                if(n_parts > 3){
+                    stop("In feols, the argument 'fml' cannot contain more than three parts separated by a pipe ('|').\nThe syntax is: DEP VAR ~ EXPL VARS | FIXED EFFECTS | IV FORMULA.")
+                }
+
+                if(!is_fml_inside(fml_parts[[3]])){
+                    stop("in feols, the third part of the formula must be the IV formula, and it does not look like a formula right now.")
+                }
+
+                if(is_fml_inside(fml_parts[[2]])){
+                    stop("In feols, problem in the formula: the RHS must contain at most one formula, currently there are two formulas.")
+                }
+
+                do_iv = TRUE
+            }
+        } else if(n_parts == 2){
+            if(is_fml_inside(fml_parts[[2]])){
+                # 2nd part a formula only allowed in feols
+                if(origin_type == "feols"){
+                    do_iv = TRUE
+                } else {
+                    stop("The RHS of the formula must represent the fixed-effects (and can't be equal to a formula: only feols supports this).")
+                }
+            }
+        }
+
+        # Checking the presence
+        complete_vars = all.vars(fml)
+        if(any(!complete_vars %in% dataNames)){
+            # Error => we take the time to provide an informative error message
+            LHS = all.vars(fml_parts[[1]][[2]])
+            RHS = all.vars(fml_parts[[1]][[3]])
+
+            if(any(!LHS %in% dataNames)){
+                stop("The variable", enumerate_items(setdiff(LHS, dataNames), "s.is.quote"), " in the LHS of the formula but not in the data set.")
+            }
+
+            if(any(!RHS %in% dataNames)){
+                stop("The variable", enumerate_items(setdiff(RHS, dataNames), "s.is.quote"), " in the RHS", ifunit(n_parts, "", " (first part)"), " of the formula but not in the data set.")
+            }
+
+            part_2 = all.vars(fml_parts[[2]])
+            if(any(!part_2 %in% dataNames)){
+                msg = ifelse(is_fml_inside(fml_parts[[2]]), "IV", "fixed-effects")
+                stop("The variable", enumerate_items(setdiff(part_2, dataNames), "s.is.quote"), " in the ", msg, " part of the formula but not in the data set.")
+            }
+
+            part_3 = all.vars(fml_parts[[3]])
+            stop("The variable", enumerate_items(setdiff(part_3, dataNames), "s.is.quote"), " in the IV part of the formula but not in the data set.")
+        }
+
+
+        #
+        # ... Panel setup ####
+        #
+
+        info = fixest_fml_rewriter(fml)
+        isPanel = info$isPanel
+        fml = info$fml
+
+        if(isPanel){
             panel.info = NULL
-            isPanel = TRUE
             if(!is.null(attr(data, "panel_info"))){
                 if(!missing(panel.id)){
                     warning("The argument 'panel.id' is provided but argument 'data' is already a 'fixest_panel' object. Thus the argument 'panel.id' is ignored.", immediate. = TRUE)
@@ -324,167 +394,318 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             class(data) = "data.frame"
         }
 
-        FML = Formula::Formula(fml)
-        n_rhs = length(FML)[2]
+        fml_parts = fml_split(fml, raw = TRUE)
 
-        if(n_rhs > 2){
-            stop("The argument 'fml' cannot contain more than two parts separated by a pipe ('|').")
-        }
-
-        # We test there are no problems in the formula
-        info = try(terms(formula(FML, lhs = 1, rhs = 1)), silent = TRUE)
-        if("try-error" %in% class(info)){
-            dp = deparse(formula(FML, lhs = 1, rhs = 1))
-            stop("The formula: ", dp[1], ifsingle(dp, "", "..."), ", is not valid:\n", gsub("^[^\n]+\n", "", info))
-        }
-
-        # we check the FE part
-        if(n_rhs == 2){
-            info = terms_fixef(formula(FML, lhs = 0, rhs = 2))
-            if("try-error" %in% class(info)){
-                dp = deparse(formula(FML, lhs = 0, rhs = 2))
-                stop("The fixed-effects part of the formula: ", dp[1], ifsingle(dp, "", "..."), ", is not valid:\n", gsub("^[^\n]+\n", "", info))
-            }
-        }
-
-        if(isPanel){
-            fml = try(rewrite_fml(fml), silent = TRUE)
-            if("try-error" %in% class(fml)){
-                stop("Problem in the formula regarding lag/leads: ", gsub("__expand", "", fml))
-            }
-            FML = Formula::Formula(fml)
-        }
-
-        # for clarity, arg fixef is transformed into fixef_vars
-        fixef_vars = NULL
-        isFixef = FALSE
-        if(n_rhs == 2){
-            isFixef = TRUE
-            if(missnull(fixef)){
-                fixef_vars = formula(FML, lhs = 0, rhs = 2)
-                fml = formula(FML, lhs = 1, rhs = 1)
+        # The different parts of the formula
+        fml_fixef = fml_iv = NULL
+        if(n_parts == 3){
+            fml_fixef = fml_maker(fml_parts[[2]])
+            fml_iv = fml_maker(fml_parts[[3]])
+        } else if(n_parts == 2){
+            if(do_iv){
+                fml_iv = fml_maker(fml_parts[[2]])
             } else {
-                stop("To add fixed-effects: either include them in argument 'fml' using a pipe ('|'), either use the argument 'fixef'. You cannot use both!")
+                fml_fixef = fml_maker(fml_parts[[2]])
             }
-        } else if(!missing(fixef) && length(fixef) >= 1){
-            isFixef = TRUE
-
-            # We check the argument => character vector
-
-            if(!isVector(fixef) || !is.character(fixef)){
-                stop("Argument 'fixef', when provided, must be a character vector of variable names.")
-            }
-
-            if(any(!fixef %in% dataNames)){
-                var_problem = fixef[!fixef %in% dataNames]
-                stop("The argument 'fixef' must be variable names! Variable", enumerate_items(var_problem, "s.is"), " not in the data.")
-
-            }
-
-            fixef_vars = fixef
         }
 
-        # fml_full now does not contain the clusters, but will later contain them
-        fml_full = fml
+        fml_linear = fml_maker(fml_parts[[1]])
+
+        #
+        # ... Fixef-effects ####
+        #
+
+        # for clarity, arg fixef is transformed into fml_fixef
+        if(!is.null(fml_fixef) && !missnull(fixef)){
+            stop("To add fixed-effects: either include them in argument 'fml' using a pipe ('|'), either use the argument 'fixef'. You cannot use both!")
+
+        } else if(!missing(fixef) && length(fixef) >= 1){
+            # We check the argument => character vector
+            check_arg_plus(fixef, "multi match", .choices = dataNames, .message = "Argument 'fixef', when provided, must be a character vector of variable names.")
+
+            # we transform it into a formula
+            fml_fixef = as.formula(paste0("~", paste(fixef, collapse = " + ")))
+        }
+
+        isFixef = !is.null(fml_fixef)
+
+        # we check the fixed-effects
+        if(isFixef){
+            # => extraction of the stepwise information
+            fixef_info_stepwise = error_sender(fixef_terms(fml_fixef, stepwise = TRUE, origin_type = origin_type),
+                                         "The fixed-effects part of the formula (", charShorten(as.character(fml_fixef)[2], 15),
+                                         ") is not valid:\n", clean = "_impossible_var_name_ => ^")
+
+            if(fixef_info_stepwise$do_multi){
+                fml_fixef = fml_tl = fixef_info_stepwise$fml
+                multi_fixef = TRUE
+                # We will compute the fixed-effects afterwards
+                isFixef = FALSE
+
+            } else {
+                # The function already returns the terms, so no need to recall it
+                fml_tl = fixef_info_stepwise$tl
+                if(length(fml_tl) == 0) isFixef = FALSE
+            }
+
+
+            fixef_terms_full = error_sender(fixef_terms(fml_tl),
+                                            "The fixed-effects part of the formula (", charShorten(as.character(fml_fixef)[2], 15),
+                                            ") is not valid:\n", clean = "_impossible_var_name_ => ^")
+
+            # if fixed-effects are provided, we make sure there is an
+            # intercept so that factors can be handled properly
+            #
+            # Beware: only slope: we don't add it
+            if(length(fixef_terms_full$slope_flag) == 0){
+                # We can be here when SW and the first SW is no fixef
+                # I redefine it just for sake of clarity
+                fake_intercept = FALSE
+            } else {
+                fake_intercept = any(fixef_terms_full$slope_flag >= 0)
+            }
+
+        }
+
     }
 
+    # We need to get the variables from the argument cluster and add them to fml_full
+    # so that subset works properly
+    if(!missnull(cluster)){
+
+        check_arg(cluster, "os formula | character vector")
+
+        if(is.character(cluster)){
+            cluster = .xpd(rhs = cluster)
+        }
+
+        complete_vars = unique(c(complete_vars, all.vars(cluster)))
+    }
 
     #
-    # The left hand side
+    # Data formatting ####
     #
 
-    # evaluation
+
+    #
+    # ... subset ####
+    #
+
+    nobs_origin = NULL
     if(isFit){
-
+        # We have to first eval y if isFit in order to check subset properly
         if(missing(y)){
             stop("You must provide argument 'y' when using ", origin_type, ".fit.")
         }
 
-        if(!is.numeric(y)){
-            stop("Argument 'y' must be numeric.")
-        }
-
-        if(!is.null(dim(y)) || is.list(y)){
-            stop("Argument y must be a vector.")
-        }
-
-        # for cpp (as double):
-        lhs = as.numeric(as.vector(y))
+        lhs = check_value_plus(y, "numeric vmatrix ncol(1) conv")
+        if(is.matrix(lhs)) lhs = as.vector(lhs)
 
         # we reconstruct a formula
-        fml = as.formula(paste0(deparse_long(mc_origin[["y"]]), "~1"))
+        fml_linear = as.formula(paste0(deparse_long(mc_origin[["y"]]), "~1"))
+        lhs_names = as.character(fml_linear[[2]])
 
-    } else {
+        nobs_origin = nobs = length(lhs)
+    }
 
-        # The LHS must contain only values in the DF
-        namesLHS = all.vars(fml[[2]])
-        if(length(namesLHS) == 0){
-            stop("The right hand side of the formula (", deparse_long(fml[[2]]), ") contains no variable!")
-        } else if(!all(namesLHS %in% dataNames)){
-            not_there = namesLHS[!namesLHS %in% dataNames]
-            stop(ifsingle(not_there, "The v", "V"), "ariable", enumerate_items(not_there, "s.is"), " in the LHS of the formula but not in the dataset.")
+    # delayed.subset only concerns isFit // subsetting must always occur before NA checking
+    isSubset = FALSE
+    delayed.subset = FALSE
+    if(!missing(subset)){
+        if(!is.null(subset)){
+
+            isSubset = TRUE
+
+            if("formula" %in% class(subset)){
+
+                if(isFit){
+                    stop("In ", origin, " the subset cannot be a formula. You must provide either an integer vector or a logical vector.")
+                }
+
+                check_value(subset, "os formula var(data)", .data = data)
+                subset.value = subset[[2]]
+                subset = check_value_plus(subset.value, "evalset integer vector gt{0} | logical vector len(data)", .data = data, .prefix = "In argument 'subset', the expression")
+
+            } else {
+
+                if(isFit){
+                    check_value(subset, "integer vector gt{0} | logical vector len(data)", .data = lhs)
+                } else {
+                    check_value(subset, "integer vector gt{0} | logical vector len(data)",
+                                .prefix = "If not a formula, argument 'subset'", .data = data)
+                }
+            }
+
+            isNA_subset = is.na(subset)
+            if(anyNA(isNA_subset)){
+                if(all(isNA_subset)){
+                    stop("In argument 'subset', all values are NA, estimation cannot be done.")
+                }
+
+                if(is.logical(subset)){
+                    subset[isNA_subset] = FALSE
+                } else {
+                    subset = subset[!isNA_subset]
+                }
+            }
+
+            if(isFit){
+                delayed.subset = TRUE
+                lhs = lhs[subset]
+            } else {
+                nobs_origin = NROW(data)
+
+                # subsetting creates a deep copy. We avoid copying the entire data set.
+
+                # Note that we already checked that complete_vars existed in the data set
+
+                if(!missnull(NL.fml)){
+                    check_value(NL.fml, "os formula")
+                    complete_vars = c(complete_vars, all.vars(NL.fml))
+                }
+
+                complete_vars = intersect(unique(complete_vars), names(data))
+
+                data = data[subset, complete_vars, drop = FALSE]
+            }
+
+
+        } else if(!is.null(mc_origin$subset)){
+            dp = deparse_long(mc_origin$subset)
+            if((grepl("[[", dp, fixed = TRUE) || grepl("$", dp, fixed = TRUE)) && dp != 'x[["subset"]]'){
+                # we avoid this behavior
+                stop("Argument 'subset' (", dp, ") is evaluated to NULL. This is likely not what you want.")
+            }
         }
-
-        lhs = try(eval(fml[[2]], data), silent = TRUE)
-
-        if("try-error" %in% class(lhs)){
-            stop("Evaluation of the left-hand-side (equal to ", deparse_long(fml[[2]]), ") raises an error: \n", lhs)
-        } else if(is.logical(lhs) || is.integer(lhs)){
-            lhs = as.numeric(as.vector(lhs))
-        } else if(!is.numeric(lhs)){
-            cls = class(lhs)
-            stop("The left hand side (", deparse_long(fml[[2]]), ") is not numeric. The class", ifsingle(cls, "", "e"), enumerate_items(cls, "s.is"), " not supported.")
-        } else {
-            lhs = as.numeric(as.vector(lhs)) # complex
-        }
     }
 
-    lhs_clean = lhs # copy used for NA case
-    nobs = length(lhs)
-
-    anyNA_y = FALSE
-    msgNA_y = "LHS: 0"
-    info = cpppar_which_na_inf_vec(lhs, nthreads)
-    if(info$any_na_inf){
-
-        if(info$any_na) ANY_NA = TRUE
-        if(info$any_inf) ANY_INF = TRUE
-
-        anyNA_y = TRUE
-        isNA_y = info$is_na_inf
-        anyNA_sample = TRUE
-        isNA_sample = isNA_sample | isNA_y
-        msgNA_y = paste0("LHS: ", numberFormatNormal(sum(isNA_y)))
-
-        lhs_clean = lhs[!isNA_y]
-
-        if(mem.clean){
-            rm(isNA_y)
-        }
-    }
-
-    if(mem.clean){
-        rm(info)
-    }
-
-    # we check the var is not a constant
-    if(cpp_isConstant(lhs_clean)){
-        stop("The dependent variable is a constant. Estimation cannot be done.")
-    }
-
-    if(family %in% c("poisson", "negbin") && any(lhs_clean < 0)){
-        stop("Negative values of the dependent variable are not allowed for the \"", family, "\" family.")
-    }
-
-    if(origin_type == "feNmlm" && family %in% "logit" && !all(lhs_clean==0 | lhs_clean==1)){
-        stop("The dependent variable has values different from 0 or 1.\nThis is not allowed with the \"logit\" family.")
-    }
 
     #
-    # Controls and setting of the linear part:
+    # ... The left hand side ####
+    #
+
+    # the LHS for isFit has been done just before subset
+
+    # evaluation
+    multi_lhs = FALSE
+    if(isFit == FALSE){
+
+        # The LHS must contain only values in the DF
+        namesLHS = all.vars(fml_linear[[2]])
+        lhs_text = deparse_long(fml_linear[[2]])
+        if(length(namesLHS) == 0){
+            stop("The right hand side of the formula (", lhs_text, ") contains no variable!")
+
+        }
+
+        lhs_text2eval = gsub("^(c|(c?(stepwise|sw)0?))\\(", "list(", lhs_text)
+
+        lhs = error_sender(eval(str2lang(lhs_text2eval), data),
+                           "Evaluation of the left-hand-side (equal to ", lhs_text, ") raises an error: \n")
+
+        if(is.list(lhs)){
+            # we check the consistency
+            lhs_names = eval(str2lang(gsub("^list\\(", "stepwise(", lhs_text2eval)))
+
+            n_all = lengths(lhs)
+            if(!all(n_all == n_all[1])){
+                i = which(n_all != n_all[1])[1]
+                stop("The evaluation of the multiple left hand sides raises an error: the first LHS is of length ", n_all[1], " while the ", n_th(i), " is of length ", n_all[i], ". They should all be of the same length")
+            }
+
+            # individual check + conversions
+            for(i in seq_along(lhs)){
+                lhs[[i]] = check_value_plus(lhs[[i]], "numeric vector conv", .prefix = paste0("Problem in the ", n_th(i), " left hand side. It"))
+            }
+
+            if(length(lhs) == 1){
+                lhs = lhs[[1]]
+            } else {
+                multi_lhs = TRUE
+            }
+
+        } else {
+            lhs = check_value_plus(lhs, "numeric vmatrix ncol(1) conv", .prefix = "The left hand side")
+            if(is.matrix(lhs)) lhs = as.vector(lhs)
+            lhs_names = lhs_text
+        }
+
+        if(is.list(lhs)){
+            nobs = length(lhs[[1]])
+        } else {
+            nobs = length(lhs)
+        }
+    }
+
+    if(is.null(nobs_origin)) {
+        nobs_origin = nobs
+    }
+
+    anyNA_y = FALSE
+    msgNA_y = ""
+    if(multi_lhs){
+
+        if(family %in% c("poisson", "negbin")){
+            for(i in seq_along(lhs)){
+                if(any(lhs[[i]] < 0, na.rm = TRUE)){
+                    stop("Presence of negative values in the ", n_th(i), " dependent variable: this is not allowed for the \"", family, "\" family.")
+                }
+            }
+        }
+
+        if(origin_type == "feNmlm" && family %in% "logit"){
+            if(!all(lhs[[i]]==0 | lhs[[i]]==1, na.rm = TRUE)){
+                stop("The ", n_th(i), " dependent variable has values different from 0 or 1.\nThis is not allowed for the \"logit\" family.")
+            }
+
+        }
+    } else {
+
+        lhs_clean = lhs # copy used for NA case
+        info = cpppar_which_na_inf_vec(lhs, nthreads)
+        if(info$any_na_inf){
+
+            if(info$any_na) ANY_NA = TRUE
+            if(info$any_inf) ANY_INF = TRUE
+
+            anyNA_y = TRUE
+            isNA_y = info$is_na_inf
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_y
+            msgNA_y = paste0("LHS: ", numberFormatNormal(sum(isNA_y)))
+
+            lhs_clean = lhs[!isNA_y]
+
+            if(mem.clean){
+                rm(isNA_y)
+            }
+        }
+
+        if(mem.clean){
+            rm(info)
+        }
+
+        # we check the var is not a constant
+        if(cpp_isConstant(lhs_clean)){
+            stop("The dependent variable is a constant. Estimation cannot be done.")
+        }
+
+        if(family %in% c("poisson", "negbin") && any(lhs_clean < 0)){
+            stop("Negative values of the dependent variable are not allowed for the \"", family, "\" family.")
+        }
+
+        if(origin_type == "feNmlm" && family %in% "logit" && !all(lhs_clean==0 | lhs_clean==1)){
+            stop("The dependent variable has values different from 0 or 1.\nThis is not allowed for the \"logit\" family.")
+        }
+    }
+
+
+    #
+    # ... linear part ####
     #
 
     interaction.info = NULL
+    multi_rhs = FALSE
     if(isFit){
 
         isLinear = FALSE
@@ -522,102 +743,132 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 stop("The number of rows of X (", nrow(X), ") must be of the same dimension as y (", nobs, ").")
             }
 
+            linear.mat = X
+
             # we coerce to matrix (avoids sparse matrix) + transform into double
-            linear.mat = as.matrix(X) * 1
+            if(!is.matrix(linear.mat) || is.integer(linear.mat[1])){
+                linear.mat = as.matrix(X) * 1
+            }
 
             if(is.null(colnames(linear.mat))){
                 colnames(linear.mat) = paste0("X", 1:ncol(linear.mat))
             }
 
             # The formula
-            fml = update(fml, as.formula(paste0(".~", paste0(colnames(linear.mat), collapse = "+"))))
-            fml_full = fml
+            fml_linear = .xpd(lhs = fml_linear[[2]], rhs = colnames(linear.mat))
 
             linear.varnames = NULL
+
+            if(delayed.subset){
+                linear.mat = linear.mat[subset, , drop = FALSE]
+            }
+
         }
 
     } else {
         isLinear = FALSE
         options("fixest_interaction_ref" = NULL)
 
-        if(grepl("[^:]::[^:]", deparse_long(fml[[3]]))){
+        linear.varnames = all.vars(fml_linear[[3]])
 
-            new_fml = try(interact_fml(fml), silent = TRUE)
-            if("try-error" %in% class(new_fml)){
-                stop("Error in the right-hand-side of the formula: ", new_fml)
-            }
-            linear.varnames = all.vars(new_fml[[3]])
-        } else {
-            linear.varnames = all.vars(fml[[3]])
-        }
-
-        if(length(linear.varnames) > 0 || attr(terms(fml), "intercept") == 1){
+        fml_terms = terms(fml_linear)
+        if(length(linear.varnames) > 0 || attr(fml_terms, "intercept") == 1){
             isLinear = TRUE
-            linear.fml = fml
         }
 
         if(isLinear){
 
-            if(!all(linear.varnames %in% dataNames)){
-                not_there = setdiff(linear.varnames, dataNames)
-                stop(ifsingle(not_there, "The v", "V"), "ariable", enumerate_items(not_there, "s.is"), " in the RHS of the formula but not in the dataset.")
-            }
+            #
+            # Handling multiple RHS
+            #
 
-            if(isFixef){
-                # if dummies are provided, we make sure there is an
-                # intercept so that factors can be handled properly
-                linear.fml = update(linear.fml, ~.+1)
-            }
+            rhs_info_stepwise = error_sender(extract_stepwise(fml_linear), "Problem in the RHS of the formula: ")
+
+            multi_rhs = rhs_info_stepwise$do_multi
+
 
             #
             # We construct the linear matrix
             #
 
-            linear.mat = try(fixest_model_matrix(fml, data), silent = TRUE)
-            if("try-error" %in% class(linear.mat)){
-                stop("Evaluation of the right-hand-side of the formula raises an error: ", linear.mat)
+            if(multi_rhs){
+                # We construct:
+                # - left and right cores (vars that are always there)
+                # - center
+
+                isLinear = FALSE # => superseded by the multi_rhs mechanism
+
+                fml_core_left = rhs_info_stepwise$fml_core_left
+                fml_core_right = rhs_info_stepwise$fml_core_right
+                fml_all_sw = rhs_info_stepwise$fml_all_sw
+
+                linear_core = list()
+                linear_core$left = error_sender(fixest_model_matrix(fml_core_left, data, fake_intercept),
+                                                "Evaluation of the right-hand-side of the formula raises an error: ")
+
+                linear_core$right = error_sender(fixest_model_matrix(fml_core_right, data, TRUE),
+                                                "Evaluation of the right-hand-side of the formula raises an error: ")
+
+                rhs_sw = list()
+                for(i in seq_along(fml_all_sw)){
+                    rhs_sw[[i]] = error_sender(fixest_model_matrix(fml_all_sw[[i]], data, TRUE),
+                                               "Evaluation of the right-hand-side of the formula raises an error: ")
+                }
+
+            } else {
+                # Regular, single RHS
+
+                linear.mat = error_sender(fixest_model_matrix(fml_linear, data, fake_intercept),
+                                          "Evaluation of the right-hand-side of the formula raises an error: ")
+
+                if(identical(linear.mat, 1)){
+                    isLinear = FALSE
+                }
+
+                # Interaction information => if no interaction: NULL, only the first is there
+                interaction.info = getOption("fixest_interaction_ref")
             }
-
-            useModel.matrix = attr(linear.mat, "useModel.matrix")
-            attr(linear.mat, "useModel.matrix") = NULL
-
-            # Interaction information => if no interaction: NULL
-            interaction.info = getOption("fixest_interaction_ref")
-
-
-            # # we look at whether there are factor-like variables to be evaluated
-            # # if there is factors => model.matrix
-            # types = sapply(data[, dataNames %in% linear.varnames, FALSE], class)
-            # if(length(types) == 0 || grepl("factor", deparse_long(linear.fml)) || any(types %in% c("character", "factor"))){
-            #     useModel.matrix = TRUE
-            # } else {
-            #     useModel.matrix = FALSE
-            # }
-            #
-            # if(useModel.matrix){
-            #     # linear.mat = stats::model.matrix(linear.fml, data)
-            #     # to catch the NAs, model.frame needs to be used....
-            #     linear.mat = try(stats::model.matrix(linear.fml, stats::model.frame(linear.fml, data, na.action=na.pass)), silent = TRUE)
-            #     if("try-error" %in% class(linear.mat)){
-            #         stop("Evaluation of the right-hand-side of the formula raises an error: \n", linear.mat)
-            #     }
-            # } else {
-            #     linear.mat = try(prepare_matrix(linear.fml, data), silent = TRUE)
-            #     if("try-error" %in% class(linear.mat)){
-            #         stop("Evaluation of the right-hand-side of the formula raises an error: \n", linear.mat)
-            #     }
-            # }
-
         }
-
     }
 
-
-    # further controls (includes na checking)
+    # Further controls (includes na checking)
     msgNA_L = ""
+    if(multi_rhs){
+
+        anyNA_L = FALSE
+        isNA_L = FALSE
+        if(length(linear_core$left) > 1){
+            info = cpppar_which_na_inf_mat(linear_core$left, nthreads)
+            if(info$any_na_inf){
+                anyNA_L = TRUE
+                if(info$any_na) ANY_NA = TRUE
+                if(info$any_inf) ANY_INF = TRUE
+                isNA_L = isNA_L | info$is_na_inf
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_L
+            }
+        }
+
+        if(length(linear_core$right) > 1){
+            info = cpppar_which_na_inf_mat(linear_core$right, nthreads)
+            if(info$any_na_inf){
+                anyNA_L = TRUE
+                if(info$any_na) ANY_NA = TRUE
+                if(info$any_inf) ANY_INF = TRUE
+                isNA_L = isNA_L | info$is_na_inf
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_L
+            }
+        }
+
+        if(anyNA_L){
+            msgNA_L = paste0("RHS: ", numberFormatNormal(sum(isNA_L)))
+        }
+    }
+
     if(isLinear){
 
-        linear.params <- colnames(linear.mat)
+        linear.params = colnames(linear.mat)
         anyNA_L = FALSE
         info = cpppar_which_na_inf_mat(linear.mat, nthreads)
         if(info$any_na_inf){
@@ -629,14 +880,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             isNA_L = info$is_na_inf
             anyNA_sample = TRUE
             isNA_sample = isNA_sample | isNA_L
-            msgNA_L = paste0(", RHS: ", numberFormatNormal(sum(isNA_L)))
+            msgNA_L = paste0("RHS: ", numberFormatNormal(sum(isNA_L)))
 
             if(mem.clean){
                 rm(isNA_L)
             }
 
-        } else {
-            msgNA_L = ", RHS: 0"
         }
 
         if(mem.clean){
@@ -645,14 +894,19 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             gc2trig = FALSE
         }
 
-    } 	else {
-        linear.params <- linear.start <- linear.varnames <- NULL
-        useModel.matrix = FALSE
+    } else if(multi_rhs && origin_type %in% "feNmlm"){
+        # We need to assign linear.params
+        v_core = unlist(lapply(linear_core, colnames))
+        v_sw = unlist(lapply(rhs_sw, colnames))
+        linear.varnames = linear.params = unique(c(v_core, v_sw))
+
+    } else {
+        linear.params = linear.start = linear.varnames = NULL
     }
 
 
     #
-    # The nonlinear part:
+    # ... nonlinear part ####
     #
 
     msgNA_NL = ""
@@ -688,33 +942,31 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             ANY_NA = TRUE
             anyNA_sample = TRUE
             isNA_sample = isNA_sample | isNA_NL
-            msgNA_NL = paste0(", NL: ", numberFormatNormal(sum(isNA_NL)))
+            msgNA_NL = paste0("NL: ", numberFormatNormal(sum(isNA_NL)))
 
             if(mem.clean){
                 rm(isNA_NL)
                 gc2trig = TRUE
             }
 
-        } else {
-            msgNA_NL = ", NL: 0"
         }
 
     } else {
         isNonLinear = FALSE
         nl.call = 0
         allnames = nonlinear.params = nonlinear.varnames = character(0)
+        NL.fml = NULL
     }
 
-    params <- c(nonlinear.params, linear.params)
-    lparams <- length(params)
-    varnames <- c(nonlinear.varnames, linear.varnames)
+    params = c(nonlinear.params, linear.params)
+    lparams = length(params)
+    varnames = c(nonlinear.varnames, linear.varnames)
 
     # Attention les parametres non lineaires peuvent etre vides
-    if(length(nonlinear.params)==0) isNL = FALSE
-    else isNL = TRUE
+    isNL = length(nonlinear.params) > 0
 
     #
-    # Offset
+    # ... Offset ####
     #
 
     isOffset = FALSE
@@ -747,6 +999,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 }
             }
 
+            if(delayed.subset){
+                offset.value = offset.value[subset]
+            }
+
             anyNA_offset = FALSE
             info = cpppar_which_na_inf_vec(offset.value, nthreads)
             if(info$any_na_inf){
@@ -758,13 +1014,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 isNA_offset = info$is_na_inf
                 anyNA_sample = TRUE
                 isNA_sample = isNA_sample | isNA_offset
-                msgNA_offset = paste0(", Offset: ", numberFormatNormal(sum(isNA_offset)))
+                msgNA_offset = paste0("Offset: ", numberFormatNormal(sum(isNA_offset)))
 
                 if(mem.clean){
                     rm(isNA_offset)
                 }
-            } else {
-                msgNA_offset = ", Offset: 0"
             }
 
             if(mem.clean){
@@ -786,7 +1040,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     }
 
     #
-    # Weights
+    # ... Weights ####
     #
 
     any0W = anyNA_W = FALSE
@@ -827,6 +1081,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 }
             }
 
+            if(delayed.subset){
+                weights.value = weights.value[subset]
+            }
+
             anyNA_weights = FALSE
             info = cpppar_which_na_inf_vec(weights.value, nthreads)
             if(info$any_na_inf){
@@ -838,13 +1096,11 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 isNA_W = info$is_na_inf
                 anyNA_sample = TRUE
                 isNA_sample = isNA_sample | isNA_W
-                msgNA_weight = paste0(", Weights: ", numberFormatNormal(sum(isNA_W)))
+                msgNA_weight = paste0("Weights: ", numberFormatNormal(sum(isNA_W)))
 
                 if(mem.clean){
                     rm(isNA_W)
                 }
-            } else {
-                msgNA_weight = ", Weights: 0"
             }
 
             if(mem.clean){
@@ -870,7 +1126,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         } else if(!is.null(mc_origin$weights)){
             dp = deparse_long(mc_origin$weights)
-            if((grepl("[[", dp, fixed = TRUE) || grepl("$", dp, fixed = TRUE)) && dp != 'x[["weights"]]'){
+            if((grepl("[[", dp, fixed = TRUE) || grepl("$", dp, fixed = TRUE)) && dp != 'x$weights'){
                 # we avoid this behavior
                 stop("Argument 'weights' (", dp, ") is evaluated to NULL. This is likely not what you want.")
             }
@@ -884,81 +1140,237 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
 
     #
-    # Handling Fixed-effects ####
+    # ... Split ####
     #
 
+    isSplit = FALSE
+    msgNA_split = ""
+    split.full = FALSE
+    if(!missnull(split) || !missnull(fsplit)){
+
+        if(!missnull(fsplit)){
+            if(!missnull(split)){
+                stop("You cannot provide the two arguments 'split' and 'fsplit' at the same time.")
+            }
+            split.full = TRUE
+            split = fsplit
+        }
+
+        if("formula" %in% class(split)){
+
+            if(isFit){
+                stop("In ", origin, " the split cannot be a formula. You must provide a numeric vector.")
+            }
+
+            check_value(split, "os formula var(data)", .data = data)
+            split.value = split[[2]]
+            split.name = as.character(split.value)
+            split = check_value_plus(split.value, "evalset vector", .data = data, .prefix = "In argument 'split', the expression")
+
+        } else {
+
+            if(isFit){
+                check_value(split, "vector len(value)", .value = nobs_origin)
+            } else {
+                check_value(split, "vector len(data)", .data = data, .prefix = "If not a formula, argument 'split'")
+            }
+
+            split.name = gsub("^[[:alpha:]][[:alnum:]\\._]*\\$", "", deparse_long(mc_origin$split))
+        }
+
+        if(delayed.subset){
+            split = split[subset]
+        }
+
+        isSplit = TRUE
+        # We will unclass split after NA removal
+
+        anyNA_split = FALSE
+        isNA_S = is.na(split)
+        if(any(isNA_S)){
+            anyNA_split = TRUE
+
+            if(info$any_na) ANY_NA = TRUE
+
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_S
+            msgNA_split = paste0("split: ", numberFormatNormal(sum(isNA_S)))
+
+            if(mem.clean){
+                rm(isNA_S)
+            }
+        }
+
+    }
+
+    if(mem.clean && gc2trig){
+        gc()
+        gc2trig = FALSE
+    }
+
+    #
+    # ... IV ####
+    #
+
+    msgNA_iv = ""
+    if(do_iv){
+        # We create the IV LHS and the IV RHS
+
+        iv_fml_parts = fml_split(fml_iv, split.lhs = TRUE, raw = TRUE)
+
+        #
+        # LHS
+        #
+
+        # Now LHS evaluated as a regular formula
+        iv_lhs_mat = error_sender(fixest_model_matrix(.xpd(lhs = quote(y), rhs = iv_fml_parts[[1]]), data, TRUE),
+                                  "Evaluation of the left-hand-side of the IV part (equal to ", deparse_long(iv_fml_parts[[1]]), ") raises an error: \n")
+
+        # Not great => to improve later
+        iv_lhs = list()
+        iv_lhs_names = colnames(iv_lhs_mat)
+        for(i in 1:ncol(iv_lhs_mat)){
+            iv_lhs[[iv_lhs_names[i]]] = iv_lhs_mat[, i]
+        }
+
+        # NAs
+        n_NA_iv = c(0, 0)
+        info = cpppar_which_na_inf_df(iv_lhs, nthreads)
+        if(info$any_na_inf){
+
+            if(info$any_na) ANY_NA = TRUE
+            if(info$any_inf) ANY_INF = TRUE
+
+            anyNA_iv = TRUE
+            isNA_iv = info$is_na_inf
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_iv
+            n_NA_iv[1] = sum(isNA_iv)
+        }
+
+        #
+        # RHS
+        #
+
+        if(length(all.vars(iv_fml_parts[[2]])) == 0){
+            stop("In the IV part, the RHS must contain at least one variable.")
+        }
+
+        iv.mat = error_sender(fixest_model_matrix(fml_iv, data, fake_intercept = TRUE),
+                              "Problem in the IV part. Evaluation of the right-hand-side raises an error: ")
+
+        inst_names = attr(terms(fml_iv), "term.labels")
+
+        # NAs
+        info = cpppar_which_na_inf_mat(iv.mat, nthreads)
+        if(info$any_na_inf){
+
+            if(info$any_na) ANY_NA = TRUE
+            if(info$any_inf) ANY_INF = TRUE
+
+            anyNA_iv = TRUE
+            isNA_iv = info$is_na_inf
+            anyNA_sample = TRUE
+            isNA_sample = isNA_sample | isNA_iv
+            n_NA_iv[2] = sum(isNA_iv)
+        }
+
+        if(any(n_NA_iv > 0)){
+            msgNA_iv = paste0("IV: ", numberFormatNormal(n_NA_iv[1]), "/", numberFormatNormal(n_NA_iv[2]))
+        }
+
+    }
+
+
+    #
+    # ... Cluster ####
+    #
+
+    msgNA_cluster = ""
+    do_summary = FALSE
+    if(!missnull(cluster)){
+        # cluster was checked already before subset => to get the right variables
+        # Here cluster is a formula
+
+        do_summary = TRUE
+
+        cluster_terms = error_sender(fixef_terms(cluster), "Problem in the argument 'cluster':\n", clean = "_impossible_var_name_ => ^")
+        if(any(cluster_terms$slope_flag != 0)){
+            stop("You cannot use variables with varying slopes in the argument 'cluster'.")
+        }
+
+        cluster_terms = cluster_terms$fe_vars
+        if(isFixef && all(cluster_terms %in% fixef_terms_full$fe_vars)){
+                # we do nothing => the algo will use the FE ids
+        } else {
+            cluster = error_sender(prepare_df(cluster_terms, data, TRUE),
+                                   "Problem evaluating the argument 'cluster':\n")
+
+            # Type conversion
+            for(i in seq_along(cluster)){
+                if(!is.numeric(cluster[[i]]) && !is.character(cluster[[i]])){
+                    cluster[[i]] = as.character(cluster[[i]])
+                }
+            }
+
+            if(anyNA(cluster)){
+                isNA_cluster = !complete.cases(cluster)
+
+                ANY_NA = TRUE
+                anyNA_sample = TRUE
+                isNA_sample = isNA_sample | isNA_cluster
+                msgNA_cluster = paste0("cluster: ", numberFormatNormal(sum(isNA_cluster)))
+
+                if(mem.clean){
+                    rm(isNA_cluster)
+                    gc2trig = TRUE
+                }
+
+            }
+        }
+    } else {
+        cluster = NULL
+    }
+
+    if(!missnull(se)){
+        do_summary = TRUE
+
+        check_arg_plus(se, "match", .choices = c("standard", "white", "hetero", "cluster", "twoway", "threeway", "fourway", "1", "2", "3", "4"), .message = "Argument argument 'se' should be equal to one of 'standard', 'hetero', 'cluster', 'twoway', 'threeway' or 'fourway'.")
+
+        # we check consistency
+        if(isFixef){
+            n_fe = length(fixef_terms_full$fe_vars)
+        } else {
+            n_fe = 0
+        }
+
+        n_clu = c(cluster = 1, twoway = 2, threeway = 3, fourway = 4)[se]
+        if(missnull(cluster) && !is.na(n_clu) && n_clu > n_fe){
+            stop("In argument 'se': ", n_letter(n_clu), "-way clustering cannot be done with the current estimation which has ", ifelse(n_fe == 0, "no fixed-effect.", paste0("only ", n_letter(n_fe), " fixed-effects.")), " Please provide the argument cluster.")
+        }
+
+    } else {
+        se = NULL
+    }
+
+    check_arg(lean, "logical scalar")
+    if(lean){
+        do_summary = TRUE
+    }
+
+
+    #
+    # Fixed-effects ####
+    #
+
+    # NOTA on stepwise FEs:
+    # I wanted to evaluate all the FEs first, then send the evaluated stuff for later. Like in stepwise linear.
+    # This is actually a bad idea because FEs are too complex to manipulate (damn SLOPES!!!).
+    # This means that lags in the FEs + stepwise FEs will never be supported.
+
     isSlope = onlySlope = FALSE
-    if(from_update){
-        # Fixed-effects information coming from the update method
-
-        #
-        # ... From update ####
-        #
-
-        # means that there is no modification of past fixed-effects
-
-        # we retrieve past information
-        fixef_id = object$fixef_id
-        obs2remove = object$obsRemoved
-        fixef_removed = object$fixef_removed
-        fixef_vars = object$fixef_vars
-        fixef_sizes = object$fixef_sizes
-        Q = length(fixef_sizes)
-
-        # We still need to recreate some objects though
-        names(fixef_id) = NULL
-
-        if(length(obs2remove) > 0){
-            lhs = lhs[-obs2remove]
-        }
-
-        fixef_names = sum_y_all = fixef_table = list()
-        for(i in 1:Q){
-            k = fixef_sizes[i]
-            dum = fixef_id[[i]]
-            sum_y_all[[i]] = cpp_tapply_vsum(k, lhs, dum)
-
-            fixef_table[[i]] = cpp_table(k, dum)
-            fixef_names[[i]] = attr(fixef_id[[i]], "fixef_names")
-        }
-
-        #
-        # saving the FEs IDs and size before reordering (note: here, case with slopes never occurs)
-        #
-
-        fixef_id_res = list()
-        for(i in 1:Q){
-            dum = fixef_id[[i]]
-            attr(dum, "fixef_names") = as.character(fixef_names[[i]])
-            fixef_id_res[[fixef_vars[i]]] = dum
-        }
-
-        fixef_sizes_res = fixef_sizes
-        names(fixef_sizes_res) = fixef_vars
-
-        #
-        # Re-ordering the CC
-        #
-
-        if(any(fixef_sizes != sort(fixef_sizes, decreasing = TRUE))){
-            new_order = order(fixef_sizes, decreasing = TRUE)
-
-            fixef_sizes = fixef_sizes[new_order]
-            fixef_id = fixef_id[new_order]
-            sum_y_all = sum_y_all[new_order]
-            fixef_table = fixef_table[new_order]
-        }
-
-        # The formula with the fixed-effects
-        fml_char = as.character(fml)
-        fml_full = as.formula(paste0(fml_char[2], "~", fml_char[3], "|", paste0(fixef_vars, collapse = "+")))
-
-    } else if(isFixef){
+    if(isFixef){
         # The main fixed-effects construction
-
-        #
-        # ... General ####
-        #
 
         if(isFit){
 
@@ -994,123 +1406,92 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             fixef_vars = names(fixef_mat)
 
             # The formula
-            # fml = update(fml, as.formula(paste0(".~.|", paste0(fixef_vars, collapse = "+"))))
-            fml_char = as.character(fml)
-            fml_full = as.formula(paste0(fml_char[2], "~", fml_char[3], "|", paste0(fixef_vars, collapse = "+")))
+            fml_fixef = .xpd(rhs = fixef_vars)
+
+            if(delayed.subset){
+                fixef_mat = fixef_mat[subset, , drop = FALSE]
+            }
 
         } else {
             #
             # ... Regular ####
             #
 
-            # Regular way
-            if(is.character(fixef_vars) && any(grepl("^", fixef_vars, fixed = TRUE))){
-                # we make it a formula
-                fixef_vars = as.formula(paste0("~", paste0(fixef_vars, collapse = "+")))
+            # Managing fast combine
+            if(missnull(combine.quick)){
+                if(NROW(data) > 5e4){
+                    combine.quick = TRUE
+                } else {
+                    combine.quick = FALSE
+                }
             }
 
-            if(is.character(fixef_vars)){
-                # fixef_vars are valid fixef names
-                fixef_mat = data[, fixef_vars, drop = FALSE]
+            # fixef_terms_full computed in the formula section
+            fixef_terms = fixef_terms_full$fml_terms
 
-            } else if(!is.character(fixef_vars)){
-                # means the fixef_vars is a formula
-                fixef_fml = fixef_vars
+            # FEs
+            fixef_mat = error_sender(prepare_df(fixef_terms_full$fe_vars, data, combine.quick),
+                                     "Problem evaluating the fixed-effects part of the formula:\n")
 
-                # we check that the fixef variables are indeed in the data
-                fixef_vars_all = all.vars(fixef_fml)
-                if(!all(fixef_vars_all %in% dataNames)){
-                    var_problem = setdiff(fixef_vars_all, dataNames)
-                    stop("The fixed-effects variable", enumerate_items(var_problem, "s.is"), " not in the data.")
+            fixef_vars = names(fixef_mat)
+
+            # Slopes
+            isSlope = any(fixef_terms_full$slope_flag != 0)
+            if(isSlope){
+
+                slope_mat = error_sender(prepare_df(fixef_terms_full$slope_vars, data),
+                                         "Problem evaluating the variables with varying slopes in the fixed-effects part of the formula:\n")
+
+                slope_flag = fixef_terms_full$slope_flag
+                slope_vars = fixef_terms_full$slope_vars
+                slope_vars_list = fixef_terms_full$slope_vars_list
+
+                # Further controls
+                not_numeric = !sapply(slope_mat, is.numeric)
+                if(any(not_numeric)){
+                    stop("In the fixed-effects part of the formula (i.e. in ", as.character(fml_fixef[2]), "), variables with varying slopes must be numeric. Currently variable", enumerate_items(names(slope_mat)[not_numeric], "s.is.quote"), " not.")
                 }
 
-                # Managing fast combine
-                if(missnull(combine.quick)){
-                    if(NROW(data) > 5e4){
-                        combine.quick = TRUE
-                    } else {
-                        combine.quick = FALSE
-                    }
-                } else if(!isLogical(combine.quick)){
-                    stop("Argument 'combine.quick' must be a single logical.")
-                }
+                # slope_flag: 0: no Varying slope // > 0: varying slope AND fixed-effect // < 0: varying slope WITHOUT fixed-effect
+                onlySlope = all(slope_flag < 0)
 
-                fixef_terms_full = terms_fixef(fixef_fml)
-                if("try-error" %in% class(fixef_terms_full)){
-                    stop("Problem extracting the terms of the fixed-effects part of the formula:\n", fixef_terms_full)
-                }
-
-                fixef_terms = fixef_terms_full$fml_terms
-
-                # FEs
-                fixef_mat = prepare_df(fixef_terms_full$fe_vars, data, combine.quick)
-                if("try-error" %in% class(fixef_mat)){
-                    stop("Problem evaluating the fixed-effects part of the formula:\n", fixef_mat)
-                }
-                fixef_vars = names(fixef_mat)
-
-                # Slopes
-                isSlope = any(fixef_terms_full$slope_flag != 0)
-                if(isSlope){
-
-                    if(!origin_type %in% c("feols", "feglm")){
-                        stop("The use of varying slopes is available only for the functions feols, feglm or fepois.")
-                    }
-
-                    slope_mat = prepare_df(fixef_terms_full$slope_vars, data)
-                    if("try-error" %in% class(slope_mat)){
-                        stop("Problem evaluating the variables with varying slopes in the fixed-effects part of the formula:\n", slope_mat)
-                    }
-                    slope_flag = fixef_terms_full$slope_flag
-                    slope_vars = fixef_terms_full$slope_vars
-                    slope_vars_list = fixef_terms_full$slope_vars_list
-
-                    # Further controls
-                    not_numeric = !sapply(slope_mat, is.numeric)
-                    if(any(not_numeric)){
-                        stop("In the fixed-effects part of the formula (i.e. in ", as.character(fixef_fml[2]), "), variables with varying slopes must be numeric. Currently variable", enumerate_items(names(slope_mat)[not_numeric], "s.is"), " not.")
-                    }
-
-                    # slope_flag: 0: no Varying slope // > 0: varying slope AND fixed-effect // < 0: varying slope WITHOUT fixed-effect
-                    onlySlope = all(slope_flag < 0)
-
-                }
-
-                # fml update
-                fml_char = as.character(fml)
-                fml_full = as.formula(paste0(fml_char[2], "~", fml_char[3], "|", paste0(fixef_terms, collapse = "+")))
             }
+
+            # fml update
+            fml_fixef = .xpd(rhs = fixef_terms)
+
         }
 
         #
         # ... NA handling ####
         #
 
-        # We change non-numeric to character (impotant for parallel qufing)
+        # We change non-numeric to character (important for parallel qufing)
         is_not_num = sapply(fixef_mat, function(x) !is.numeric(x))
         if(any(is_not_num)){
             for(i in which(is_not_num)){
+                # we don't convert Dates to numeric because conversion can lead to NA in some cases!
+                # e.g dates < 1970 with non-robust parsers
                 if(!is.character(fixef_mat[[i]])){
                     fixef_mat[[i]] = as.character(fixef_mat[[i]])
                 }
             }
         }
 
+        msgNA_fixef = ""
         if(anyNA(fixef_mat)){
-            isNA_fixef = rowSums(is.na(fixef_mat)) > 0
+            isNA_fixef = !complete.cases(fixef_mat)
 
             ANY_NA = TRUE
             anyNA_sample = TRUE
             isNA_sample = isNA_sample | isNA_fixef
-            msgNA_fixef = paste0(", Fixed-effects: ", numberFormatNormal(sum(isNA_fixef)))
+            msgNA_fixef = paste0("Fixed-effects: ", numberFormatNormal(sum(isNA_fixef)))
 
             if(mem.clean){
                 rm(isNA_fixef)
                 gc2trig = TRUE
             }
 
-        } else {
-            msgNA_fixef = ", Fixed-effects: 0"
         }
 
         # NAs in slopes
@@ -1121,7 +1502,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 gc2trig = FALSE
             }
 
-            # Convert to double
+            # Convert to double => to remove in the future
             who_not_double = which(sapply(slope_mat, is.integer))
             for(i in who_not_double){
                 slope_mat[[i]] = as.numeric(slope_mat[[i]])
@@ -1136,10 +1517,10 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 isNA_slope = info$is_na_inf
                 anyNA_sample = TRUE
                 isNA_sample = isNA_sample | isNA_slope
-                msgNA_slope = paste0(", Var. Slopes: ", numberFormatNormal(sum(isNA_slope)))
+                msgNA_slope = paste0("Var. Slopes: ", numberFormatNormal(sum(isNA_slope)))
 
             } else {
-                msgNA_slope = ", Var. Slopes: 0"
+                msgNA_slope = ""
             }
 
             if(mem.clean){
@@ -1158,17 +1539,20 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             # we remove all NAs obs + 0 weight obs
             gc2trig = TRUE
 
+            details = c(msgNA_y, msgNA_L, msgNA_iv, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, msgNA_split, msgNA_cluster)
+            msg_details = paste(details[nchar(details) > 0], collapse = ", ")
+
             nbNA = sum(isNA_sample)
 
             if(anyNA_sample){
                 msg = msg_na_inf(ANY_NA, ANY_INF)
-                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of ", msg, " (", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ").")
+                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of ", msg, " (", msg_details, ").")
                 notes = c(notes, message_NA)
             }
 
             if(nbNA == nobs){
                 msg = msg_na_inf(ANY_NA, ANY_INF)
-                stop("All observations contain ", msg, ". Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ".)")
+                stop("All observations contain ", msg, ". Estimation cannot be done. Breakup: ", msg_details, ".")
             }
 
             if(any0W){
@@ -1179,7 +1563,7 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
                 if(nbNA == nobs){
                     if(anyNA_sample){
                         msg = msg_na_inf(ANY_NA, ANY_INF)
-                        stop("All observations contain ", msg, " or are 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup ", msg, ": ", msgNA_y, msgNA_L, msgNA_NL, msgNA_fixef, msgNA_slope, msgNA_offset, msgNA_weight, ")")
+                        stop("All observations contain ", msg, " or are 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup ", msg, ": ", msg_details, ")")
                     } else {
                         stop("All observations are 0-weight. Estimation cannot be done.")
                     }
@@ -1189,23 +1573,28 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             # we drop the NAs from the fixef matrix
             fixef_mat = fixef_mat[!isNA_sample, , drop = FALSE]
             obs2remove_NA = which(isNA_sample)
-            index_noNA = (1:nobs)[!isNA_sample]
 
             if(isSlope){
                 slope_mat = slope_mat[!isNA_sample, , drop = FALSE]
             }
 
             # we change the LHS variable
-            lhs = lhs[-obs2remove_NA]
+            if(is.list(lhs)){
+                for(i in seq_along(lhs)){
+                    lhs[[i]] = lhs[[i]][-obs2remove_NA]
+                }
+            } else {
+                lhs = lhs[-obs2remove_NA]
 
-            if(cpp_isConstant(lhs)){
-                # We absolutely need to control for that, otherwise, the code breaks later on
+                if(cpp_isConstant(lhs)){
+                    # We absolutely need to control for that, otherwise, the code breaks later on
 
-                message(ifsingle(notes, "NOTE: ", "NOTES: "), paste(notes, collapse = "\n       "))
-                msg = "NAs"
-                if(any0W && !anyNA_sample) msg = "0-weight"
-                if(any0W && anyNA_sample) msg = "NAs and 0-weight"
-                stop("The dependent variable (after cleaning for ", msg, ") is a constant. Estimation cannot be done.")
+                    message(ifsingle(notes, "NOTE: ", "NOTES: "), paste(notes, collapse = "\n       "))
+                    msg = "NAs"
+                    if(any0W && !anyNA_sample) msg = "0-weight"
+                    if(any0W && anyNA_sample) msg = "NAs and 0-weight"
+                    stop("The dependent variable (after cleaning for ", msg, ") is a constant. Estimation cannot be done.")
+                }
             }
         }
 
@@ -1213,134 +1602,39 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         # ... QUF setup ####
         #
 
-        Q = length(fixef_vars) # terms: contains FEs + slopes
+        info_fe = setup_fixef(fixef_mat = fixef_mat, lhs = lhs, fixef_vars = fixef_vars, fixef.rm = fixef.rm, family = family, isSplit = isSplit, split.full = split.full, origin_type = origin_type, isSlope = isSlope, slope_flag = slope_flag, slope_mat = slope_mat, slope_vars_list = slope_vars_list, nthreads = nthreads)
 
-        fixef_removed = list()
-        obs2remove = c()
+        Q               = info_fe$Q
+        fixef_id        = info_fe$fixef_id
+        fixef_names     = info_fe$fixef_names
+        fixef_sizes     = info_fe$fixef_sizes
+        fixef_table     = info_fe$fixef_table
+        sum_y_all       = info_fe$sum_y_all
+        lhs             = info_fe$lhs
 
-        type = switch(family, gaussian = 0, logit = 2, 1)
-        do_sum_y = !origin_type %in% c("feols", "feglm")
+        obs2remove      = info_fe$obs2remove
+        fixef_removed   = info_fe$fixef_removed
+        message_fixef   = info_fe$message_fixef
 
-        only_slope = FALSE
-        if(isSlope){
-            # only slope: not any non-slope
-            # only_slope = as.vector(tapply(!slope_flag, slope_fe, sum)[fixef_vars]) == 0
-            only_slope = slope_flag < 0
+        slope_variables = info_fe$slope_variables
+        slope_flag      = info_fe$slope_flag
 
-            # shallow copy
-            slope_variables = as.list(slope_mat)
-        }
+        fixef_id_res    = info_fe$fixef_id_res
+        fixef_sizes_res = info_fe$fixef_sizes_res
+        new_order       = info_fe$new_order
 
-        if(mem.clean && gc2trig){
-            gc()
-            gc2trig = FALSE
-        }
-
-        quf_info_all = cpppar_quf_table_sum(x = fixef_mat, y = lhs, do_sum_y = do_sum_y, type = type, only_slope = only_slope, nthreads = nthreads)
-
-        fixef_id = quf_info_all$quf
-        # names
-        fixef_names = list()
-        is_string = sapply(fixef_mat, is.character)
-        for(i in 1:length(fixef_id)){
-            if(is_string[i]){
-                fixef_names[[i]] = fixef_mat[[i]][quf_info_all$items[[i]]]
-            } else {
-                fixef_names[[i]] = quf_info_all$items[[i]]
-            }
-        }
-        # table/sum_y/sizes
-        fixef_table = quf_info_all$table
-        sum_y_all = quf_info_all$sum_y
-        fixef_sizes = lengths(fixef_table)
-
-        # If observations have been removed:
-        if(!is.null(quf_info_all$obs_removed)){
-
-            # which obs are removed
-            obs2remove = which(quf_info_all$obs_removed)
-
-            # update of the lhs
-            lhs = lhs[-obs2remove]
-
-            # update of the slope variables
-            if(isSlope){
-                for(i in seq_along(slope_variables)) slope_variables[[i]] = slope_variables[[i]][-obs2remove]
-            }
-
-            # Names of the FE removed
-            for(i in 1:length(fixef_id)){
-                if(is_string[i]){
-                    fixef_removed[[i]] = fixef_mat[[i]][quf_info_all$fe_removed[[i]]]
-                } else {
-                    fixef_removed[[i]] = quf_info_all$fe_removed[[i]]
-                }
-            }
-
-            names(fixef_removed) = fixef_vars
-
-            # Then the "Notes"
-            nb_missing = lengths(fixef_removed)
-            message_fixef = paste0(paste0(nb_missing, collapse = "/"), " fixed-effect", plural(sum(nb_missing)), " (", numberFormatNormal(length(obs2remove)), " observation", plural_len(obs2remove), ") removed because of only ", ifelse(family=="logit", "zero (or only one)", "zero"), " outcomes.")
-            notes = c(notes, message_fixef)
-        }
+        notes = c(notes, message_fixef)
 
         if(length(obs2remove_NA) > 0){
             # we update the value of obs2remove (will contain both NA and removed bc of outcomes)
             if(length(obs2remove) > 0){
+                index_noNA = (1:(tail(obs2remove_NA, 1) + tail(obs2remove, 1)))[-obs2remove_NA]
                 obs2remove_fixef = index_noNA[obs2remove]
             } else {
                 obs2remove_fixef = c()
             }
 
             obs2remove = sort(c(obs2remove_NA, obs2remove_fixef))
-        }
-
-        #
-        # we save the fixed-effects IDs + sizes (to be returned in "res") [original order!]
-        #
-
-        fixef_id_res = list()
-        for(i in 1:Q){
-            dum = fixef_id[[i]]
-            attr(dum, "fixef_names") = as.character(fixef_names[[i]])
-            fixef_id_res[[fixef_vars[i]]] = dum
-        }
-
-
-        # The real size is equal to nb_coef * nb_slopes
-        if(isSlope){
-            fixef_sizes_real = fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0))
-        } else {
-            fixef_sizes_real = fixef_sizes
-        }
-
-        fixef_sizes_res = fixef_sizes
-        names(fixef_sizes_res) = fixef_vars
-
-        #
-        # We re-order the fixed-effects
-        #
-
-        IS_REORDER = FALSE
-        if(any(fixef_sizes_real != sort(fixef_sizes_real, decreasing = TRUE))){
-            IS_REORDER = TRUE
-            # FE with the most cases first (limits precision problems)
-
-            new_order = order(fixef_sizes_real, decreasing = TRUE)
-
-            fixef_sizes = fixef_sizes[new_order]
-            fixef_id = fixef_id[new_order]
-            sum_y_all = sum_y_all[new_order]
-            fixef_table = fixef_table[new_order]
-
-            if(isSlope){
-                slope_variables = slope_variables[unlist(slope_vars_list[new_order], use.names = FALSE)]
-                slope_flag = slope_flag[new_order]
-            }
-
-        } else {
-            new_order = 1:Q
         }
 
     } else {
@@ -1352,12 +1646,15 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
             nbNA = sum(isNA_sample)
 
+            details = c(msgNA_y, msgNA_L, msgNA_iv, msgNA_NL, msgNA_offset, msgNA_weight, msgNA_split, msgNA_cluster)
+            msg_details = paste(details[nchar(details) > 0], collapse = ", ")
+
             if(anyNA_sample){
-                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of NA values (", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ").")
+                message_NA = paste0(numberFormatNormal(nbNA), " observation", plural(nbNA), " removed because of NA values (", msg_details, ").")
                 notes = c(notes, message_NA)
 
                 if(nbNA == nobs){
-                    stop("All observations contain NAs. Estimation cannot be done. (Breakup: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ".)")
+                    stop("All observations contain NAs. Estimation cannot be done. (Breakup: ", msg_details, ".)")
                 }
             }
 
@@ -1368,15 +1665,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
                 if(nbNA == nobs){
                     if(anyNA_sample){
-                        stop("All observations are either NA or 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup NA: ", msgNA_y, msgNA_L, msgNA_NL, msgNA_offset, msgNA_weight, ".)")
+                        stop("All observations are either NA or 0-weight. Estimation cannot be done. (0-weight: ", sum(is0W), ", breakup NA: ", msg_details, ".)")
                     } else {
                         stop("All observations are 0-weight. Estimation cannot be done.")
                     }
                 }
             }
-
-            # note = ifelse((anyNA_sample + any0W) == 2, "NOTES: ", "NOTE: ")
-            # if(notes) message(note, message_NA, ifelse(anyNA_sample && any0W, "\n       ", ""), message_0W)
 
             # we drop the NAs from the fixef matrix
             obs2remove = which(isNA_sample)
@@ -1390,27 +1684,33 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         message(ifsingle(notes, "NOTE: ", "NOTES: "), paste(notes, collapse = "\n       "))
     }
 
+    #
+    # NA removal ####
+    #
+
     # NA & problem management
     if(length(obs2remove) > 0){
         # we kick out the problems (both NA related and fixef related)
 
-        # We drop only 0 variables (may happen for factors)
-        linear.mat = linear.mat[-obs2remove, , drop = FALSE]
+        if(isLinear){
+            # We drop only 0 variables (may happen for factors)
+            linear.mat = select_obs(linear.mat, -obs2remove, nthreads)
 
-        if(useModel.matrix){
-            # There are factors => possibly some vars are only 0 now that NAs are removed
-
-            only_0 = cpppar_check_only_0(linear.mat, nthreads)
-            if(all(only_0 == 1)){
-                stop("After removing NAs, not a single explanatory variable is different from 0.")
-            } else if(any(only_0 == 1)){
-                linear.mat = linear.mat[, only_0 == 0, drop = FALSE]
-            }
+            # useful for feNmlm
+            linear.params = colnames(linear.mat)
+            params = c(nonlinear.params, linear.params)
+            lparams = length(params)
         }
 
         if(Q == 0){
             # if Q > 0: done already when managing the fixed-effects
-            lhs = lhs[-obs2remove]
+            lhs = select_obs(lhs, -obs2remove)
+
+        }
+
+        if(do_iv){
+            iv_lhs = select_obs(iv_lhs, -obs2remove)
+            iv.mat = select_obs(iv.mat, -obs2remove, nthreads, "instrument")
         }
 
         if(isOffset){
@@ -1425,28 +1725,51 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             data_NL = data_NL[-obs2remove, , drop = FALSE]
         }
 
+        if(isSplit){
+            split = split[-obs2remove]
+        }
+
+        if(multi_rhs){
+            linear_core = select_obs(linear_core, -obs2remove, nthreads)
+            rhs_sw = select_obs(rhs_sw, -obs2remove, nthreads)
+        }
+
+    }
+
+    # NEW NUMBER OF OBS AFTER NA/FE REMOVAL
+    if(is.list(lhs)){
+        nobs = length(lhs[[1]])
+    } else {
+        nobs = length(lhs)
     }
 
     # If presence of FEs => we exclude the intercept only if not all slopes
     if(Q > 0 && onlySlope == FALSE){
         # If there is a linear intercept, we withdraw it
         # We drop the intercept:
+
         if(isLinear && "(Intercept)" %in% colnames(linear.mat)){
             var2remove = which(colnames(linear.mat) == "(Intercept)")
             if(ncol(linear.mat) == length(var2remove)){
                 isLinear = FALSE
                 linear.params = NULL
-                params <- nonlinear.params
-                lparams <- length(params)
-                varnames <- nonlinear.varnames
+                params = nonlinear.params
+                lparams = length(params)
+                varnames = nonlinear.varnames
             } else{
                 linear.mat = linear.mat[, -var2remove, drop = FALSE]
-                linear.params <- colnames(linear.mat)
-                params <- c(nonlinear.params, linear.params)
-                lparams <- length(params)
-                varnames <- c(nonlinear.varnames, linear.varnames)
+                linear.params = colnames(linear.mat)
+                params = c(nonlinear.params, linear.params)
+                lparams = length(params)
+                varnames = c(nonlinear.varnames, linear.varnames)
             }
         }
+
+    }
+
+    if(do_iv && "(Intercept)" %in% colnames(iv.mat)){
+        var2remove = which(colnames(iv.mat) == "(Intercept)")
+        iv.mat = iv.mat[, -var2remove, drop = FALSE]
     }
 
 
@@ -1464,10 +1787,13 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         if(n_linstart == 0){
             stop("If 'start' is provided, its length should be equal to the number of variables (", n_vars, ") or equal to 1 (or a named-vector whose names are the variable names). Currently it is zero-length.")
+
         } else if(!is.numeric(linear.start)){
             stop("Argument 'start' must be a numeric vector (currently its class is ", class(linear.start)[1], ").")
+
         } else if(!isVector(linear.start)){
             stop("Argument 'start' must be a numeric vector (currently it is not a vector).")
+
         } else if(is.null(names(linear.start))){
             if(n_linstart == 1){
                 # Nothing to do
@@ -1511,20 +1837,20 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             }
 
 
-            # controls
-            if(!is.numeric(starting_values) || !isVector(starting_values)){
-                stop("Argument '", arg_name, "' must be a numeric vector.")
-            }
-            starting_values = as.numeric(as.vector(starting_values)) # avoids integers
+            # controls + avoid integers
+            check_value_plus(starting_values, "numeric vector conv", .arg_name = arg_name)
 
             if(length(starting_values) == 1){
-                starting_values = rep(starting_values, length(lhs))
-            } else if(length(starting_values) == length(lhs)){
+                starting_values = rep(starting_values, nobs)
+
+            } else if(length(starting_values) == nobs){
                 # Fine (although that's weird the user knows the final length ex ante)
+
             } else if(length(starting_values) == nobs){ # nobs => original nb of obs
                 if(length(obs2remove) > 0){
                     starting_values = starting_values[-obs2remove]
                 }
+
             } else {
                 stop("The length '", arg_name, "' (", numberFormatNormal(length(starting_values)), ") differs from the length of the data (", numberFormatNormal(nobs), ").")
             }
@@ -1559,27 +1885,35 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     }
 
+    #
     # families of feglm
+    #
+
     if(origin_type == "feglm"){
+        # We optimize Poisson and Logit
 
         family_equiv = family_funs$family_equiv
 
         if(family_equiv == "poisson"){
             family_funs$linkfun = function(mu) cpppar_log(mu, nthreads)
             family_funs$linkinv = function(eta) cpppar_poisson_linkinv(eta, nthreads)
-            y_pos = lhs[lhs > 0]
-            qui_pos = lhs > 0
-            if(isWeight){
-                constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
-                # dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
-                sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
-            } else {
-                constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
-                # dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
-                sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+
+            if(multi_lhs == FALSE && isSplit == FALSE){
+                # => we simply delay the assignment for multi_lhs == TRUE or split
+                # It will be done in reshape_env
+                y_pos = lhs[lhs > 0]
+                qui_pos = lhs > 0
+                if(isWeight){
+                    constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
+                    sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
+                } else {
+                    constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
+                    sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+                }
+
+                family_funs$sum_dev.resids = sum_dev.resids
             }
 
-            family_funs$sum_dev.resids = sum_dev.resids
 
             family_funs$mu.eta = function(mu, eta) mu
             family_funs$validmu = function(mu) cpppar_poisson_validmu(mu, nthreads)
@@ -1588,10 +1922,8 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             family_funs$linkfun = function(mu) cpppar_logit_linkfun(mu, nthreads)
             family_funs$linkinv = function(eta) cpppar_logit_linkinv(eta, nthreads)
             if(isWeight){
-                # dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, wt, nthreads))
                 sum_dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, wt, nthreads))
             } else {
-                # dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, 1, nthreads))
                 sum_dev.resids = function(y, mu, eta, wt) sum(cpppar_logit_devresids(y, mu, 1, nthreads))
             }
             family_funs$sum_dev.resids = sum_dev.resids
@@ -1603,26 +1935,13 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     }
 
+    if(lparams == 0 && Q == 0 && !multi_fixef && !multi_rhs) stop("No parameter to be estimated.")
 
-    if(lparams == 0 && Q == 0) stop("No parameter to be estimated.")
-
-    if(!isLogical(useHessian)){
-        stop("'useHessian' must be a single 'logical'!")
-    }
+    check_arg(useHessian, "logical scalar")
     assign("hessian.args", hessian.args, env)
 
     if(origin == "feNmlm"){
-
-        if(!isSingleChar(jacobian.method)){
-            stop("Argument 'jacobian.method' must be a character scalar equal to 'simple' or 'Richardson'.")
-        } else {
-            value = try(match.arg(jacobian.method, c("simple", "Richardson")))
-            if("try-error" %in% class(value)){
-                stop("Argument jacobian.method does not match 'simple' or 'Richardson' (currently equal to ", jacobian.method, ").")
-            }
-            jacobian.method = value
-        }
-
+        jacobian.method = check_arg_plus(jacobian.method, "match(simple, Richardson)")
     }
 
     #
@@ -1678,12 +1997,12 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             stop("'lower' MUST be a list.")
         }
 
-        lower[params[!params %in% names(lower)]] <- -Inf
-        lower <- unlist(lower[params])
+        lower[params[!params %in% names(lower)]] = -Inf
+        lower = unlist(lower[params])
 
     }	else {
-        lower <- rep(-Inf, lparams)
-        names(lower) <- params
+        lower = rep(-Inf, lparams)
+        names(lower) = params
     }
 
     if(!missnull(upper)){
@@ -1692,26 +2011,20 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
             stop("'upper' MUST be a list.")
         }
 
-        upper[params[!params %in% names(upper)]] <- Inf
-        upper <- unlist(upper[params])
+        upper[params[!params %in% names(upper)]] = Inf
+        upper = unlist(upper[params])
 
     }	else {
-        upper <- rep(Inf, lparams)
-        names(upper) <- params
+        upper = rep(Inf, lparams)
+        names(upper) = params
     }
 
-    lower <- c(lower)
-    upper <- c(upper)
+    lower = c(lower)
+    upper = c(upper)
 
     #
     # Controls: user defined gradient
     #
-
-    # OFFSET
-    assign("offset.value", offset.value, env)
-
-    # WEIGHTS
-    assign("weights.value", weights.value, env)
 
     #
     # PRECISION + controls ####
@@ -1719,45 +2032,21 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     # The main precision
 
-    if(!isScalar(fixef.tol) || fixef.tol <= 0 || fixef.tol >1){
-        stop("If provided, argument 'fixef.tol' must be a strictly positive scalar lower than 1.")
-    } else if(fixef.tol < 10000*.Machine$double.eps){
-        stop("Argument 'fixef.tol' cannot be lower than ", signif(10000*.Machine$double.eps))
-    }
-
-    if(!isScalar(fixef.iter) || fixef.iter < 1){
-        stop("Argument fixef.iter must be an integer greater than 0.")
-    }
+    check_value(fixef.tol, "numeric scalar GT{(10000*.Machine$double.eps)}")
+    check_arg(fixef.iter, "integer scalar GE{1}")
 
     if(origin_type == "feNmlm"){
-        if(!isScalar(deriv.iter) || deriv.iter < 1){
-            stop("Argument deriv.iter must be an integer greater than 0.")
-        }
-
-        if(!isScalar(deriv.tol) || deriv.tol <= 0 || deriv.tol >1){
-            stop("If provided, argument 'deriv.tol' must be a strictly positive scalar lower than 1.")
-        } else if(deriv.tol < 10000*.Machine$double.eps){
-            stop("Argument 'deriv.tol' cannot be lower than ", signif(10000*.Machine$double.eps))
-        }
+        check_arg(deriv.tol, "numeric scalar GT{(10000*.Machine$double.eps)}")
+        check_arg(deriv.iter, "integer scalar GE{1}")
 
         # Other: opt.control
-        if(!is.list(opt.control)){
-            stop("Argument opt.control must be a list of controls for the function nlminb (see help for details).")
-        }
+        check_arg(opt.control, "list l0", .message = "Argument opt.control must be a list of controls for the function nlminb (see help for details).")
 
     }
 
     if(origin_type == "feglm"){
-
-        if(!isScalar(glm.iter) || glm.iter < 1){
-            stop("Argument glm.iter must be an integer greater than, or equal to, 1.")
-        }
-
-        if(!isScalar(glm.tol) || glm.tol <= 0 || glm.tol > 1){
-            stop("Argument 'glm.tol' must be a strictly positive scalar lower than 1.")
-        } else if(glm.tol < 1000*.Machine$double.eps){
-            stop("Argument 'glm.tol' cannot be lower than ", signif(1000*.Machine$double.eps))
-        }
+        check_arg(glm.tol, "numeric scalar gt{(1000*.Machine$double.eps)}")
+        check_arg(glm.iter, "integer scalar GE{1}")
 
         assign("glm.iter", glm.iter, env)
         assign("glm.tol", glm.tol, env)
@@ -1780,254 +2069,238 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         what[is.na(what)] = 0
         linear.start = what
     }
-    start[linear.params] <- linear.start
-    params <- names(start)
-    start <- unlist(start)
-    start <- c(start)
-    lparams <- length(params)
-    names(start) <- params
+    start[linear.params] = linear.start
+    params = names(start)
+    start = unlist(start)
+    start = c(start)
+    lparams = length(params)
+    names(start) = params
 
     # The right order of upper and lower
     upper = upper[params]
     lower = lower[params]
 
-    #
-    # The MODEL0 => to get the init of the theta for the negbin
-    #
-
-    # Bad location => rethink the design of the code
-    assign("famFuns", famFuns, env)
-    assign("family", family, env)
-    assign("nobs", length(lhs), env)
-    assign("lhs", lhs, env)
-    assign("nthreads", nthreads, env)
-
-    if(missing(theta.init)){
-        theta.init = NULL
-    } else {
-        if(!isScalar(theta.init) || theta.init <= 0){
-            stop("the argument 'theta.init' must be a strictly positive scalar.")
-        }
-    }
-
-    if(origin_type == "feNmlm" || computeModel0){
-        model0 <- get_model_null(env, theta.init)
-        theta.init = model0$theta
-    } else {
-        model0 = NULL
-    }
-
-    # For the negative binomial:
-    if(family == "negbin"){
-        params = c(params, ".theta")
-        start = c(start, theta.init)
-        names(start) = params
-        upper = c(upper, 10000)
-        lower = c(lower, 1e-3)
-    }
-
-    # On balance les donnees a utiliser dans un nouvel environnement
-    if(isLinear) assign("linear.mat", linear.mat, env)
-
     ####
     #### Sending to the env ####
     ####
 
-    useExp_fixefCoef = family %in% c("poisson")
+    #
+    # General elements
+    #
 
-    # The dummies
+    # Control
+    assign("fixef.iter", fixef.iter, env)
+    assign("fixef.iter.limit_reached", 0, env) # for warnings if max iter is reached
+    assign("fixef.tol", fixef.tol, env)
+    assign("collin.tol", collin.tol, env)
+    assign("fixef.rm", fixef.rm, env)
+
+    # Data
+    if(isLinear){
+        assign("linear.mat", linear.mat, env)
+    } else {
+        assign("linear.mat", 1, env)
+    }
+    assign("offset.value", offset.value, env)
+    assign("weights.value", weights.value, env)
+    assign("lhs", lhs, env)
+    assign("lhs_names", lhs_names, env)
+    assign("nobs", nobs, env)
+    assign("nobs_origin", nobs_origin, env)
+
+    # Other
+    assign("family", family, env)
+    assign("famFuns", famFuns, env)
+    assign("fml", fml_linear, env)
+    assign("origin", origin, env)
+    assign("origin_type", origin_type, env)
+    assign("warn", warn, env)
+    assign("mem.clean", mem.clean, env)
+    assign("nthreads", nthreads, env)
+
+    # summary
+    assign("do_summary", do_summary, env)
+    if(do_summary){
+        assign("cluster", cluster, env)
+        assign("se", se, env)
+        assign("lean", lean, env)
+    }
+
+    # Multi
+
+    assign("do_multi_lhs", multi_lhs, env)
+
+    assign("do_multi_rhs", multi_rhs, env)
+    if(multi_rhs){
+        assign("rhs_info_stepwise", rhs_info_stepwise, env)
+        assign("linear_core", linear_core, env)
+        assign("rhs_sw", rhs_sw, env)
+
+    }
+
+    assign("do_multi_fixef", multi_fixef, env)
+    if(multi_fixef){
+        assign("multi_fixef_fml_full", fixef_info_stepwise$fml_all_full, env)
+
+        if(missnull(combine.quick)){
+            combine.quick = TRUE
+        }
+        assign("combine.quick", combine.quick, env)
+
+        var_sw = unique(fixef_info_stepwise$sw_all_vars)
+
+        if(length(var_sw) > 0){
+            if(length(obs2remove) > 0){
+                assign("data", data[-obs2remove, var_sw, drop = FALSE], env)
+            } else {
+                assign("data", data[, var_sw, drop = FALSE], env)
+            }
+        }
+    }
+
+
+    # IV
+    assign("do_iv", do_iv, env)
+    if(do_iv){
+        assign("iv_lhs", iv_lhs, env)
+        assign("iv_lhs_names", iv_lhs_names, env)
+        assign("iv.mat", iv.mat, env)
+    }
+
+    #
+    # The MODEL0 => to get the init of the theta for the negbin
+    #
+
+    check_arg(theta.init, "numeric scalar gt{0}")
+    if(missing(theta.init)){
+        theta.init = NULL
+    }
+    assign("theta.init", theta.init, env)
+
+    assign("start", start, env)
+    assign("isNL", isNL, env)
+    assign("linear.params", linear.params, env)
+    assign("isLinear", isLinear, env)
+    assign("nonlinear.params", nonlinear.params, env)
+    assign("nonlinear.varnames", nonlinear.varnames, env)
+    assign("params", params, env)
+
+    #
+    # The Fixed-effects
+    #
+
     assign("isFixef", isFixef, env)
     if(isFixef){
-        assign("fixef_id", fixef_id, env)
-        assign("fixef_sizes", fixef_sizes, env)
-        assign("sum_y", sum_y_all, env)
-        assign("fixef_table", fixef_table, env)
-        assign("familyConv", family, env) # new family -- used in convergence, can be modified
 
-        if(family %in% c("negbin")){
-            # for the deriv_xi_other
-            fixef_id.matrix_cpp = NULL
-            if(Q > 1){
-                fixef_id.matrix_cpp = matrix(unlist(fixef_id), ncol = Q) - 1
-            }
-
-            assign("fixef_id.matrix_cpp", fixef_id.matrix_cpp, env)
+        if(!isSlope){
+            slope_vars_list = list(0)
         }
 
-        # the saved sumFE
-        if(!missnull(sumFE_init)){
-            # information on starting values coming from update method
-            doExp = ifelse(useExp_fixefCoef, exp, I)
+        assign("new_order_original", new_order, env)
+        assign("fixef_names", fixef_names, env)
+        assign("fixef_vars", fixef_vars, env)
 
-            # Means it's the full fixef properly given
-            assign("saved_sumFE", doExp(sumFE_init), env)
-
-        } else if(useExp_fixefCoef){
-            assign("saved_sumFE", rep(1, length(lhs)), env)
-        } else {
-            assign("saved_sumFE", rep(0, length(lhs)), env)
-        }
-
-        # New cpp functions
-        # This is where we send the elements needed for convergence in cpp
-        if(origin_type == "feNmlm"){
-            assign("fixef_id_vector", as.integer(unlist(fixef_id) - 1), env)
-        } else {
-            assign("fixef_id_list", fixef_id, env)
-        }
-
-        assign("fixef_table_vector", as.integer(unlist(fixef_table)), env)
-        assign("sum_y_vector", unlist(sum_y_all), env)
-
-        if(origin_type == "feNmlm"){
-            if(family == "gaussian" && Q >= 2){
-                assign("fixef_invTable", 1/unlist(fixef_table), env)
-            } else {
-                assign("fixef_invTable", 1, env)
-            }
-
-            if(family %in% c("negbin", "logit")){
-                fixef_order = list()
-                for(i in 1:Q){
-                    fixef_order[[i]] = order(fixef_id[[i]]) - 1
-                }
-                assign("fixef_cumtable_vector", as.integer(unlist(lapply(fixef_table, cumsum))), env)
-                assign("fixef_order_vector", as.integer(unlist(fixef_order)), env)
-            } else {
-                # we need to assign it anyway
-                assign("fixef_cumtable_vector", 1L, env)
-                assign("fixef_order_vector", 1L, env)
-            }
-        }
-
-        # Slopes
-
-        if(isSlope){
-            assign("slope_flag", slope_flag, env)
-            assign("slope_variables", slope_variables, env)
-        } else {
-            assign("slope_flag", rep(0L, length(fixef_vars)), env)
-            assign("slope_variables", list(0), env)
-        }
-
+        assign_fixef_env(env, family, origin_type, fixef_id, fixef_sizes, fixef_table, sum_y_all, slope_flag, slope_variables, slope_vars_list)
     }
 
-    # basic NL
-    envNL = new.env()
-    assign("isNL", isNL, env)
-    if(isNL){
-        data_NL = as.data.frame(data_NL)
-        for(var in nonlinear.varnames) assign(var, data_NL[[var]], envNL)
-        for(var in nonlinear.params) assign(var, start[var], envNL)
-    }
-    assign("envNL", envNL, env)
-    assign("nl.call", nl.call, env)
-    # NO user defined gradient: too complicated, not really efficient
-    assign("isGradient", FALSE, env)
-    assign("lower", lower, env)
-    assign("upper", upper, env)
 
-    # other
-    assign("lhs", lhs, env)
-    assign("isLinear", isLinear, env)
-    assign("linear.params", linear.params, env)
-    assign("nonlinear.params", nonlinear.params, env)
-    assign("params", params, env)
-    assign("nobs", length(lhs), env)
-    assign("jacobian.method", jacobian.method, env)
-    assign("famFuns", famFuns, env)
-    assign("family", family, env)
-    assign("iter", 0, env)
-    # Pour gerer les valeurs de mu:
-    assign("coefMu", list(), env)
-    assign("valueMu", list(), env)
-    assign("valueExpMu", list(), env)
-    assign("wasUsed", TRUE, env)
-    # Pour les valeurs de la Jacobienne non lineaire
-    assign("JC_nbSave", 0, env)
-    assign("JC_nbMaxSave", 1, env)
-    assign("JC_savedCoef", list(), env)
-    assign("JC_savedValue", list(), env)
-    # PRECISION
-    assign("fixef.tol", fixef.tol, env)
-    assign("NR.tol", NR.tol, env)
-    assign("deriv.tol", deriv.tol, env)
-    assign("collin.tol", collin.tol, env)
-    # ITERATIONS
-    assign("fixef.iter", fixef.iter, env)
-    assign("deriv.iter", deriv.iter, env)
-    assign("fixef.iter.limit_reached", 0, env) # for warnings if max iter is reached
-    assign("deriv.iter.limit_reached", 0, env) # for warnings if max iter is reached
-    # OTHER
-    assign("useAcc", TRUE, env)
-    assign("warn_0_Hessian", FALSE, env)
-    assign("warn_overfit_logit", FALSE, env)
-    # Misc
-    assign("origin", origin, env)
-    assign("warn", warn, env)
-    assign("opt.control", opt.control, env)
-    assign("mem.clean", mem.clean, env)
+    #
+    # Specific to femlm/feNmlm
+    #
 
-
-    # To monitor how the FEs are computed (if the problem is difficult or not)
-    assign("firstIterCluster", 1e10, env) # the number of iterations in the first run
-    assign("firstRunCluster", TRUE, env) # flag for first entry in get_dummies
-    assign("iterCluster", 1e10, env) # the previous number of fixef iterations
-    assign("evolutionLL", Inf, env) # diff b/w two successive LL
-    assign("pastLL", 0, env)
-    assign("iterLastPrecisionIncrease", 0, env) # the last iteration when precision was increased
-    assign("nbLowIncrease", 0, env) # number of successive evaluations with very low LL increments
-    assign("nbIterOne", 0, env) # nber of successive evaluations with only 1 iter to get the clusters
-    assign("difficultConvergence", FALSE, env)
-
-    # Same for derivatives
-    assign("derivDifficultConvergence", FALSE, env)
-    assign("firstRunDeriv", TRUE, env) # flag for first entry in derivative
-    assign("accDeriv", TRUE, env) # Logical: flag for accelerating deriv
-    assign("iterDeriv", 1e10, env) # number of iterations in the derivatives step
-
-
-    # NL: On teste les valeurs initiales pour informer l'utilisateur
-
-    if(isNL){
-        mu = NULL
-        try(mu <- eval(nl.call, envir = envNL), silent = FALSE)
-        if(is.null(mu)){
-            # the non linear part could not be evaluated - ad hoc message
-            stop("The non-linear part (NL.fml) could not be evaluated. There may be a problem in 'NL.fml'.")
-        }
-
-        # No numeric vectors
-        if(!isVector(mu) || !is.numeric(mu)){
-            stop("Evaluation of NL.fml should return a numeric vector. (This is currently not the case.)")
-        }
-
-        # Handling NL.fml errors
-        if(length(mu) != nrow(data_NL)){
-            stop("Evaluation of NL.fml leads to ", length(mu), " observations while there are ", nrow(data_NL), " observations in the data base. They should be of the same lenght.")
-        }
-
-        if(anyNA(mu)){
-            stop("Evaluating NL.fml leads to NA values: this is not supported. Maybe it's a problem with the starting values, maybe it's another problem.")
-        }
-
-    } else {
-        mu = eval(nl.call, envir = envNL)
-    }
-
-    # On sauvegarde les valeurs de la partie non lineaire
-    assign("nbMaxSave", 2, env) # nombre maximal de valeurs a sauvegarder
-    assign("nbSave", 1, env)  # nombre de valeurs totales sauvegardees
-    assign("savedCoef", list(start[nonlinear.params]), env)
-    assign("savedValue", list(mu), env)
-    if(isLinear) {
-        # mu <- mu + c(linear.mat%*%unlist(start[linear.params]))
-        start_coef_linear = unlist(start[linear.params])
-        mu <- mu + cpppar_xbeta(linear.mat, start_coef_linear, nthreads)
-    }
-
-    # Mise en place du calcul du gradient
     if(origin_type == "feNmlm"){
+
+        # basic NL
+        envNL = new.env()
+        if(isNL){
+            data_NL = as.data.frame(data_NL)
+            for(var in nonlinear.varnames) assign(var, data_NL[[var]], envNL)
+            for(var in nonlinear.params) assign(var, start[var], envNL)
+        }
+        assign("envNL", envNL, env)
+        assign("nl.call", nl.call, env)
+        # NO user defined gradient: too complicated, not really efficient
+        assign("isGradient", FALSE, env)
+        assign("lower", lower, env)
+        assign("upper", upper, env)
+
+        # other
+        assign("iter", 0, env)
+        assign("jacobian.method", jacobian.method, env)
+        # Pour gerer les valeurs de mu:
+        assign("coefMu", list(), env)
+        assign("valueMu", list(), env)
+        assign("valueExpMu", list(), env)
+        assign("wasUsed", TRUE, env)
+        # Pour les valeurs de la Jacobienne non lineaire
+        assign("JC_nbSave", 0, env)
+        assign("JC_nbMaxSave", 1, env)
+        assign("JC_savedCoef", list(), env)
+        assign("JC_savedValue", list(), env)
+        # PRECISION
+        assign("NR.tol", NR.tol, env)
+        assign("deriv.tol", deriv.tol, env)
+        # ITERATIONS
+        assign("deriv.iter", deriv.iter, env)
+        assign("deriv.iter.limit_reached", 0, env) # for warnings if max iter is reached
+        # OTHER
+        assign("useAcc", TRUE, env)
+        assign("warn_0_Hessian", FALSE, env)
+        assign("warn_overfit_logit", FALSE, env)
+        # Misc
+        assign("opt.control", opt.control, env)
+
+        # To monitor how the FEs are computed (if the problem is difficult or not)
+        assign("firstIterCluster", 1e10, env) # the number of iterations in the first run
+        assign("firstRunCluster", TRUE, env) # flag for first entry in get_dummies
+        assign("iterCluster", 1e10, env) # the previous number of fixef iterations
+        assign("evolutionLL", Inf, env) # diff b/w two successive LL
+        assign("pastLL", 0, env)
+        assign("iterLastPrecisionIncrease", 0, env) # the last iteration when precision was increased
+        assign("nbLowIncrease", 0, env) # number of successive evaluations with very low LL increments
+        assign("nbIterOne", 0, env) # nber of successive evaluations with only 1 iter to get the clusters
+        assign("difficultConvergence", FALSE, env)
+
+        # Same for derivatives
+        assign("derivDifficultConvergence", FALSE, env)
+        assign("firstRunDeriv", TRUE, env) # flag for first entry in derivative
+        assign("accDeriv", TRUE, env) # Logical: flag for accelerating deriv
+        assign("iterDeriv", 1e10, env) # number of iterations in the derivatives step
+
+        # NL: On teste les valeurs initiales pour informer l'utilisateur
+
+        if(isNL){
+
+            mu = error_sender(eval(nl.call, envir = envNL), "The non-linear part (NL.fml) could not be evaluated.:\n")
+
+            # No numeric vectors
+            check_value(mu, "numeric vector", .message = "Evaluation of NL.fml should return a numeric vector.")
+
+            # Handling NL.fml errors
+            if(length(mu) != nrow(data_NL)){
+                if(length(mu) == 1 && length(nonlinear.varnames) == 0){
+                    stop("No variable from the data is in the 'NL.fml', there must be a problem.")
+                } else {
+                    stop("Evaluation of NL.fml leads to ", length(mu), " observations while there are ", nrow(data_NL), " observations in the data base. They should be of the same lenght.")
+                }
+
+            }
+
+            if(anyNA(mu)){
+                stop("Evaluating NL.fml leads to NA values: this is not supported. Maybe it's a problem with the starting values, maybe it's another problem.")
+            }
+
+        } else {
+            mu = eval(nl.call, envir = envNL)
+        }
+
+        # On sauvegarde les valeurs de la partie non lineaire
+        assign("nbMaxSave", 2, env) # nombre maximal de valeurs a sauvegarder
+        assign("nbSave", 1, env)  # nombre de valeurs totales sauvegardees
+        assign("savedCoef", list(start[nonlinear.params]), env)
+        assign("savedValue", list(mu), env)
+
+        # Mise en place du calcul du gradient
         gradient = femlm_gradient
         hessian <- NULL
         if(useHessian) hessian <- femlm_hessian
@@ -2035,16 +2308,18 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
         assign("hessian", hessian, env)
     }
 
-    assign("fml", fml, env)
-    assign("model0", model0, env)
+    # split
+    assign("do_split", isSplit, env)
+    if(isSplit){
+        split = to_integer(split, add_items = TRUE, sorted = TRUE, items.list = TRUE)
+        split.items = split$items
+        split = split$x
 
-    onlyFixef = !isLinear && !isNonLinear && Q > 0
-    assign("onlyFixef", onlyFixef, env)
-    if(onlyFixef){
-        assign("linear.mat", 0, env)
+        assign("split", split, env)
+        assign("split.items", split.items, env)
+        assign("split.name", split.name, env)
+        assign("split.full", split.full, env)
     }
-
-    assign("start", start, env)
 
     # fixest tag
     assign("fixest_env", TRUE, env)
@@ -2057,13 +2332,25 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     # Preparation of the results list (avoid code repetition in estimation funs)
     #
 
-    res = list(nobs=length(lhs), fml=fml, call = mc_origin, method = origin)
+    res = list(nobs=nobs, nobs_origin=nobs_origin, fml=fml_linear, call = mc_origin, call_env = call_env, method = origin, method_type = origin_type)
 
-    if(isFixef) res$fml_full = fml_full
+    fml_all = list()
+    fml_all$linear = fml_linear
+    fml_all$fixef = fml_fixef
+    fml_all$NL = NL.fml
+    fml_all$iv = fml_iv
+    res$fml_all = fml_all
 
     if(!is.null(fml_no_xpd)) res$fml_no_xpd = fml_no_xpd
 
     if(isFit) res$fromFit = TRUE
+
+    if(do_iv){
+        res$iv = TRUE
+        res$iv_inst_names = inst_names
+        res$iv_n_inst = ncol(iv.mat)
+        res$iv_endo_names = iv_lhs_names
+    }
 
     # nber of params
     K = length(params)
@@ -2092,7 +2379,6 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
         if(isSlope){
             res$fixef_terms = fixef_terms
-            original_order = order(new_order)
             res$slope_flag = slope_flag[order(new_order)]
             res$slope_flag_reordered = slope_flag
             res$slope_variables_reordered = slope_variables
@@ -2105,6 +2391,14 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     }
 
     # Observations removed (either NA or fixed-effects)
+    if(isSubset){
+        # subset does not accept duplicate values eg c(1, 1, 1, 2)
+        all_obs = 1:nobs_origin
+        obs2keep = all_obs[subset]
+        obs2remove_subset = all_obs[-obs2keep]
+        obs2remove = sort(c(obs2remove_subset, obs2keep[obs2remove]))
+    }
+
     if(length(obs2remove) > 0){
         res$obsRemoved = obs2remove
         if(isFixef && any(lengths(fixef_removed) > 0)){
@@ -2121,7 +2415,8 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
     }
 
     # We save lhs in case of feglm, for later within-r2 evaluation
-    if(origin_type == "feglm" && isFixef){
+    if(origin_type == "feglm" && isFixef && !multi_lhs){
+        # in multi_lhd => will be done in reshape_env
         res$y = lhs
     }
 
@@ -2142,5 +2437,1078 @@ fixest_env <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussi
 
     env
 }
+
+
+setup_fixef = function(fixef_mat, lhs, fixef_vars, fixef.rm, family, isSplit, split.full = FALSE, origin_type, isSlope, slope_flag, slope_mat, slope_vars_list, fixef_names_old = NULL, fixef_sizes = NULL, obs2keep = NULL, nthreads){
+
+    isSplitNoFull = identical(fixef_names_old, "SPLIT_NO_FULL")
+    isRefactor = !isSplitNoFull && !is.null(fixef_names_old)
+
+    Q = length(fixef_vars) # terms: contains FEs + slopes
+
+    rm_0 = !family == "gaussian"
+    rm_1 = family == "logit"
+    rm_single = fixef.rm %in% c("singleton", "both")
+    do_sum_y = !origin_type %in% c("feols", "feglm")
+
+    multi_lhs = is.list(lhs)
+
+    if(multi_lhs){
+        # we delay the removal of FEs to later, when called in reshape env
+        rm_0 = rm_1 = do_sum_y = FALSE
+    }
+
+    only_slope = FALSE
+    if(isSlope){
+        # only slope: not any non-slope
+        only_slope = slope_flag < 0
+
+        # shallow copy
+        slope_variables = as.list(slope_mat)
+
+        if(!is.null(obs2keep)){
+            for(i in seq_along(slope_variables)){
+                slope_variables[[i]] = slope_variables[[i]][obs2keep]
+            }
+        }
+    } else {
+        slope_flag = rep(0L, length(fixef_mat))
+        slope_variables = list(0)
+    }
+
+    if(isSplit && split.full == FALSE){
+        # We don't do anything => it will be taken care of in the splits
+        res = list(Q = Q, fixef_id = fixef_mat, fixef_names = "SPLIT_NO_FULL", sum_y_all = 0, fixef_sizes = 0, fixef_table = 0, obs2remove = NULL, fixef_removed = NULL, message_fixef = NULL, lhs = lhs, slope_variables = slope_variables, slope_flag = slope_flag, new_order = 1:Q)
+
+        return(res)
+    }
+
+    do_keep = !is.null(obs2keep)
+
+    if(isSplitNoFull && do_keep){
+        # Here fixef_mat is a DF
+        fixef_mat = select_obs(fixef_mat, obs2keep)
+    }
+
+    if(is.null(obs2keep)){
+        obs2keep = 0
+    }
+
+    if(is.null(fixef_sizes)){
+        fixef_sizes = 0
+    }
+
+    # quoi = list(fixef_mat=fixef_mat, lhs=lhs, do_sum_y=do_sum_y, rm_0=rm_0, rm_1=rm_1, rm_single=rm_single, only_slope=only_slope, nthreads=nthreads, isRefactor=isRefactor, fixef_sizes=fixef_sizes, obs2keep=obs2keep)
+    # save(quoi, file = "../_DATA/problem.Rdata")
+
+    # browser()
+
+    quf_info_all = cpppar_quf_table_sum(x = fixef_mat, y = lhs, do_sum_y = do_sum_y, rm_0 = rm_0, rm_1 = rm_1, rm_single = rm_single, only_slope = only_slope, nthreads = nthreads, do_refactor = isRefactor, r_x_sizes = fixef_sizes, obs2keep = obs2keep)
+
+    fixef_id = quf_info_all$quf
+    # names
+
+    fixef_names = list()
+    if(isRefactor == FALSE){
+        is_string = sapply(fixef_mat, is.character)
+        for(i in 1:length(fixef_id)){
+            if(is_string[i]){
+                fixef_names[[i]] = fixef_mat[[i]][quf_info_all$items[[i]]]
+            } else {
+                fixef_names[[i]] = quf_info_all$items[[i]]
+            }
+        }
+
+    } else {
+        # If here, we're in refactoring. The new fixef are integers
+        for(i in 1:length(fixef_id)){
+            fixef_names[[i]] = fixef_names_old[[i]][quf_info_all$items[[i]]]
+        }
+    }
+
+
+    # table/sum_y/sizes
+    fixef_table = quf_info_all$table
+    sum_y_all = quf_info_all$sum_y
+    fixef_sizes = lengths(fixef_table)
+
+    # If observations have been removed:
+    fixef_removed = list()
+    obs2remove = message_fixef = c()
+
+    if(!is.null(quf_info_all$obs_removed)){
+
+        # which obs are removed
+        obs2remove = which(quf_info_all$obs_removed)
+
+        # update of the lhs (only if not multi LHS)
+        if(multi_lhs == FALSE) lhs = lhs[-obs2remove]
+
+        # update of the slope variables
+        if(isSlope){
+            for(i in seq_along(slope_variables)) slope_variables[[i]] = slope_variables[[i]][-obs2remove]
+        }
+
+        # Names of the FE removed
+        for(i in 1:length(fixef_id)){
+            if(is.character(fixef_mat[[i]])){
+                fixef_removed[[i]] = fixef_mat[[i]][quf_info_all$fe_removed[[i]]]
+            } else {
+                fixef_removed[[i]] = quf_info_all$fe_removed[[i]]
+            }
+        }
+
+        names(fixef_removed) = fixef_vars
+
+        # Then the "Notes"
+        nb_missing = lengths(fixef_removed)
+        if(rm_0 == FALSE){
+            n_single = sum(nb_missing)
+            message_fixef = paste0(n_single, " fixed-effect singleton", plural(n_single, "s.was"), " removed (", numberFormatNormal(length(obs2remove)), " observation", plural_len(obs2remove), ifelse(Q == 1, "", paste0(", breakup: ", paste0(nb_missing, collapse = "/"))), ").")
+        } else {
+            message_fixef = paste0(paste0(nb_missing, collapse = "/"), " fixed-effect", plural(sum(nb_missing)), " (", numberFormatNormal(length(obs2remove)), " observation", plural_len(obs2remove), ") removed because of only ", ifelse(rm_1, "0 (or only 1)", "0"), " outcomes", ifelse(rm_single && !rm_1, " or singletons", ""), ".")
+        }
+
+    }
+
+    if(multi_lhs == FALSE || family == "gaussian"){
+        #
+        # we save the fixed-effects IDs + sizes (to be returned in "res") [original order!]
+        #
+
+        fixef_id_res = list()
+        for(i in 1:Q){
+            dum = fixef_id[[i]]
+            attr(dum, "fixef_names") = as.character(fixef_names[[i]])
+            fixef_id_res[[fixef_vars[i]]] = dum
+        }
+
+        # The real size is equal to nb_coef * nb_slopes
+        if(isSlope){
+            fixef_sizes_real = fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0))
+        } else {
+            fixef_sizes_real = fixef_sizes
+        }
+
+        fixef_sizes_res = fixef_sizes
+        names(fixef_sizes_res) = fixef_vars
+
+        #
+        # We re-order the fixed-effects
+        #
+
+        if(any(fixef_sizes_real != sort(fixef_sizes_real, decreasing = TRUE))){
+            # FE with the most cases first (limits precision problems)
+
+            new_order = order(fixef_sizes_real, decreasing = TRUE)
+
+            fixef_sizes = fixef_sizes[new_order]
+            fixef_id = fixef_id[new_order]
+            sum_y_all = sum_y_all[new_order]
+            fixef_table = fixef_table[new_order]
+
+            if(isSlope){
+                slope_variables = slope_variables[unlist(slope_vars_list[new_order], use.names = FALSE)]
+                slope_flag = slope_flag[new_order]
+            }
+
+        } else {
+            new_order = 1:Q
+        }
+    }
+
+    # saving
+    res = list(Q = Q, fixef_id = fixef_id, fixef_names = fixef_names, sum_y_all = sum_y_all, fixef_sizes = fixef_sizes, fixef_table = fixef_table, obs2remove = obs2remove, fixef_removed = fixef_removed, message_fixef = message_fixef, lhs = lhs)
+
+    res$slope_variables = slope_variables
+    res$slope_flag = slope_flag
+
+    if(multi_lhs == FALSE || family == "gaussian"){
+        res$fixef_id_res = fixef_id_res
+        res$fixef_sizes_res = fixef_sizes_res
+        res$new_order = new_order
+    }
+
+    return(res)
+}
+
+
+
+
+
+assign_fixef_env = function(env, family, origin_type, fixef_id, fixef_sizes, fixef_table, sum_y_all, slope_flag, slope_variables, slope_vars_list){
+
+    Q = length(fixef_id)
+
+    assign("fixef_id_list", fixef_id, env)
+    assign("fixef_sizes", fixef_sizes, env)
+    assign("sum_y", sum_y_all, env)
+    assign("fixef_table", fixef_table, env)
+    assign("familyConv", family, env) # new family -- used in convergence, can be modified
+
+    if(family %in% c("negbin")){
+        # for the deriv_xi_other
+        fixef_id.matrix_cpp = NULL
+        if(Q > 1){
+            fixef_id.matrix_cpp = matrix(unlist(fixef_id), ncol = Q) - 1
+        }
+
+        assign("fixef_id.matrix_cpp", fixef_id.matrix_cpp, env)
+    }
+
+    # New cpp functions
+    # This is where we send the elements needed for convergence in cpp
+    if(origin_type == "feNmlm"){
+        assign("fixef_id_vector", as.integer(unlist(fixef_id) - 1), env)
+    }
+
+    assign("fixef_table_vector", as.integer(unlist(fixef_table)), env)
+    assign("sum_y_vector", unlist(sum_y_all), env)
+
+    if(origin_type == "feNmlm"){
+
+        useExp_fixefCoef = family %in% c("poisson")
+
+        nobs = length(fixef_id[[1]])
+
+        if(useExp_fixefCoef){
+            assign("saved_sumFE", rep(1, nobs), env)
+        } else {
+            assign("saved_sumFE", rep(0, nobs), env)
+        }
+
+        if(family == "gaussian" && Q >= 2){
+            assign("fixef_invTable", 1/unlist(fixef_table), env)
+        } else {
+            assign("fixef_invTable", 1, env)
+        }
+
+        if(family %in% c("negbin", "logit")){
+            fixef_order = list()
+            for(i in 1:Q){
+                fixef_order[[i]] = order(fixef_id[[i]]) - 1
+            }
+            assign("fixef_cumtable_vector", as.integer(unlist(lapply(fixef_table, cumsum))), env)
+            assign("fixef_order_vector", as.integer(unlist(fixef_order)), env)
+        } else {
+            # we need to assign it anyway
+            assign("fixef_cumtable_vector", 1L, env)
+            assign("fixef_order_vector", 1L, env)
+        }
+    }
+
+    # Slopes
+    assign("slope_flag", slope_flag, env)
+    assign("slope_variables", slope_variables, env)
+    assign("slope_vars_list", slope_vars_list, env)
+}
+
+
+
+reshape_env = function(env, obs2keep = NULL, lhs = NULL, rhs = NULL, assign_lhs = TRUE, assign_rhs = TRUE, fml_linear = NULL, fml_fixef = NULL, fml_iv_endo = NULL, check_lhs = FALSE, assign_fixef = FALSE){
+    # env: environment from an estimation
+    # This functions reshapes the environment to perform the neww estimation
+    # either by selecting some observation (in split)
+    # either by changing the depvar (leading to new NAs, etc)
+    # obs2keep => must be a which()
+
+    # Mainly:
+    # - dropping the NAs from the new y
+    # - reformatting of res
+    # - refactoring the fixef and VSs
+    # - dropping the factor values from i() that are only 0
+
+    # gt = function(x) cat(sfill(x, 20), ": ", -(t0 - (t0<<-proc.time()))[3], "s\n", sep = "")
+    # t0 = proc.time()
+
+    new_env = new.env(parent = env)
+
+    isFixef     = get("isFixef", env)
+    origin_type = get("origin_type", env)
+    family      = get("family", env)
+    nthreads    = get("nthreads", env)
+
+    save_lhs = !missnull(lhs)
+    save_rhs = !missnull(rhs)
+
+    if(assign_lhs == FALSE){
+        lhs = list(0)
+    } else if(is.null(lhs)){
+        lhs = get("lhs", env)
+    }
+
+    lhs_done = FALSE
+
+    #
+    # fixef ####
+    #
+
+    if(isFixef && (length(obs2keep) > 0 || check_lhs || assign_fixef)){
+
+        # gt("nothing")
+
+        if(assign_lhs && length(obs2keep) > 0){
+            lhs = select_obs(lhs, obs2keep)
+        }
+
+        # gt("fixef, dropping lhs")
+
+        fixef_mat       = get("fixef_id_list", env)
+        fixef_vars      = get("fixef_vars", env)
+        fixef.rm        = get("fixef.rm", env)
+        fixef_names_old = get("fixef_names", env)
+        fixef_sizes     = get("fixef_sizes", env)
+
+        slope_flag      = get("slope_flag", env)
+        slope_mat       = get("slope_variables", env)
+        slope_vars_list = get("slope_vars_list", env)
+        isSlope         = any(slope_flag != 0)
+
+        # gt("fixef, dropping")
+
+        # We refactor the fixed effects => we may remove even more obs
+        info_fe = setup_fixef(fixef_mat = fixef_mat, lhs = lhs, fixef_vars = fixef_vars, fixef.rm = fixef.rm, family = family, isSplit = FALSE, origin_type = origin_type, isSlope = isSlope, slope_flag = slope_flag, slope_mat = slope_mat, slope_vars_list = slope_vars_list, fixef_names_old = fixef_names_old, fixef_sizes = fixef_sizes, obs2keep = obs2keep, nthreads = nthreads)
+
+        # gt("fixef, recompute")
+
+        Q               = info_fe$Q
+        fixef_id        = info_fe$fixef_id
+        fixef_names     = info_fe$fixef_names
+        fixef_sizes     = info_fe$fixef_sizes
+        fixef_table     = info_fe$fixef_table
+        sum_y_all       = info_fe$sum_y_all
+        lhs             = info_fe$lhs
+
+        obs2remove      = info_fe$obs2remove
+        fixef_removed   = info_fe$fixef_removed
+        message_fixef   = info_fe$message_fixef
+
+        slope_variables = info_fe$slope_variables
+        slope_flag      = info_fe$slope_flag
+
+        fixef_id_res    = info_fe$fixef_id_res
+        fixef_sizes_res = info_fe$fixef_sizes_res
+        new_order       = info_fe$new_order
+
+        if(length(obs2remove) > 0){
+
+            if(is.null(obs2keep)){
+                obs2keep = 1:length(fixef_mat[[1]])
+            }
+
+            if(assign_lhs && is.list(lhs)){
+                # list means multiple LHS
+                lhs = select_obs(lhs, -obs2remove)
+            }
+
+            obs2keep = obs2keep[-obs2remove]
+        }
+
+        lhs_done = TRUE
+
+        assign_fixef_env(new_env, family, origin_type, fixef_id, fixef_sizes, fixef_table, sum_y_all, slope_flag, slope_variables, slope_vars_list)
+
+    } else if(isFixef){
+        slope_flag = get("slope_flag", env)
+        isSlope = any(slope_flag != 0)
+    }
+
+    res = get("res", new_env)
+
+    # This is very tedious
+    if(!is.null(obs2keep) || assign_fixef){
+        # Recreating the values
+
+        #
+        # RM obs = TRUE ####
+        #
+
+        if(!is.null(obs2keep)){
+            #
+            # The left hand side
+            #
+
+            if(assign_lhs){
+                if(lhs_done == FALSE){
+                    # lhs: can be vector or list
+                    lhs = select_obs(lhs, obs2keep)
+                }
+                assign("lhs", lhs, new_env)
+            }
+
+            #
+            # The linear mat
+            #
+
+            if(assign_rhs){
+
+                if(is.null(rhs)){
+                    rhs = get("linear.mat", env)
+                }
+
+                isLinear = FALSE
+                if(length(rhs) > 1){
+                    isLinear = TRUE
+                    rhs = select_obs(rhs, obs2keep, nthreads)
+
+                    linear.params = colnames(rhs)
+                    nonlinear.params = get("nonlinear.params", env)
+                    params = c(nonlinear.params, linear.params)
+                    assign("linear.params", linear.params, new_env)
+                    assign("params", params, new_env)
+
+                    # useful when feNmlm or feglm
+                    if(origin_type %in% c("feNmlm", "feglm")){
+
+                        start = get("start", env)
+                        if(!is.null(start)){
+                            new_start = setNames(start[params], params)
+                            new_start[is.na(new_start)] = 0
+                            assign("start", new_start, new_env)
+                        }
+
+                        if(origin_type == "feNmlm"){
+                            upper = get("upper", env)
+                            new_upper = setNames(upper[params], params)
+                            new_upper[is.na(new_upper)] = Inf
+                            assign("upper", new_upper, new_env)
+
+                            lower = get("lower", env)
+                            new_lower = setNames(lower[params], params)
+                            new_lower[is.na(new_lower)] = -Inf
+                            assign("lower", new_lower, new_env)
+                        }
+                    }
+
+                    assign("linear.mat", rhs, new_env)
+                }
+                assign("isLinear", isLinear, new_env)
+            }
+
+            #
+            # The IV
+            #
+
+            do_iv = get("do_iv", env)
+            if(do_iv){
+                # LHS
+                iv_lhs = get("iv_lhs", env)
+                for(i in seq_along(iv_lhs)){
+                    iv_lhs[[i]] = iv_lhs[[i]][obs2keep]
+                }
+                assign("iv_lhs", iv_lhs, new_env)
+
+                # RHS
+                iv.mat = get("iv.mat", env)
+                iv.mat = select_obs(iv.mat, obs2keep, nthreads, msg = "instrument")
+                assign("iv.mat", iv.mat, new_env)
+
+            }
+
+            #
+            # The cluster
+            #
+
+            do_summary = get("do_summary", env)
+            if(do_summary){
+                cluster = get("cluster", env)
+                if(is.data.frame(cluster)){
+                    cluster = cluster[obs2keep, , drop = FALSE]
+                    assign("cluster", cluster, new_env)
+                }
+            }
+
+            #
+            # Stepwise RHS
+            #
+
+            if(get("do_multi_rhs", env)){
+                linear_core = get("linear_core", env)
+                rhs_sw = get("rhs_sw", env)
+
+                assign("linear_core", select_obs(linear_core, obs2keep, nthreads), new_env)
+                assign("rhs_sw", select_obs(rhs_sw, obs2keep, nthreads), new_env)
+            }
+
+            #
+            # New data if stepwise estimation
+            #
+
+            # So far this is used only in stepwise FE
+            if(get("do_multi_fixef", env)){
+                data = get("data", env)
+                assign("data", data[obs2keep, , drop = FALSE], new_env)
+            }
+
+            #
+            # The non-linear part, the weight and the offset
+            #
+
+            offset.value = get("offset.value", env)
+            isOffset = length(offset.value) > 1
+            if(isOffset){
+                assign("offset.value", offset.value[obs2keep], new_env)
+            }
+
+            weights.value = get("weights.value", env)
+            isWeight = length(weights.value) > 1
+            if(isWeight){
+                # used in family$family_equiv
+                weights.value = weights.value[obs2keep]
+                assign("weights.value", weights.value, new_env)
+            }
+
+            isNL = get("isNL", env)
+            if(isNL){
+                envNL = get("envNL", env)
+                envNL_new = new.env()
+                for(var in names(envNL)){
+                    x = get(var, envNL)
+                    if(length(x) > 1){
+                        assign(var, x[obs2keep], envNL_new)
+                    } else {
+                        assign(var, x, envNL_new)
+                    }
+                }
+                assign("envNL", envNL_new, new_env)
+            }
+
+
+            # GLM specific stuff
+            if(origin_type == "feglm"){
+
+                family_funs = get("family_funs", env)
+                if(!is.list(lhs) && family_funs$family_equiv == "poisson"){
+
+                    y_pos = lhs[lhs > 0]
+                    qui_pos = lhs > 0
+
+                    if(isWeight){
+                        constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
+                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
+                    } else {
+                        constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
+                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+                    }
+
+                    family_funs$sum_dev.resids = sum_dev.resids
+
+                    assign("family_funs", family_funs, new_env)
+                }
+
+                starting_values = get("starting_values", env)
+                if(!is.null(starting_values)){
+                    assign("starting_values", starting_values[obs2keep], new_env)
+                }
+
+            }
+
+            #
+            # Reformatting "res"
+            #
+
+            # offset and weight
+            if(isOffset){
+                res$offset = offset.value
+            }
+            if(isWeight){
+                res$weights = weights.value
+            }
+
+            # We save lhs in case of feglm, for later within-r2 evaluation
+            if(origin_type == "feglm" && isFixef){
+                res$y = lhs
+            }
+
+            # obs2keep
+            res$nobs = length(obs2keep)
+            assign("nobs", res$nobs, new_env)
+            if(is.null(res$obs_selection)){
+                res$obs_selection = list(obs2keep)
+            } else {
+                res$obs_selection[[length(res$obs_selection) + 1]] = obs2keep
+            }
+
+        }
+
+        # Nber of parameters
+        params = get("params", new_env)
+        K = length(params)
+        if(isFixef){
+            fixef_sizes = get("fixef_sizes", new_env)
+            slope_flag = get("slope_flag", new_env)
+            isSlope = any(slope_flag != 0)
+            if(isSlope){
+                K = K + sum(fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0)))
+                # now the references
+                if(any(slope_flag >= 0)){
+                    K = K + 1 - sum(slope_flag >= 0)
+                }
+            } else {
+                K = K + sum(fixef_sizes - 1) + 1
+            }
+        }
+        res$nparams = K
+
+        # Fixed-effects information
+        if(isFixef){
+            if(isSlope){
+                res$slope_flag = slope_flag[order(new_order)]
+                res$slope_flag_reordered = slope_flag
+                res$slope_variables_reordered = slope_variables
+                res$fe.reorder = new_order
+            }
+
+            res$fixef_id = fixef_id_res
+            res$fixef_sizes = fixef_sizes_res
+        }
+
+    } else {
+
+        #
+        # Save LHS/RHS ####
+        #
+
+        if(save_lhs){
+            # Here lhs is ALWAYS a vector
+            assign("lhs", lhs, new_env)
+
+            if(origin_type == "feglm"){
+                family_funs = get("family_funs", env)
+
+                if(family_funs$family_equiv == "poisson"){
+
+                    y_pos = lhs[lhs > 0]
+                    qui_pos = lhs > 0
+
+                    weights.value = get("weights.value", env)
+                    isWeight = length(weights.value) > 1
+
+                    if(isWeight){
+                        constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
+                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
+                    } else {
+                        constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
+                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
+                    }
+
+                    family_funs$sum_dev.resids = sum_dev.resids
+
+                    assign("family_funs", family_funs, new_env)
+                }
+            }
+
+            if(origin_type == "feglm" && isFixef){
+                res$y = lhs
+            }
+        }
+
+        if(save_rhs){
+            assign("linear.mat", rhs, new_env)
+
+            isLinear = FALSE
+            if(length(rhs) > 1){
+                isLinear = TRUE
+
+                linear.params = colnames(rhs)
+                nonlinear.params = get("nonlinear.params", env)
+                params = c(nonlinear.params, linear.params)
+                assign("linear.params", linear.params, new_env)
+                assign("params", params, new_env)
+
+                # useful when feNmlm or feglm
+                if(origin_type %in% c("feNmlm", "feglm")){
+
+                    start = get("start", env)
+                    if(!is.null(start)){
+                        new_start = setNames(start[params], params)
+                        new_start[is.na(new_start)] = 0
+                        assign("start", new_start, new_env)
+                    }
+
+                    if(origin_type == "feNmlm"){
+                        upper = get("upper", env)
+                        new_upper = setNames(upper[params], params)
+                        new_upper[is.na(new_upper)] = Inf
+                        assign("upper", new_upper, new_env)
+
+                        lower = get("lower", env)
+                        new_lower = setNames(lower[params], params)
+                        new_lower[is.na(new_lower)] = -Inf
+                        assign("lower", new_lower, new_env)
+                    }
+                }
+            }
+
+            assign("isLinear", isLinear, new_env)
+
+            # Finally the DoF
+            params = get("params", new_env)
+            K = length(params)
+            if(isFixef){
+                fixef_sizes = get("fixef_sizes", new_env)
+                slope_flag = get("slope_flag", new_env)
+                if(isSlope){
+                    K = K + sum(fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0)))
+                    # now the references
+                    if(any(slope_flag >= 0)){
+                        K = K + 1 - sum(slope_flag >= 0)
+                    }
+                } else {
+                    K = K + sum(fixef_sizes - 1) + 1
+                }
+            }
+            res$nparams = K
+
+            if(!isLinear && !isTRUE(res$iv)){
+                res$onlyFixef = TRUE
+            }
+        }
+
+    }
+
+    # We save the formulas
+    if(!is.null(fml_linear)){
+        res$fml = res$fml_all$linear = fml_linear
+    }
+
+    if(!is.null(fml_fixef)){
+        res$fml_all$fixef = fml_fixef
+    }
+
+    if(!is.null(fml_iv_endo)){
+        fml_linear = res$fml_all$linear
+        fml_iv = res$fml_all$iv
+
+        new_fml_linear = .xpd(..y ~ ..inst + ..rhs,
+                             ..y = fml_iv_endo, ..rhs = fml_linear[[3]], ..inst = fml_iv[[3]])
+        res$fml = res$fml_all$linear = new_fml_linear
+        res$fml_all$iv = NULL
+    }
+
+    assign("fixest_env", TRUE, new_env)
+    assign("res", res, new_env)
+
+    return(new_env)
+}
+
+
+#' Stepwise estimation tools
+#'
+#' Functions to perform stepwise estimations.
+#'
+#' @param ... Represents formula variables to be added in a stepwise fashion to an estimation.
+#'
+#' @details
+#'
+#' To include multiple independent variables, you need to use the stepwise functions. There are 4 stepwise functions associated to 4 short aliases. These are a) stepwise, stepwise0, cstepwise, cstepwise0, and b) sw, sw0, csw, csw0. Let's explain that.
+#'
+#' Assume you have the following formula: \code{fml = y ~ x1 + sw(x2, x3)}. The stepwise function \code{sw} will estimate the following two models: \code{y ~ x1 + x2} and \code{y ~ x1 + x3}. That is, each element in \code{sw()} is sequentially, and separately, added to the formula. Would have you used \code{sw0} in lieu of \code{sw}, then the model \code{y ~ x1} would also have been estimated. The \code{0} in the name means that the model wihtout any stepwise element also needs to be estimated.
+#'
+#' Finally, the prefix \code{c} means cumulative: each stepwise element is added to the next. That is, \code{fml = y ~ x1 + csw(x2, x3)} would lead to the following models \code{y ~ x1 + x2} and \code{y ~ x1 + x2 + x3}. The \code{0} has the same meaning and would also lead to the model without the stepwise elements to be estimated: in other words, \code{fml = y ~ x1 + csw0(x2, x3)} leads to the following three models: \code{y ~ x1}, \code{y ~ x1 + x2} and \code{y ~ x1 + x2 + x3}.
+#'
+#'
+#' @examples
+#'
+#' base = iris
+#' names(base) = c("y", "x1", "x2", "x3", "species")
+#'
+#' # Regular stepwise
+#' feols(y ~ sw(x1, x2, x3), base)
+#'
+#' # Cumulative stepwise
+#' feols(y ~ csw(x1, x2, x3), base)
+#'
+#' # Using the 0
+#' feols(y ~ x1 + x2 + sw0(x3), base)
+#'
+stepwise = sw = cstepwise = csw = function(...){
+    mc = match.call(expand.dots = TRUE)
+
+    n = length(mc) - 1
+
+    if(n == 0){
+        return("")
+    }
+
+    res = vector("character", n)
+
+    for(i in 1:n){
+        res[[i]] = deparse_long(mc[[i + 1]])
+    }
+
+    if(grepl("^c", as.character(mc[[1]]))){
+        attr(res, "is_cumul") = TRUE
+    }
+
+    res
+}
+
+cstepwise0 = csw0 = stepwise0 = sw0 = function(...){
+    mc = match.call(expand.dots = TRUE)
+
+    n = length(mc) - 1
+
+    if(n == 0){
+        return("")
+    }
+
+    res = vector("character", n + 1)
+
+    for(i in 1:n){
+        res[[i + 1]] = deparse_long(mc[[i + 1]])
+    }
+
+    if(grepl("^c", as.character(mc[[1]]))){
+        attr(res, "is_cumul") = TRUE
+    }
+
+    res
+}
+
+#' @rdname stepwise
+"sw"
+
+#' @rdname stepwise
+"cstepwise"
+
+#' @rdname stepwise
+"csw"
+
+#' @rdname stepwise
+"stepwise0"
+
+#' @rdname stepwise
+"sw0"
+
+#' @rdname stepwise
+"cstepwise0"
+
+#' @rdname stepwise
+"csw0"
+
+
+extract_stepwise = function(fml, tms, all_vars = TRUE){
+    # fml = y ~ sw(x1, x2)
+    # fml = ~ fe1 + csw(fe2, fe3)
+
+    is_fml = !missing(fml)
+    if(is_fml){
+        n_parts = length(fml)
+        osf = n_parts == 2
+        fml_txt = deparse_long(fml[[n_parts]])
+        do_stepwise = grepl("(^|[^[:alnum:]_\\.])c?(stepwise|sw)0?\\(", fml_txt)
+        tl = attr(terms(fml), "term.labels")
+
+    } else {
+        osf = TRUE
+        tl = attr(tms, "term.labels")
+        tl = gsub("_impossible_var_name_", "^", tl, fixed = TRUE)
+        do_stepwise = any(grepl("(^|[^[:alnum:]_\\.])c?(stepwise|sw)0?\\(", tl))
+
+    }
+
+    if(do_stepwise){
+        # We will partially create the linear matrix
+
+        qui = grepl("(^|[^[:alnum:]_\\.])c?(stepwise|sw)0?\\(", tl)
+        if(sum(qui) >= 2){
+            stop("You cannot use more than one stepwise function.")
+        }
+
+        if(!is_naked_fun(tl[qui], "c?(stepwise|sw)0?")){
+            stop("You cannot combine stepwise functions with any other element.")
+        }
+
+        tl_new = tl
+
+        sw_text = tl[qui]
+        sw_terms = eval(str2lang(sw_text))
+        is_cumul = isTRUE(attr(sw_terms, "is_cumul"))
+
+        if(length(sw_terms) == 1){
+
+            if(nchar(sw_terms) == 0){
+                tl_new = tl[!qui]
+                if(length(tl_new) == 0){
+                    tl_new = 1
+                }
+
+            } else {
+                tl_new[qui] = sw_terms
+            }
+
+            # lhs_text: created in the LHS section
+            if(osf){
+                fml_new = .xpd(rhs = tl_new)
+            } else {
+                fml_new = .xpd(lhs = fml[[2]], rhs = tl_new)
+            }
+
+            if(is_fml){
+                res = list(do_multi = FALSE, fml = fml_new)
+            } else {
+                res = list(do_multi = FALSE, tl = tl_new)
+            }
+
+            return(res)
+
+        } else {
+
+            tl_new[qui] = "..STEPWISE_VARIABLES"
+            fml_raw = .xpd(rhs = tl_new)
+
+            fml_all_full = list()
+            fml_all_sw = list()
+            for(i in seq_along(sw_terms)){
+                if(nchar(sw_terms[i]) == 0 && length(tl_new) > 1){
+                    # adding 1 when empty is "ugly"
+                    fml_all_full[[i]] = .xpd(rhs = tl_new[!qui])
+                    if(osf){
+                        fml_all_sw[[i]] = ~ 1
+                    } else {
+                        fml_all_sw[[i]] = lhs ~ 1
+                    }
+                } else {
+                    if(is_cumul){
+                        fml_all_full[[i]] = .xpd(fml_raw, ..STEPWISE_VARIABLES = sw_terms[1:i])
+                    } else {
+                        fml_all_full[[i]] = .xpd(fml_raw, ..STEPWISE_VARIABLES = sw_terms[i])
+                    }
+
+                    if(osf){
+                        fml_all_sw[[i]] = .xpd(rhs = sw_terms[i])
+                    } else {
+                        fml_all_sw[[i]] = .xpd(lhs = quote(lhs),  rhs = sw_terms[i])
+                    }
+
+                }
+            }
+
+            # New mechanism => we will evaluate everything at the first call for linear stepwise
+            # we respect the order of the user. So we need the core left and right
+
+            qui = which(qui)
+            if(is_cumul){
+                # We add the first terms to the main formula
+                tl_left = tl[seq(1, length.out = qui)]
+                tl_left[qui] = sw_terms[1]
+            } else {
+                tl_left = tl[seq(1, length.out = qui - 1)]
+            }
+
+            tl_right = tl[seq(qui + 1, length.out = length(tl) - qui)]
+
+            if(length(tl_left) == 0) tl_left = ""
+            if(length(tl_right) == 0) tl_right = ""
+
+            if(osf){
+                fml_core_left = .xpd(rhs = tl_left)
+                fml_core_right = .xpd(rhs = tl_right)
+            } else {
+                fml_core_left = .xpd(lhs = quote(lhs), rhs = tl_left)
+                fml_core_right = .xpd(lhs = quote(lhs), rhs = tl_right)
+            }
+
+
+            if(all_vars){
+                if(is_fml){
+                    sw_all_vars = all.vars(fml[[3]])
+                } else {
+                    # we need to recreate the formula because of impossible_var_name in tms
+                    sw_all_vars = all.vars(.xpd(rhs = tl))
+                }
+            } else {
+                sw_all_vars = all.vars(.xpd(rhs = sw_terms))
+            }
+
+            # Creating the current formula
+            if(is_cumul){
+                # Cumulative => first item in main linear matrix
+                tl_new[qui] = sw_terms[1]
+            } else {
+                tl_new = tl[!qui]
+                if(length(tl_new) == 0){
+                    tl_new = 1
+                }
+            }
+
+            # => this is only useful to deduce fake_intercept
+            if(osf){
+                fml_new = .xpd(rhs = tl_new)
+            } else {
+                fml_new = .xpd(lhs = quote(lhs), rhs = tl_new)
+            }
+
+        }
+    } else if(is_fml) {
+        res = list(do_multi = FALSE, fml = fml)
+        return(res)
+    } else {
+        res = list(do_multi = FALSE, tl = tl)
+        return(res)
+    }
+
+    res = list(do_multi = TRUE, fml = fml_new, fml_all_full = fml_all_full, fml_all_sw = fml_all_sw, is_cumul = is_cumul, fml_core_left = fml_core_left, fml_core_right = fml_core_right, sw_all_vars = sw_all_vars)
+
+    return(res)
+}
+
+
+
+# a = list(1:5, 6:10)
+# b = 1:5
+# d = list(matrix(1:10, 5, 2), 1, matrix(1:5, 5, 1))
+# select_obs(a, 1:2) ; select_obs(b, 1:2) ; select_obs(d, 1:2)
+select_obs = function(x, index, nthreads = 1, msg = "explanatory variable"){
+    # => selection of observations.
+    # Since some objects can be of multiple types, this avoids code repetition and increases clarity.
+
+    if(!is.list(x)){
+
+        if(is.matrix(x)){
+            x = x[index, , drop = FALSE]
+
+            only_0 = cpppar_check_only_0(x, nthreads)
+            if(all(only_0 == 1)){
+                stop("After removing NAs (or perfect fit fixed-effects), not a single explanatory variable is different from 0.")
+
+            } else if(any(only_0 == 1)){
+                x = x[, only_0 == 0, drop = FALSE]
+            }
+
+        } else if(length(x) > 0){
+            # We check the length because RHS = 1 means not linear (we don't want to subset on that)
+            x = x[index]
+        }
+
+    } else if(is.matrix(x[[1]]) || length(x[[1]]) == 1){
+        # Means RHS
+        for(i in seq_along(x)){
+            if(length(x[[i]]) > 1){
+                x[[i]] = x[[i]][index, , drop = FALSE]
+
+                only_0 = cpppar_check_only_0(x[[i]], nthreads)
+                if(all(only_0 == 1)){
+                    stop("After removing NAs (or perfect fit fixed-effects), not a single ", msg, " is different from 0.")
+
+                } else if(any(only_0 == 1)){
+                    x[[i]] = x[[i]][, only_0 == 0, drop = FALSE]
+                }
+            }
+        }
+
+    } else {
+        for(i in seq_along(x)){
+            x[[i]] = x[[i]][index]
+        }
+    }
+
+    x
+}
+
+
+
+
 
 

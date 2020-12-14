@@ -309,7 +309,7 @@ void set_sparse(std::vector<int> &n_j, std::vector<int> &start_j, std::vector<in
 
 }
 
-void mp_sparse_XtX(NumericMatrix XtX, const std::vector<int> &n_j, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, const NumericMatrix &X, int nthreads){
+void mp_sparse_XtX(NumericMatrix &XtX, const std::vector<int> &n_j, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, const NumericMatrix &X, int nthreads){
 
     int K = X.ncol();
 
@@ -345,7 +345,7 @@ void mp_sparse_XtX(NumericMatrix XtX, const std::vector<int> &n_j, const std::ve
     }
 }
 
-void mp_sparse_Xty(NumericVector Xty, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, NumericVector &y, int nthreads){
+void mp_sparse_Xty(NumericVector &Xty, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, const double *y, int nthreads){
 
     int K = Xty.length();
 
@@ -425,7 +425,7 @@ void mp_XtX(NumericMatrix &XtX, const NumericMatrix &X, const NumericMatrix &wX,
 }
 
 // mp: mat prod
-void mp_Xty(NumericVector &Xty, const NumericMatrix &X, const NumericVector y, int nthreads){
+void mp_Xty(NumericVector &Xty, const NumericMatrix &X, const double *y, int nthreads){
 
     int N = X.nrow();
     int K = X.ncol();
@@ -439,7 +439,7 @@ void mp_Xty(NumericVector &Xty, const NumericMatrix &X, const NumericVector y, i
         for(int t=0 ; t<nthreads ; ++t){
             double val = 0;
             for(int i=bounds[t]; i<bounds[t + 1] ; ++i){
-                val += X(i, 0) * y(i);
+                val += X(i, 0) * y[i];
             }
             all_values[t] = val;
         }
@@ -465,49 +465,85 @@ void mp_Xty(NumericVector &Xty, const NumericMatrix &X, const NumericVector y, i
 }
 
 // [[Rcpp::export]]
-List cpp_sparse_products(NumericMatrix X, NumericVector w, NumericVector y, bool correct_0w = false, int nthreads = 1){
+List cpp_sparse_products(NumericMatrix X, NumericVector w, SEXP y, bool correct_0w = false, int nthreads = 1){
 
     int N = X.nrow();
     int K = X.ncol();
 
     bool isWeight = w.length() > 1;
 
+    bool is_y_list = TYPEOF(y) == VECSXP;
+
     NumericMatrix XtX(K, K);
-    NumericVector Xty(K);
+
 
     if(sparse_check(X) == false){
         // NOT SPARSE
 
-        if(isWeight){
+        List res;
 
-            NumericMatrix wX(Rcpp::clone(X));
+        // if(isWeight){
+        //
+        //     NumericMatrix wX(Rcpp::clone(X));
+        //     for(int k=0 ; k<K ; ++k){
+        //         for(int i=0 ; i<N ; ++i){
+        //             wX(i, k) *= w[i];
+        //         }
+        //     }
+        //
+        //     // XtX
+        //     mp_XtX(XtX, X, wX, nthreads);
+        //
+        //     // Xty
+        //     mp_Xty(Xty, wX, y, nthreads);
+        //
+        //
+        // } else {
+        //     // Identique, mais pas besoin de faire une copie de X ni de y qui peuvent etre couteuses
+        //
+        //     // XtX
+        //     mp_XtX(XtX, X, X, nthreads);
+        //
+        //     // Xty
+        //     mp_Xty(Xty, X, y, nthreads);
+        //
+        // }
+
+        NumericMatrix wX;
+        if(isWeight){
+           wX = Rcpp::clone(X);
             for(int k=0 ; k<K ; ++k){
                 for(int i=0 ; i<N ; ++i){
                     wX(i, k) *= w[i];
                 }
             }
-
-            // XtX
-            mp_XtX(XtX, X, wX, nthreads);
-
-            // Xty
-            mp_Xty(Xty, wX, y, nthreads);
-
-
         } else {
-            // Identique, mais pas besoin de faire une copie de X ni de y qui peuvent etre couteuses
-
-            // XtX
-            mp_XtX(XtX, X, X, nthreads);
-
-            // Xty
-            mp_Xty(Xty, X, y, nthreads);
-
+            // shallow copy
+            wX = X;
         }
 
-        List res;
+        // XtX
+        mp_XtX(XtX, X, wX, nthreads);
         res["XtX"] = XtX;
-        res["Xty"] = Xty;
+
+        // Xty
+        if(is_y_list){
+            int n_vars_y = Rf_length(y);
+            List Xty(n_vars_y);
+
+            for(int v=0 ; v<n_vars_y ; ++v){
+                NumericVector Xty_tmp(K);
+                mp_Xty(Xty_tmp, wX, REAL(VECTOR_ELT(y, v)), nthreads);
+                Xty[v] = Xty_tmp;
+            }
+
+            res["Xty"] = Xty;
+
+        } else {
+            NumericVector Xty(K);
+            mp_Xty(Xty, wX, REAL(y), nthreads);
+            res["Xty"] = Xty;
+        }
 
         return res;
     }
@@ -523,15 +559,30 @@ List cpp_sparse_products(NumericMatrix X, NumericVector w, NumericVector y, bool
 
     set_sparse(n_j, start_j, all_i, x, X, w);
 
+    List res;
+
     // XtX
     mp_sparse_XtX(XtX, n_j, start_j, all_i, x, X, nthreads);
+    res["XtX"] = XtX;
 
     // Xty
-    mp_sparse_Xty(Xty, start_j, all_i, x, y, nthreads);
+    if(is_y_list){
+        int n_vars_y = Rf_length(y);
+        List Xty(n_vars_y);
 
-    List res;
-    res["XtX"] = XtX;
-    res["Xty"] = Xty;
+        for(int v=0 ; v<n_vars_y ; ++v){
+            NumericVector Xty_tmp(K);
+            mp_sparse_Xty(Xty_tmp, start_j, all_i, x, REAL(VECTOR_ELT(y, v)), nthreads);
+            Xty[v] = Xty_tmp;
+        }
+
+        res["Xty"] = Xty;
+
+    } else {
+        NumericVector Xty(K);
+        mp_sparse_Xty(Xty, start_j, all_i, x, REAL(y), nthreads);
+        res["Xty"] = Xty;
+    }
 
     return res;
 }
@@ -618,10 +669,474 @@ NumericMatrix cpp_mat_reconstruct(NumericMatrix X, Rcpp::LogicalVector id_excl){
 }
 
 
+// mp: mat prod
+void mp_ZXtZX(NumericMatrix &ZXtZX, const NumericMatrix &XtX, const NumericMatrix &X, const NumericMatrix &Z, const NumericMatrix &wZ, int nthreads){
+
+    int N = Z.nrow();
+    int K1 = Z.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    // First: we copy XtX
+    for(int k=0 ; k<K2 ; ++k){
+        for(int l=0 ; l<K2 ; ++l){
+            ZXtZX(k + K1, l + K1) = XtX(k, l);
+        }
+    }
+
+    //
+    // The K2 x K1 band
+    //
+
+    // l: index of Z
+    // k: index of X
+
+    int nValues = K2 * K1;
+    std::vector<int> all_l, all_k;
+    for(int l=0 ; l<K1 ; ++l){
+        for(int k=0 ; k<K2 ; ++k){
+            all_l.push_back(l);
+            all_k.push_back(k);
+        }
+    }
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int index=0 ; index<nValues ; ++index){
+        int l = all_l[index];
+        int k = all_k[index];
+
+        double val = 0;
+        for(int i=0 ; i<N ; ++i){
+            val += X(i, k) * wZ(i, l);
+        }
+
+        ZXtZX(K1 + k, l) = val;
+        ZXtZX(l, K1 + k) = val;
+    }
+
+    //
+    // The K1 * K1 mat
+    //
+
+    // k, l: indexes of Z
+    nValues = K1 * (K1 + 1) / 2;
+    all_l.clear();
+    all_k.clear();
+    for(int l=0 ; l<K1 ; ++l){
+        for(int k=l ; k<K1 ; ++k){
+            all_l.push_back(l);
+            all_k.push_back(k);
+        }
+    }
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int index=0 ; index<nValues ; ++index){
+        int l = all_l[index];
+        int k = all_k[index];
+
+        double val = 0;
+        for(int i=0 ; i<N ; ++i){
+            val += Z(i, k) * wZ(i, l);
+        }
+
+        ZXtZX(k, l) = val;
+        ZXtZX(l, k) = val;
+    }
+
+}
+
+// mp: mat prod
+void mp_ZXtu(NumericVector &ZXtu, const NumericMatrix &X, const NumericMatrix &Z, const double *u, int nthreads){
+
+    int N = Z.nrow();
+    int K1 = Z.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int k=0 ; k<(K2 + K1) ; ++k){
+        double val = 0;
+        for(int i=0 ; i<N ; ++i){
+            if(k < K1){
+                val += Z(i, k) * u[i];
+            } else {
+                val += X(i, k - K1) * u[i];
+            }
+        }
+
+        ZXtu[k] = val;
+    }
+
+}
+
+void mp_sparse_ZXtZX(NumericMatrix &ZXtZX, const NumericMatrix &XtX, const std::vector<int> &n_j, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, const NumericMatrix &X, const NumericMatrix &Z, const NumericMatrix &wZ, int nthreads){
+
+    int N  = Z.nrow();
+    int K1 = Z.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    // First: we copy XtX
+    for(int k=0 ; k<K2 ; ++k){
+        for(int l=0 ; l<K2 ; ++l){
+            ZXtZX(k + K1, l + K1) = XtX(k, l);
+        }
+    }
+
+    // the K2 x K1 band
+    for(int l=0 ; l<K1 ; ++l){
+        #pragma omp parallel for num_threads(nthreads) schedule(static, 1)
+        for(int j=0 ; j<K2 ; ++j){
+
+            int start = start_j[j];
+            int end = start_j[j + 1];
+
+            double value = 0;
+            for(int index=start ; index<end ; ++index){
+                value += Z(all_i[index], l) * x[index];
+            }
+
+            ZXtZX(j + K1, l) = value;
+            ZXtZX(l, j + K1) = value;
+        }
+    }
+
+    //
+    // The K1 * K1 mat
+    //
+
+    // k, l: indexes of Z
+    int nValues = K1 * (K1 + 1) / 2;
+    std::vector<int> all_l, all_k;
+    for(int l=0 ; l<K1 ; ++l){
+        for(int k=l ; k<K1 ; ++k){
+            all_l.push_back(l);
+            all_k.push_back(k);
+        }
+    }
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int index=0 ; index<nValues ; ++index){
+        int l = all_l[index];
+        int k = all_k[index];
+
+        double val = 0;
+        for(int i=0 ; i<N ; ++i){
+            val += Z(i, k) * wZ(i, l);
+        }
+
+        ZXtZX(k, l) = val;
+        ZXtZX(l, k) = val;
+    }
+}
+
+void mp_sparse_ZXtu(NumericVector &ZXtu, const std::vector<int> &start_j, const std::vector<int> &all_i, const std::vector<double> &x, const double *u, const NumericMatrix &X, const NumericMatrix &wZ, int nthreads){
+
+    int N = wZ.nrow();
+    int K1 = wZ.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int k=0 ; k<(K2 + K1) ; ++k){
+
+        double value = 0;
+        if(k < K1){
+            for(int i=0 ; i<N ; ++i){
+                value += u[i] * wZ(i, k);
+            }
+        } else {
+            int start = start_j[k - K1];
+            int end = start_j[k - K1 + 1];
+
+            for(int index=start ; index<end ; ++index){
+                value += u[all_i[index]] * x[index];
+            }
+        }
+
+        ZXtu[k] = value;
+    }
+
+}
 
 
+// [[Rcpp::export]]
+List cpp_iv_products(NumericMatrix X, SEXP y, NumericMatrix Z, SEXP u, NumericVector w, int nthreads){
+    // We compute the following:
+    // - X'X
+    // - X'y
+    // - (ZX)'(ZX)
+    // - (ZX)'u
+    //
+    // Z: IV mat, u: endo regs
+
+    // Note that X can be equal to 0 (ie no X)
+
+    int N = Z.nrow();
+    int K1 = Z.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    bool isWeight = w.length() > 1;
+
+    bool is_y_list = TYPEOF(y) == VECSXP;
+
+    NumericMatrix XtX(K2, K2);
+    NumericMatrix ZXtZX(K2 + K1, K2 + K1);
+
+    NumericMatrix wZ;
+    if(isWeight){
+        wZ = Rcpp::clone(Z);
+        for(int k=0 ; k<K1 ; ++k){
+            for(int i=0 ; i<N ; ++i){
+                wZ(i, k) *= w[i];
+            }
+        }
+    } else {
+        // shallow copy
+        wZ = Z;
+    }
+
+    if(sparse_check(X) == false){
+        // NOT SPARSE
+
+        List res;
+        NumericMatrix wX;
+        if(isWeight){
+            wX = Rcpp::clone(X);
+            for(int k=0 ; k<K2 ; ++k){
+                for(int i=0 ; i<N ; ++i){
+                    wX(i, k) *= w[i];
+                }
+            }
+        } else {
+            // shallow copy
+            wX = X;
+        }
+
+        // XtX
+        mp_XtX(XtX, X, wX, nthreads);
+        res["XtX"] = XtX;
+
+        // (ZX)'(ZX)
+        mp_ZXtZX(ZXtZX, XtX, X, Z, wZ, nthreads);
+        res["ZXtZX"] = ZXtZX;
+
+        // Xty
+        if(!isX){
+            NumericVector Xty(1);
+            res["Xty"] = Xty;
+
+        } else if(is_y_list){
+            int n_vars_y = Rf_length(y);
+            List Xty(n_vars_y);
+
+            for(int v=0 ; v<n_vars_y ; ++v){
+                NumericVector Xty_tmp(K2);
+                mp_Xty(Xty_tmp, wX, REAL(VECTOR_ELT(y, v)), nthreads);
+                Xty[v] = Xty_tmp;
+            }
+
+            res["Xty"] = Xty;
+
+        } else {
+            NumericVector Xty(K2);
+            mp_Xty(Xty, wX, REAL(y), nthreads);
+            res["Xty"] = Xty;
+        }
+
+        // (ZX)'u
+        // u is always a list
+        int n_vars_u = Rf_length(u);
+        List ZXtu(n_vars_u);
+
+        for(int v=0 ; v<n_vars_u ; ++v){
+            NumericVector ZXtu_tmp(K2 + K1);
+            mp_ZXtu(ZXtu_tmp, wX, wZ, REAL(VECTOR_ELT(u, v)), nthreads);
+            ZXtu[v] = ZXtu_tmp;
+        }
+
+        res["ZXtu"] = ZXtu;
+
+        return res;
+    }
+
+    //
+    // SPARSE case
+    //
+
+    std::vector<int> n_j(K2 + !isX, 0);
+    std::vector<int> start_j(K2 + !isX + 1, 0);
+    std::vector<int> all_i;
+    std::vector<double> x;
+
+    set_sparse(n_j, start_j, all_i, x, X, w);
+
+    List res;
+
+    // XtX
+    mp_sparse_XtX(XtX, n_j, start_j, all_i, x, X, nthreads);
+    res["XtX"] = XtX;
+
+    // (xZ)'(ZX)
+    mp_sparse_ZXtZX(ZXtZX, XtX, n_j, start_j, all_i, x, X, Z, wZ, nthreads);
+    res["ZXtZX"] = ZXtZX;
+
+    // Xty
+    if(!isX){
+        NumericVector Xty(1);
+        res["Xty"] = Xty;
+
+    } else if(is_y_list){
+        int n_vars_y = Rf_length(y);
+        List Xty(n_vars_y);
+
+        for(int v=0 ; v<n_vars_y ; ++v){
+            NumericVector Xty_tmp(K2);
+            mp_sparse_Xty(Xty_tmp, start_j, all_i, x, REAL(VECTOR_ELT(y, v)), nthreads);
+            Xty[v] = Xty_tmp;
+        }
+
+        res["Xty"] = Xty;
+
+    } else {
+        NumericVector Xty(K2);
+        mp_sparse_Xty(Xty, start_j, all_i, x, REAL(y), nthreads);
+        res["Xty"] = Xty;
+    }
+
+    // (ZX)'u
+    int n_vars_u = Rf_length(u);
+    List ZXtu(n_vars_u);
+
+    for(int v=0 ; v<n_vars_u ; ++v){
+        NumericVector ZXtu_tmp(K2 + K1);
+        mp_sparse_ZXtu(ZXtu_tmp, start_j, all_i, x, REAL(VECTOR_ELT(u, v)), X, wZ, nthreads);
+        ZXtu[v] = ZXtu_tmp;
+    }
+
+    res["ZXtu"] = ZXtu;
+
+    return res;
+}
 
 
+// [[Rcpp::export]]
+List cpp_iv_product_completion(NumericMatrix XtX, NumericVector Xty, NumericMatrix X, NumericVector y, NumericMatrix U, NumericVector w, int nthreads){
+    // We compute the following
+    // - (UX)'(UX)
+    // - (UX)'y
+
+    int N = U.nrow();
+    int K1 = U.ncol();
+
+    bool isX = X.nrow() > 1;
+    int K2 = isX ? X.ncol() : 0;
+
+    bool isWeight = w.length() > 1;
+
+    NumericMatrix UXtUX(K2 + K1, K2 + K1);
+    NumericVector UXty(K2 + K1);
+
+    NumericMatrix wU;
+    if(isWeight){
+        wU = Rcpp::clone(U);
+        for(int k=0 ; k<K1 ; ++k){
+            for(int i=0 ; i<N ; ++i){
+                wU(i, k) *= w[i];
+            }
+        }
+    } else {
+        // shallow copy
+        wU = U;
+    }
+
+    List res;
+
+    // (UX)'y
+    for(int k=0 ; k<K2 ; ++k){
+        UXty[k + K1] = Xty[k];
+    }
+
+    #pragma omp parallel for num_threads(nthreads)
+    for(int k=0 ; k<K1 ; ++k){
+        double val = 0;
+        for(int i=0 ; i<N ; ++i){
+            val += y[i] * wU(i, k);
+        }
+
+        UXty[k] = val;
+    }
+
+    res["UXty"] = UXty;
+
+    // (UX)'(UX)
+
+    if(sparse_check(X) == false){
+        mp_ZXtZX(UXtUX, XtX, X, U, wU, nthreads);
+        res["UXtUX"] = UXtUX;
+
+    } else {
+        std::vector<int> n_j(K2 + !isX, 0);
+        std::vector<int> start_j(K2 + !isX + 1, 0);
+        std::vector<int> all_i;
+        std::vector<double> x;
+
+        set_sparse(n_j, start_j, all_i, x, X, w);
+
+        mp_sparse_ZXtZX(UXtUX, XtX, n_j, start_j, all_i, x, X, U, wU, nthreads);
+        res["UXtUX"] = UXtUX;
+    }
+
+
+    return res;
+}
+
+// [[Rcpp::export]]
+NumericVector cpp_iv_resid(NumericVector resid_2nd, NumericVector coef, SEXP resid_1st, bool is_int, int nthreads){
+
+    int N = resid_2nd.length();
+    int K = Rf_length(resid_1st);
+
+    NumericVector iv_resid = clone(resid_2nd);
+
+    if(K == 1){
+        std::vector<double> all_values(nthreads, 0);
+        std::vector<int> bounds = set_parallel_scheme(N, nthreads);
+
+        double *p_r = REAL(VECTOR_ELT(resid_1st, 0));
+
+        #pragma omp parallel for num_threads(nthreads)
+        for(int t=0 ; t<nthreads ; ++t){
+            for(int i=bounds[t]; i<bounds[t + 1] ; ++i){
+                iv_resid[i] -= coef[0 + is_int] * p_r[i];
+            }
+        }
+
+    } else {
+
+        std::vector<double*> p_p_r(K);
+        for(int k=0 ; k<K ; ++k){
+            p_p_r[k] = REAL(VECTOR_ELT(resid_1st, k));
+        }
+
+        #pragma omp parallel for num_threads(nthreads)
+        for(int k=0 ; k<K ; ++k){
+
+            double *p_r = p_p_r[k];
+            for(int i=0 ; i<N ; ++i){
+                iv_resid[i] -= coef[k + is_int] * p_r[i];
+            }
+        }
+    }
+
+    return iv_resid;
+}
 
 
 

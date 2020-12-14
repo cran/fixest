@@ -4,6 +4,21 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
+set.seed(0)
+
+if(requireNamespace("data.table", quietly = TRUE)) library(data.table)
+
+require_DT_ON = function(){
+  if(!requireNamespace("data.table", quietly = TRUE)){
+    knitr::opts_chunk$set(eval = FALSE)
+    cat("Evaluation of the next chunks requires 'data.table', which is not present.")
+  }
+}
+
+require_DT_OFF = function(){
+  knitr::opts_chunk$set(eval = TRUE)
+}
+
 library(fixest)
 setFixest_nthreads(1)
 
@@ -17,7 +32,7 @@ tab = head(trade)
 knitr::kable(tab)
 
 ## -----------------------------------------------------------------------------
-gravity_pois <- feglm(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+gravity_pois = fepois(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
 
 ## -----------------------------------------------------------------------------
 print(gravity_pois)
@@ -39,19 +54,22 @@ summary(gravity_pois, se = "twoway")
 summary(gravity_pois, cluster = ~Product)
 
 ## -----------------------------------------------------------------------------
-gravity_simple = feglm(Euros ~ log(dist_km), trade)
+gravity_simple = fepois(Euros ~ log(dist_km), trade)
 # Two way clustering is deduced from the argument 'cluster'
 # Using data:
 summary(gravity_simple, cluster = trade[, c("Origin", "Destination")])
 # Using a formula (note that the values of the variables are 
 #  fetched directly in the original database):
-summary(gravity_simple, cluster = ~Origin+Destination)
+summary(gravity_simple, cluster = ~Origin + Destination)
 
 ## -----------------------------------------------------------------------------
-gravity_ols <- feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+fepois(Euros ~ log(dist_km), trade, cluster = ~Product)
 
 ## -----------------------------------------------------------------------------
-gravity_negbin <- fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade)
+gravity_ols = feols(log(Euros) ~ log(dist_km) | Origin + Destination + Product + Year, trade)
+
+## -----------------------------------------------------------------------------
+gravity_negbin = fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
 
 
 ## ---- eval=FALSE--------------------------------------------------------------
@@ -67,7 +85,7 @@ knitr::kable(tab[-2, ])
 gravity_subfe = list()
 all_FEs = c("Year", "Destination", "Origin")
 for(i in 0:3){
-	gravity_subfe[[i+1]] = feglm(Euros ~ log(dist_km), trade, fixef = all_FEs[0:i])
+	gravity_subfe[[i+1]] = fepois(Euros ~ log(dist_km), trade, fixef = all_FEs[0:i])
 }
 
 ## ---- eval=FALSE--------------------------------------------------------------
@@ -78,24 +96,27 @@ tab = etable(gravity_subfe, cluster = ~Origin+Destination)
 knitr::kable(tab)
 
 ## -----------------------------------------------------------------------------
+res_multi = fepois(Euros ~ log(dist_km) | csw0(Year, Destination, Origin), trade)
+
+## -----------------------------------------------------------------------------
 # with two-way clustered SEs
-etable(gravity_subfe, cluster = ~Origin+Destination, tex = TRUE)
+etable(res_multi, cluster = ~Origin+Destination, tex = TRUE)
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  # we set the dictionary once and for all
 #  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 #  # 1st export: we change the signif code and drop the intercept
-#  etable(gravity_subfe, signifCode = c("a" = 0.01, "b" = 0.05),
+#  etable(res_multi, signifCode = c("a" = 0.01, "b" = 0.05),
 #         drop = "Const", dict = myDict, file = "Estimation Tables.tex",
 #         replace = TRUE, title = "First export -- normal Standard-errors")
 #  # 2nd export: clustered S-E + distance as the first coefficient
-#  etable(gravity_subfe, cluster = ~Product, order = "Dist",
+#  etable(res_multi, cluster = ~Product, order = "Dist",
 #         dict = myDict, file = "Estimation Tables.tex",
 #         title = "Second export -- clustered standard-errors (on Product variable)")
 #  
 
 ## -----------------------------------------------------------------------------
-fixedEffects <- fixef(gravity_pois)
+fixedEffects = fixef(gravity_pois)
 summary(fixedEffects)
 
 ## -----------------------------------------------------------------------------
@@ -103,6 +124,33 @@ fixedEffects$Year
 
 ## ---- fig.width=7-------------------------------------------------------------
 plot(fixedEffects)
+
+## -----------------------------------------------------------------------------
+base = iris
+names(base) = c("y", "x1", "x_endo_1", "x_inst_1", "fe")
+set.seed(2)
+base$x_inst_2 = 0.2 * base$y + 0.2 * base$x_endo_1 + rnorm(150, sd = 0.5)
+base$x_endo_2 = 0.2 * base$y - 0.2 * base$x_inst_1 + rnorm(150, sd = 0.5)
+
+est_iv = feols(y ~ x1 | x_endo_1 + x_endo_2 ~ x_inst_1 + x_inst_2, base)
+est_iv
+
+## -----------------------------------------------------------------------------
+fitstat(est_iv, ~ ivf1 + ivwald1 + ivf2 + ivwald2, cluster = "fe")
+
+## -----------------------------------------------------------------------------
+setFixest_print(fitstat = ~ . + ivwald2)
+est_iv
+
+## -----------------------------------------------------------------------------
+est_iv_fe = feols(y ~ x1 | fe | x_endo_1 + x_endo_2 ~ x_inst_1 + x_inst_2, base)
+est_iv_fe
+
+## -----------------------------------------------------------------------------
+summary(est_iv_fe, stage = 1)
+
+## -----------------------------------------------------------------------------
+etable(summary(est_iv_fe, stage = 1:2), fitstat = ~ . + ivfall + ivwaldall.p)
 
 ## -----------------------------------------------------------------------------
 base_vs = iris
@@ -127,29 +175,52 @@ est_comb
 ## -----------------------------------------------------------------------------
 fixef(est_comb)[[1]]
 
+## -----------------------------------------------------------------------------
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+# Defining the macro variables
+setFixest_fml(..ctrl = ~poly(x2, 2) + poly(x3, 2))
+# Accessing them
+xpd(y ~ x1 + ..ctrl)
+
+# Definition at run time
+vars = c("x2", "x2^2", "x3")
+for(i in 1:3){
+  print(xpd(y ~ x1 + ..ctrl, ..ctrl = vars[1:i]))
+}
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 + ..ctrl, base)
+
+## -----------------------------------------------------------------------------
+data(longley)
+xpd(Armed.Forces ~ Population + ..("GNP|ployed"), data = longley)
+
+## -----------------------------------------------------------------------------
+feols(Armed.Forces ~ Population + ..("GNP|ployed"), longley)
+
+## -----------------------------------------------------------------------------
+data(airquality)
+res_i1 = feols(Ozone ~ Solar.R + i(Month), airquality)
+res_i2 = feols(Ozone ~ Solar.R + i(Month, ref = 8), airquality)
+res_i3 = feols(Ozone ~ Solar.R + i(Month, keep = 5:6), airquality)
+
+etable(res_i1, res_i2, res_i3, dict = c("6" = "June", "Month::5" = "May"), 
+       order = c("Int|May", "Mon"))
+
 ## ---- eval = TRUE-------------------------------------------------------------
 # Sample data illustrating the DiD
 data(base_did)
 head(base_did)
 
 ## ---- eval = TRUE-------------------------------------------------------------
-# Estimation of yearly effect
+# Estimation of yearly treatment effect
 # We also add individual/time fixed-effects:
 est_did = feols(y ~ x1 + i(treat, period, 5) | id + period, base_did)
 est_did
 
 ## ---- fig.width=7-------------------------------------------------------------
 coefplot(est_did)
-
-## ---- eval = TRUE-------------------------------------------------------------
-# Estimation of yearly effect
-# We also add individual/time fixed-effects:
-est_f_did = feols(y ~ x1 + i(period, keep = 3:6) + i(treat, period, 5) | id, base_did)
-# The display in etable is now 'nicer' than when using regular factors
-etable(est_f_did, dict = c("period" = "Period", "6" = "six"))
-
-## ---- fig.width=7-------------------------------------------------------------
-coefplot(est_f_did, only.inter = FALSE)
 
 ## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
@@ -167,6 +238,9 @@ est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 etable(est1, est2, est_sub, order = "f", drop = "Int")
 
+## ---- include = FALSE---------------------------------------------------------
+require_DT_ON()
+
 ## -----------------------------------------------------------------------------
 library(data.table)
 pdat_dt = panel(as.data.table(base_did), ~id+period)
@@ -176,17 +250,26 @@ pdat_dt[, x1_l1 := l(x1)]
 pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 head(pdat_dt)
 
+## ---- include = FALSE---------------------------------------------------------
+require_DT_OFF()
+
 ## -----------------------------------------------------------------------------
 base_lag = base_did
 # we create a lagged value of the variable x1
 base_lag$x1.l1 = lag(x1 ~ id + period, 1, base_lag)
 head(base_lag)
 
+## ---- include = FALSE---------------------------------------------------------
+require_DT_ON()
+
 ## -----------------------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
 base_lag_dt[, x1.l1 := lag(x1 ~ id + period, 1)]
+
+## ---- include = FALSE---------------------------------------------------------
+require_DT_OFF()
 
 ## -----------------------------------------------------------------------------
 # Generating data:

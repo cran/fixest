@@ -221,7 +221,6 @@
 #'
 coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, horiz = FALSE, dict = getFixest_dict(), keep, drop, order, ci.width="1%", ci_level = 0.95, add = FALSE, pt.pch = 20, pt.bg = NULL, cex = 1, pt.cex = cex, col = 1:8, pt.col = col, ci.col = col, lwd = 1, pt.lwd = lwd, ci.lwd = lwd, ci.lty = 1, grid = TRUE, grid.par = list(lty=3, col = "gray"), zero = TRUE, zero.par = list(col="black", lwd=1), pt.join = FALSE, pt.join.par = list(col = pt.col, lwd=lwd), ci.join = FALSE, ci.join.par = list(lwd = lwd, col = col, lty = 2), ci.fill = FALSE, ci.fill.par = list(col = "lightgray", alpha = 0.5), ref = "auto", ref.line = "auto", ref.line.par = list(col = "black", lty = 2), lab.cex, lab.min.cex = 0.85, lab.max.mar = 0.25, lab.fit = "auto", xlim.add, ylim.add, only.params = FALSE, only.inter = TRUE, sep, as.multiple = FALSE, bg, group = "auto", group.par = list(lwd=2, line=3, tcl=0.75), main = "Effect on __depvar__", value.lab = "Estimate and __ci__ Conf. Int.", ylab = NULL, xlab = NULL, sub = NULL){
 
-
     # Set up the dictionary
     if(is.null(dict)){
         dict = c()
@@ -320,7 +319,7 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
         arg2set = setdiff(names(my_opt), names(mc))
         for(arg in arg2set){
             my_arg = my_opt[[arg]]
-            if(is.name(my_arg)){
+            if(is.name(my_arg) || is.call(my_arg)){
                 if(length(my_opt$extra_values) > 0){
                     assign(arg, eval(my_arg, my_opt$extra_values))
                 } else {
@@ -1357,7 +1356,7 @@ coefplot = function(object, ..., style, sd, ci_low, ci_high, x, x.shift = 0, hor
 
             if(!is.null(group_name)){
                 if(grepl("^&", group_name)){
-                    group_name = eval(parse(text = gsub("^&", "", group_name)))
+                    group_name = eval(str2lang(gsub("^&", "", group_name)))
                 }
 
                 axis(side, mean(info), labels = group_name, tick = FALSE, line = par_fit(group.par$text.line, i), cex.axis = par_fit(group.par$text.cex, i), font = par_fit(group.par$text.font, i), col.axis = par_fit(group.par$text.col, i))
@@ -1390,8 +1389,15 @@ coefplot_prms = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict,
     NO_NAMES = FALSE
     IS_INTER = FALSE
     AXIS_AS_NUM = FALSE
-    if(is_internal == FALSE && is.list(object) && class(object)[1] == "list"){
+    if(is_internal == FALSE && ((is.list(object) && class(object)[1] == "list") || "fixest_multi" %in% class(object))){
         # This is a list of estimations
+
+        if("fixest_multi" %in% class(object)){
+            # WIP:
+            # - add tags of the sample
+            # - add legend
+            object = attr(object, "data")
+        }
 
         #
         # Multiple estimations ####
@@ -1474,7 +1480,7 @@ coefplot_prms = function(object, ..., sd, ci_low, ci_high, x, x.shift = 0, dict,
         my_names_order = unique(all_estimates$estimate_names)
         my_order = 1:length(my_names_order)
         names(my_order) = my_names_order
-        all_estimates$id_order = my_order[all_estimates$estimate_names]
+        all_estimates$id_order = my_order[as.character(all_estimates$estimate_names)]
         all_estimates = all_estimates[base::order(all_estimates$id_order, all_estimates$est_nb), ]
 
         # we rescale
@@ -1979,7 +1985,7 @@ replace_and_make_callable = function(text, varlist, text_as_expr = FALSE){
                     if(grepl("^expression\\(", res)){
                         res = gsub("(^expression\\()|(\\)$)", "", res)
                     } else if(grepl("^substitute\\(", res)){
-                        res = deparse(eval(parse(text = res)))
+                        res = deparse(eval(str2lang(res)))
                     }
                 } else {
                     res = x
@@ -2040,9 +2046,9 @@ expr_builder = function(x){
         my_expr = gsub("^&", "", x)
         if(grepl("^(expression|substitute)\\(", my_expr)){
             # direct evaluation
-            res = eval(parse(text = my_expr), parent.frame(2))
+            res = eval(str2lang(my_expr), parent.frame(2))
         } else {
-            res = eval(parse(text = paste0("expression(", my_expr, ")")))
+            res = eval(str2lang(paste0("expression(", my_expr, ")")))
         }
     } else {
         res = x
@@ -2200,7 +2206,7 @@ setFixest_coefplot = function(style, horiz = FALSE, dict = getFixest_dict(), kee
         } else {
             my_extra_args = setdiff(my_arg_vars, arg_list)
             if(length(my_extra_args) > 0){
-                for(v in my_extra_args) extra_values[[v]] = eval(parse(text = v), parent.frame())
+                for(v in my_extra_args) extra_values[[v]] = eval(str2lang(v), parent.frame())
             }
             # control that the order is proper
             arg2eval = intersect(my_arg_vars, arg_list)
