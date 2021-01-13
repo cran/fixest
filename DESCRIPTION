@@ -1,8 +1,8 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.8.0
-Authors@R: c(person("Laurent", "Berge", email = "laurent.berge@uni.lu", role = c("aut", "cre")), person("Sebastian", "Krantz", role = "ctb"))
+Version: 0.8.1
+Authors@R: c(person("Laurent", "Berge", email = "laurent.berge@u-bordeaux.fr", role = c("aut", "cre")), person("Sebastian", "Krantz", role = "ctb"))
 Imports: stats, graphics, grDevices, utils, methods, numDeriv, nlme,
         sandwich, Rcpp, dreamerr(>= 1.2.3)
 Suggests: knitr, rmarkdown, data.table, plm, MASS, pander
@@ -13,15 +13,17 @@ Description: Fast and user-friendly estimation of econometric models with multip
     Further provides tools to export and view the results of several estimations with intuitive design to cluster the standard-errors.
 License: GPL-3
 BugReports: https://github.com/lrberge/fixest/issues
+URL: https://lrberge.github.io/fixest/,
+        https://github.com/lrberge/fixest
 SystemRequirements: C++11
 VignetteBuilder: knitr
 LazyData: true
 RoxygenNote: 7.1.1
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2020-12-13 23:54:36 UTC; laure
+Packaged: 2021-01-12 21:39:05 UTC; laure
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb]
-Maintainer: Laurent Berge <laurent.berge@uni.lu>
+Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2020-12-14 09:10:07 UTC
+Date/Publication: 2021-01-13 10:40:02 UTC

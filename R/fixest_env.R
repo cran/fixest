@@ -2,7 +2,7 @@
 # Author: Laurent Berge
 # Date creation: Mon Jun 10 23:46:47 2019
 # Purpose: sets up the params + performs
-#           all necessay checks
+#           all necessary checks
 #----------------------------------------------#
 
 
@@ -10,7 +10,7 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
                        fixef, NL.start, lower, upper, NL.start.init,
                        offset, subset, split = NULL, fsplit = NULL, linear.start = 0, jacobian.method = "simple",
                        useHessian = TRUE, hessian.args = NULL, opt.control = list(),
-                       cluster, se,
+                       cluster, se, dof,
                        y, X, fixef_mat, panel.id, fixef.rm = "perfect",
                        nthreads = getFixest_nthreads(), lean = FALSE,
                        verbose = 0, theta.init, fixef.tol = 1e-5, fixef.iter = 10000, collin.tol = 1e-14,
@@ -63,7 +63,7 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
 
     #
     # Arguments control
-    main_args = c("fml", "data", "panel.id", "offset", "subset", "split", "fsplit", "cluster", "se", "fixef.rm", "fixef.tol", "fixef.iter", "fixef", "nthreads", "lean", "verbose", "warn", "notes", "combine.quick", "start", "only.env", "mem.clean")
+    main_args = c("fml", "data", "panel.id", "offset", "subset", "split", "fsplit", "cluster", "se", "dof", "fixef.rm", "fixef.tol", "fixef.iter", "fixef", "nthreads", "lean", "verbose", "warn", "notes", "combine.quick", "start", "only.env", "mem.clean")
     femlm_args = c("family", "theta.init", "linear.start", "opt.control", "deriv.tol", "deriv.iter")
     feNmlm_args = c("NL.fml", "NL.start", "lower", "upper", "NL.start.init", "jacobian.method", "useHessian", "hessian.args")
     feglm_args = c("family", "weights", "glm.iter", "glm.tol", "etastart", "mustart", "collin.tol")
@@ -479,7 +479,15 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
             cluster = .xpd(rhs = cluster)
         }
 
-        complete_vars = unique(c(complete_vars, all.vars(cluster)))
+        cluster_origin = cluster
+
+        # Check
+        clust_vars = all.vars(cluster)
+        if(any(!clust_vars %in% dataNames)){
+            stop("In argument 'cluster' the variable", enumerate_items(setdiff(clust_vars, dataNames), "s.is.quote"), " is not in the data set. It must be composed of variable names only.")
+        }
+
+        complete_vars = unique(c(complete_vars, clust_vars))
     }
 
     #
@@ -641,6 +649,7 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
         nobs_origin = nobs
     }
 
+    check_LHS_const = FALSE
     anyNA_y = FALSE
     msgNA_y = ""
     if(multi_lhs){
@@ -687,7 +696,8 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
 
         # we check the var is not a constant
         if(cpp_isConstant(lhs_clean)){
-            stop("The dependent variable is a constant. Estimation cannot be done.")
+            # We delay this evaluation
+            check_LHS_const = TRUE
         }
 
         if(family %in% c("poisson", "negbin") && any(lhs_clean < 0)){
@@ -828,6 +838,18 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
                 # Interaction information => if no interaction: NULL, only the first is there
                 interaction.info = getOption("fixest_interaction_ref")
             }
+        }
+    }
+
+    if(check_LHS_const){
+        # Estimation cannot be done if fixed-effects or the constant are present
+        # Note that the fit stats get messed up in such estimation => but since it's super niche I don't correct for it
+
+        if(isFixef){
+            stop("The dependent variable is a constant. The estimation with fixed-effects cannot be done.")
+
+        } else if(isLinear && (!isFit && attr(fml_terms, "intercept") == 1)){
+            stop("The dependent variable is a constant. The estimation cannot be done. If you really want to carry on, please remove the intercept first.")
         }
     }
 
@@ -1172,10 +1194,17 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
             if(isFit){
                 check_value(split, "vector len(value)", .value = nobs_origin)
             } else {
-                check_value(split, "vector len(data)", .data = data, .prefix = "If not a formula, argument 'split'")
+                check_value(split, "vector len(data) | character scalar", .data = data, .prefix = "If not a formula, argument 'split'")
             }
 
-            split.name = gsub("^[[:alpha:]][[:alnum:]\\._]*\\$", "", deparse_long(mc_origin$split))
+            if(length(split) == 1){
+                split.name = split
+                check_value(split, "charin", .choices = dataNames, .message = "If equal to a character scalar, argument 'split' must be a variable name.")
+                split = data[[split]]
+            } else {
+                split.name = gsub("^[[:alpha:]][[:alnum:]\\._]*\\$", "", deparse_long(mc_origin$split))
+            }
+
         }
 
         if(delayed.subset){
@@ -1329,7 +1358,8 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
             }
         }
     } else {
-        cluster = NULL
+        # Cluster origin was first defined when we first check cluster, way up
+        cluster_origin = cluster = NULL
     }
 
     if(!missnull(se)){
@@ -1351,6 +1381,15 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
 
     } else {
         se = NULL
+    }
+
+    if(!missnull(dof)){
+        do_summary = TRUE
+        if(!identical(class(dof), "dof.type")){
+            stop("The argument 'dof' must be an object obtained from the function dof().")
+        }
+    } else {
+        dof = NULL
     }
 
     check_arg(lean, "logical scalar")
@@ -2118,12 +2157,15 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
     assign("mem.clean", mem.clean, env)
     assign("nthreads", nthreads, env)
 
-    # summary
+    # Summary
     assign("do_summary", do_summary, env)
     if(do_summary){
         assign("cluster", cluster, env)
         assign("se", se, env)
         assign("lean", lean, env)
+        assign("dof", dof, env)
+
+        assign("summary_flags", build_flags(mc_origin, se = se, cluster = cluster_origin, dof = dof), env)
     }
 
     # Multi
@@ -2157,6 +2199,8 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
             }
         }
     }
+
+    assign("IN_MULTI", multi_lhs || multi_rhs || multi_fixef || isSplit, env)
 
 
     # IV
@@ -2486,7 +2530,7 @@ setup_fixef = function(fixef_mat, lhs, fixef_vars, fixef.rm, family, isSplit, sp
     do_keep = !is.null(obs2keep)
 
     if(isSplitNoFull && do_keep){
-        # Here fixef_mat is a DF
+        # Here fixef_mat is a DF or a list (outcome of previous calls) => that's why I need to use select_obs
         fixef_mat = select_obs(fixef_mat, obs2keep)
     }
 
@@ -2739,6 +2783,8 @@ reshape_env = function(env, obs2keep = NULL, lhs = NULL, rhs = NULL, assign_lhs 
 
     lhs_done = FALSE
 
+    res = get("res", new_env)
+
     #
     # fixef ####
     #
@@ -2808,12 +2854,13 @@ reshape_env = function(env, obs2keep = NULL, lhs = NULL, rhs = NULL, assign_lhs 
 
         assign_fixef_env(new_env, family, origin_type, fixef_id, fixef_sizes, fixef_table, sum_y_all, slope_flag, slope_variables, slope_vars_list)
 
+        assign_fixef = TRUE
+
     } else if(isFixef){
         slope_flag = get("slope_flag", env)
         isSlope = any(slope_flag != 0)
     }
 
-    res = get("res", new_env)
 
     # This is very tedious
     if(!is.null(obs2keep) || assign_fixef){
@@ -2824,6 +2871,9 @@ reshape_env = function(env, obs2keep = NULL, lhs = NULL, rhs = NULL, assign_lhs 
         #
 
         if(!is.null(obs2keep)){
+            # I set both values to FALSE since they're done here
+            save_lhs = save_rhs = FALSE
+
             #
             # The left hand side
             #
@@ -3063,108 +3113,106 @@ reshape_env = function(env, obs2keep = NULL, lhs = NULL, rhs = NULL, assign_lhs 
             res$fixef_sizes = fixef_sizes_res
         }
 
-    } else {
+    }
 
-        #
-        # Save LHS/RHS ####
-        #
+    #
+    # Save LHS/RHS ####
+    #
 
-        if(save_lhs){
-            # Here lhs is ALWAYS a vector
-            assign("lhs", lhs, new_env)
+    if(save_lhs){
+        # Here lhs is ALWAYS a vector
+        assign("lhs", lhs, new_env)
 
-            if(origin_type == "feglm"){
-                family_funs = get("family_funs", env)
+        if(origin_type == "feglm"){
+            family_funs = get("family_funs", env)
 
-                if(family_funs$family_equiv == "poisson"){
+            if(family_funs$family_equiv == "poisson"){
 
-                    y_pos = lhs[lhs > 0]
-                    qui_pos = lhs > 0
+                y_pos = lhs[lhs > 0]
+                qui_pos = lhs > 0
 
-                    weights.value = get("weights.value", env)
-                    isWeight = length(weights.value) > 1
+                weights.value = get("weights.value", env)
+                isWeight = length(weights.value) > 1
 
-                    if(isWeight){
-                        constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
-                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
-                    } else {
-                        constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
-                        sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
-                    }
-
-                    family_funs$sum_dev.resids = sum_dev.resids
-
-                    assign("family_funs", family_funs, new_env)
-                }
-            }
-
-            if(origin_type == "feglm" && isFixef){
-                res$y = lhs
-            }
-        }
-
-        if(save_rhs){
-            assign("linear.mat", rhs, new_env)
-
-            isLinear = FALSE
-            if(length(rhs) > 1){
-                isLinear = TRUE
-
-                linear.params = colnames(rhs)
-                nonlinear.params = get("nonlinear.params", env)
-                params = c(nonlinear.params, linear.params)
-                assign("linear.params", linear.params, new_env)
-                assign("params", params, new_env)
-
-                # useful when feNmlm or feglm
-                if(origin_type %in% c("feNmlm", "feglm")){
-
-                    start = get("start", env)
-                    if(!is.null(start)){
-                        new_start = setNames(start[params], params)
-                        new_start[is.na(new_start)] = 0
-                        assign("start", new_start, new_env)
-                    }
-
-                    if(origin_type == "feNmlm"){
-                        upper = get("upper", env)
-                        new_upper = setNames(upper[params], params)
-                        new_upper[is.na(new_upper)] = Inf
-                        assign("upper", new_upper, new_env)
-
-                        lower = get("lower", env)
-                        new_lower = setNames(lower[params], params)
-                        new_lower[is.na(new_lower)] = -Inf
-                        assign("lower", new_lower, new_env)
-                    }
-                }
-            }
-
-            assign("isLinear", isLinear, new_env)
-
-            # Finally the DoF
-            params = get("params", new_env)
-            K = length(params)
-            if(isFixef){
-                fixef_sizes = get("fixef_sizes", new_env)
-                slope_flag = get("slope_flag", new_env)
-                if(isSlope){
-                    K = K + sum(fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0)))
-                    # now the references
-                    if(any(slope_flag >= 0)){
-                        K = K + 1 - sum(slope_flag >= 0)
-                    }
+                if(isWeight){
+                    constant = sum(weights.value[qui_pos] * y_pos * cpppar_log(y_pos, nthreads) - weights.value[qui_pos] * y_pos)
+                    sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(wt[qui_pos] * y_pos * eta[qui_pos]) + sum(wt * mu))
                 } else {
-                    K = K + sum(fixef_sizes - 1) + 1
+                    constant = sum(y_pos * cpppar_log(y_pos, nthreads) - y_pos)
+                    sum_dev.resids = function(y, mu, eta, wt) 2 * (constant - sum(y_pos * eta[qui_pos]) + sum(mu))
                 }
-            }
-            res$nparams = K
 
-            if(!isLinear && !isTRUE(res$iv)){
-                res$onlyFixef = TRUE
+                family_funs$sum_dev.resids = sum_dev.resids
+
+                assign("family_funs", family_funs, new_env)
             }
         }
 
+        if(origin_type == "feglm" && isFixef){
+            res$y = lhs
+        }
+    }
+
+    if(save_rhs){
+        assign("linear.mat", rhs, new_env)
+
+        isLinear = FALSE
+        if(length(rhs) > 1){
+            isLinear = TRUE
+
+            linear.params = colnames(rhs)
+            nonlinear.params = get("nonlinear.params", env)
+            params = c(nonlinear.params, linear.params)
+            assign("linear.params", linear.params, new_env)
+            assign("params", params, new_env)
+
+            # useful when feNmlm or feglm
+            if(origin_type %in% c("feNmlm", "feglm")){
+
+                start = get("start", env)
+                if(!is.null(start)){
+                    new_start = setNames(start[params], params)
+                    new_start[is.na(new_start)] = 0
+                    assign("start", new_start, new_env)
+                }
+
+                if(origin_type == "feNmlm"){
+                    upper = get("upper", env)
+                    new_upper = setNames(upper[params], params)
+                    new_upper[is.na(new_upper)] = Inf
+                    assign("upper", new_upper, new_env)
+
+                    lower = get("lower", env)
+                    new_lower = setNames(lower[params], params)
+                    new_lower[is.na(new_lower)] = -Inf
+                    assign("lower", new_lower, new_env)
+                }
+            }
+        }
+
+        assign("isLinear", isLinear, new_env)
+
+        # Finally the DoF
+        params = get("params", new_env)
+        K = length(params)
+        if(isFixef){
+            fixef_sizes = get("fixef_sizes", new_env)
+            slope_flag = get("slope_flag", new_env)
+            if(isSlope){
+                K = K + sum(fixef_sizes * (1 + abs(slope_flag) - (slope_flag < 0)))
+                # now the references
+                if(any(slope_flag >= 0)){
+                    K = K + 1 - sum(slope_flag >= 0)
+                }
+            } else {
+                K = K + sum(fixef_sizes - 1) + 1
+            }
+        }
+        res$nparams = K
+
+        if(!isLinear && !isTRUE(res$iv)){
+            res$onlyFixef = TRUE
+        }
     }
 
     # We save the formulas
@@ -3266,26 +3314,28 @@ cstepwise0 = csw0 = stepwise0 = sw0 = function(...){
     res
 }
 
-#' @rdname stepwise
-"sw"
+# To add a proper documentation:
 
 #' @rdname stepwise
-"cstepwise"
+sw <- sw
 
 #' @rdname stepwise
-"csw"
+cstepwise <- csw
 
 #' @rdname stepwise
-"stepwise0"
+csw <- csw
 
 #' @rdname stepwise
-"sw0"
+stepwise0 <- sw0
 
 #' @rdname stepwise
-"cstepwise0"
+sw0 <- sw0
 
 #' @rdname stepwise
-"csw0"
+cstepwise0 <- csw0
+
+#' @rdname stepwise
+csw0 <- csw0
 
 
 extract_stepwise = function(fml, tms, all_vars = TRUE){
@@ -3482,6 +3532,9 @@ select_obs = function(x, index, nthreads = 1, msg = "explanatory variable"){
             x = x[index]
         }
 
+    } else if(is.data.frame(x)){
+        x = x[index, , drop = FALSE]
+
     } else if(is.matrix(x[[1]]) || length(x[[1]]) == 1){
         # Means RHS
         for(i in seq_along(x)){
@@ -3509,6 +3562,41 @@ select_obs = function(x, index, nthreads = 1, msg = "explanatory variable"){
 
 
 
+fixest_NA_results = function(env){
+    # Container for NA results
+    # so far the non-linear part is not covered
 
+    res = get("res", env)
+
+    X = get("linear.mat", env)
+
+    n = ncol(X)
+    NA_values = rep(NA_real_, n)
+
+    coef = se = NA_values
+    names(coef) = names(se) = colnames(X)
+
+    coeftable = data.frame("Estimate" = NA_values, "Std. Error" = NA_values, "t value" = NA_values, "Pr(>|t|)" = NA_values)
+    names(coeftable) = c("Estimate", "Std. Error", "t value",  "Pr(>|t|)")
+    row.names(coeftable) = names(coef)
+
+    cov.scaled = matrix(NA, n, n)
+
+    attr(se, "type") = attr(coeftable, "type") = attr(cov.scaled, "type") = "Void"
+    res$coeftable = coeftable
+    res$se = se
+    res$cov.scaled = cov.scaled
+
+    res$summary = TRUE
+
+    # Fit stats
+    res$nobs = nrow(X)
+    res$ssr = res$ssr_null = res$ssr_fe_only = res$sigma2 = res$loglik = res$ll_null = res$ll_fe_only = res$pseudo_r2 = res$deviance = res$sq.cor = NA_real_
+
+    res$NA_model = TRUE
+    class(res) = "fixest"
+
+    res
+}
 
 

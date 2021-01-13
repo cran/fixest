@@ -2,13 +2,13 @@
 % Please edit documentation in R/MiscFuns.R
 \name{vcov.fixest}
 \alias{vcov.fixest}
-\title{Extracts the variance/covariance of a \code{femlm} fit}
+\title{Computes the variance/covariance of a \code{fixest} object}
 \usage{
 \method{vcov}{fixest}(
   object,
   se,
   cluster,
-  dof = getFixest_dof(),
+  dof = NULL,
   attr = FALSE,
   forceCovariance = FALSE,
   keepBounded = FALSE,

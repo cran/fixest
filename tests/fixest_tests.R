@@ -176,6 +176,7 @@ base$fe1[110:118] = NA
 base$fe2[base$fe2 == 1] = 0
 base$fe3 = sample(letters[1:5], 150, TRUE)
 base$period = rep(1:50, 3)
+base$x_cst = 1
 
 res = feols(y ~ 1 | csw(fe1, fe1^fe2), base)
 
@@ -183,8 +184,30 @@ res = feols(y ~ 1 + csw(x1, i(fe1)) | fe2, base)
 
 res = feols(y ~ csw(f(x1, 1:2), x2) | sw0(fe2, fe2^fe3), base, panel.id = ~ fe1 + period)
 
-
 res = feols(c(y, x1) ~ 1 | fe1 | x2 ~ x3, base)
+
+#
+# NA models (ie all variables are collinear with the FEs)
+#
+
+# Should work when warn = FALSE or multiple est
+for(i in 1:2){
+    fun = switch(i, "1" = feols, "2" = feglm)
+
+    res = feols(y ~ x_cst | fe1, base, warn = FALSE)
+    res         # => no error
+    etable(res) # => no error
+
+    # error when warn = TRUE
+    test(feols(y ~ x_cst | fe1, base), "err")
+
+    # multiple est => no error
+    res = feols(c(y, x1) ~ x_cst | fe1, base)
+    res         # => no error
+    etable(res) # => no error
+}
+
+
 
 ####
 #### Fit methods ####
@@ -1093,7 +1116,35 @@ for(depvar in c("y", "y_na", "y_0")){
 
 cat("done.\n\n")
 
+#
+# Data table
+#
 
+cat("data.table...")
+# We just check there is no bug (consistency should be OK)
+
+library(data.table)
+
+base_dt = data.table(id = c("A", "A", "B", "B"),
+                     time = c(1, 2, 1, 3),
+                     x = c(5, 6, 7, 8))
+
+base_dt = panel(base_dt, ~id + time)
+
+base_dt[, x_l := l(x)]
+test(base_dt$x_l, c(NA, 5, NA, NA))
+
+lag_creator = function(dt) {
+    dt2 = panel(dt, ~id + time)
+    dt2[, x_l := l(x)]
+    return(dt2)
+}
+
+base_bis = lag_creator(base_dt)
+
+base_bis[, x_d := d(x)]
+
+cat("done.\n\n")
 
 
 ####
@@ -1359,5 +1410,98 @@ y = model.matrix(res, type = "lhs", data = base, na.rm = FALSE)
 X = model.matrix(res, type = "rhs", data = base, na.rm = FALSE)
 res_bis = lm.fit(X[-res$obsRemoved, ], y[-res$obsRemoved,])
 test(res_bis$coefficients, res$coefficients)
+
+
+####
+#### VCOV at estimation ####
+####
+
+chunk("vcov at estimation")
+
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+base$clu = sample(6, 150, TRUE)
+base$clu[1:5] = NA
+
+est = feols(y ~ x1 | species, base, cluster = ~clu, dof = dof(adj = FALSE))
+
+# The three should be identical
+v1 = est$cov.scaled
+v1b = vcov(est)
+v1c = summary(est)$cov.scaled
+
+test(v1, v1b)
+test(v1, v1c)
+
+# Only dof change
+v2 = summary(est, dof = dof())$cov.scaled
+v2b = vcov(est, cluster = ~clu, dof = dof())
+
+test(v2, v2b)
+test(max(abs(v1 - v2)) == 0, FALSE)
+
+# SE change only
+v3 = summary(est, se = "hetero")$cov.scaled
+v3b = vcov(est, se = "hetero", dof = dof(adj = FALSE))
+
+test(v3, v3b)
+test(max(abs(v1 - v3)) == 0, FALSE)
+test(max(abs(v2 - v3)) == 0, FALSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

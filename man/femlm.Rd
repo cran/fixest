@@ -18,6 +18,7 @@ femlm(
   fsplit,
   cluster,
   se,
+  dof,
   panel.id,
   fixef.tol = 1e-05,
   fixef.iter = 10000,
@@ -47,6 +48,7 @@ fenegbin(
   fsplit,
   cluster,
   se,
+  dof,
   panel.id,
   fixef.tol = 1e-05,
   fixef.iter = 10000,
@@ -87,6 +89,8 @@ fenegbin(
 
 \item{se}{Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{hetero}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "standard"}. Note that this argument can be implicitly deduced from the argument \code{cluster}.}
 
+\item{dof}{An object of class \code{dof.type} obtained with the function \code{\link[fixest]{dof}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{dof}} for this argument. The arguments and defaults of the function \code{\link[fixest]{dof}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "conventional"}, \code{t.df = "conventional"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{dof}} for details.}
+
 \item{panel.id}{The panel identifiers. Can either be: i) a one sided formula (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables with \code{^} only inside formulas (see the dedicated section in \code{\link[fixest]{feols}}).}
 
 \item{fixef.tol}{Precision used to obtain the fixed-effects. Defaults to \code{1e-5}. It corresponds to the maximum absolute difference allowed between two coefficients of successive iterations. Argument \code{fixef.tol} cannot be lower than \code{10000*.Machine$double.eps}. Note that this parameter is dynamically controlled by the algorithm.}
@@ -116,7 +120,7 @@ fenegbin(
 \item{...}{Not currently used.}
 }
 \value{
-A \code{fixest} object.
+A \code{fixest} object. Note that \code{fixest} objects contain many elements and most of them are for internal use, they are presented here only for information. To access them, it is safer to use the user-level methods (e.g. \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{resid.fixest}}, etc) or functions (like for instance \code{\link[fixest]{fitstat}} to access any fit statistic).
 \item{nobs}{The number of observations.}
 \item{fml}{The linear formula of the call.}
 \item{call}{The call of the function.}
@@ -224,7 +228,7 @@ est_pois = femlm(Euros ~ log(dist_km) | Origin + Destination + Product, trade)
 # 2) Log-Log Gaussian estimation (with same FEs)
 est_gaus = update(est_pois, log(Euros+1) ~ ., family = "gaussian")
 
-# Comparison of the results using the function esttable
+# Comparison of the results using the function etable
 etable(est_pois, est_gaus)
 # Now using two way clustered standard-errors
 etable(est_pois, est_gaus, se = "twoway")
@@ -243,7 +247,7 @@ etable(sum_hetero, sum_oneway, sum_twoway, sum_threeway)
 #
 
 # 6 estimations
-est_mult = fepois(c(Ozone, Solar.R) ~ Wind + Temp + csw0(Wind:Temp, Day), airquality)
+est_mult = femlm(c(Ozone, Solar.R) ~ Wind + Temp + csw0(Wind:Temp, Day), airquality)
 
 # We can display the results for the first lhs:
 etable(est_mult[lhs = 1])

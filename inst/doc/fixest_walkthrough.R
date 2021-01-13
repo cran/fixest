@@ -223,6 +223,68 @@ est_did
 coefplot(est_did)
 
 ## -----------------------------------------------------------------------------
+
+#
+# Data
+#
+
+set.seed(1)
+n_group = 20
+n_per_group = 5
+id_i = paste0((1:n_group), ":", rep(1:n_per_group, each = n_group))
+id_t = 1:10
+base = expand.grid(id = id_i, year = id_t)
+base$group = as.numeric(gsub(":.+", "", base$id))
+base$year_treated = base$group
+base$year_treated[base$group > 10] = 10000
+base$treat_post = (base$year >= base$year_treated) * 1
+base$time_to_treatment = pmax(base$year - base$year_treated, -1000)
+base$treated = (base$year_treated < 10000) * 1
+# The effect of the treatment is cohort specific and increases with time
+base$y_true = base$treat_post * (1 + 1 * base$time_to_treatment - 1 * base$group)
+base$y = base$y_true + rnorm(nrow(base))
+
+# Note that the time_to_treatment for controls is set to -1000
+
+# we need to drop the always treated
+base = base[base$group > 1,]
+
+#
+# Estimations
+#
+
+# "Regular" DiD
+res_naive = feols(y ~ i(treated, time_to_treatment, ref = -1, drop = -1000) | id + year, base)
+
+# with cohort x time to treatment dummies
+res_cohort = feols(y ~ i(time_to_treatment, f2 = group, drop = c(-1, -1000)) | id + year, base)
+
+# Looking at the difference between estimates
+coefplot(res_naive, ylim = c(-6, 8))
+att_true = tapply(base$y_true, base$time_to_treatment, mean)[-1]
+points(-9:8 + 0.15, att_true, pch = 15, col = 2)
+
+# SA method: we aggregate the effects for each period
+agg_coef = aggregate(res_cohort, "(ti.*nt)::(-?[[:digit:]])")
+x = c(-9:-2, 0:8) + .35
+points(x, agg_coef[, 1], pch = 17, col = 4)
+ci_low = agg_coef[, 1] - 1.96 * agg_coef[, 2]
+ci_up = agg_coef[, 1] + 1.96 * agg_coef[, 2]
+segments(x0 = x, y0 = ci_low, x1 = x, y1 = ci_up, col = 4)
+legend("topleft", col = c(1, 2, 4), pch = c(20, 15, 17), legend = c("Naive", "True", "Sun & Abraham"))
+
+print(agg_coef)
+
+
+## -----------------------------------------------------------------------------
+# The full ATT
+aggregate(res_cohort, c("ATT" = "treatment::[^-]"))
+mean(base[base$treat_post == 1, "y_true"])
+
+## -----------------------------------------------------------------------------
+etable(res_cohort, agg = "(ti.*nt)::(-?[[:digit:]])")
+
+## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
 est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
 est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)

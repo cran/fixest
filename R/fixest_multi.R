@@ -120,7 +120,7 @@ setup_multi = function(index, all_names, data, simplify = TRUE){
 #' summary(res, type = "se_compact")
 #'
 #'
-summary.fixest_multi = function(object, type = "short", se, cluster, dof = getFixest_dof(), .vcov, stage = 2, lean = FALSE, n, ...){
+summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NULL, dof = NULL, .vcov, stage = 2, lean = FALSE, n, ...){
     dots = list(...)
     data = attr(object, "data")
 
@@ -586,8 +586,14 @@ print.fixest_multi = function(x, ...){
         # 1) we prune the tree
         obs_keep = tree[[my_dim]] %in% selection[[my_dim]]
         tree = tree[obs_keep, , drop = FALSE]
-        # 2) we reorder it
-        tree = tree[order(tree[[my_dim]]), ]
+
+        # 2) we reorder it according to the order of the user
+        new_tree = list()
+        dim_order = selection[[my_dim]]
+        for(i in seq_along(dim_order)){
+            new_tree[[i]] = tree[tree[[my_dim]] == dim_order[i], ]
+        }
+        tree = do.call(base::rbind, new_tree)
     }
 
     new_data = list()
