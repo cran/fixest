@@ -362,31 +362,52 @@ summary.fixest = function(object, se = NULL, cluster = NULL, dof = NULL, .vcov, 
 	    object$n_print = n
 	}
 
+	# we need this to save the summary flags
+	if(missing(se)){
+	    se = se_in = NULL
+	} else {
+	    se_in = se
+	}
+
+	if(missing(cluster)) {
+	    cluster = cluster_in = NULL
+	} else {
+	    cluster_in = cluster
+	}
+
 	if(isTRUE(object$summary)){
+	    do_assign = TRUE
 	    if("fromPrint" %in% names(dots)){
 	        # From print
 	        return(object)
 
-	    } else if(is.null(se) && is.null(cluster) && is.null(dof) && missing(.vcov) && missing(stage)){
-	        # No modification required
-	        object$summary_from_fit = FALSE
-	        return(object)
+	    } else if(is.null(se) && is.null(cluster) && is.null(dof) && missing(.vcov)){
+	        if(missing(stage)){
+	            # No modification required
+	            object$summary_from_fit = FALSE
+	            return(object)
+	        } else {
+	            # No modification required
+	            do_assign = FALSE
+	        }
 	    }
 
 	    # why is it always so complicated??? => I really should remove the argument "se" and only keep "cluster"
 	    # It's only because the two can be contradictory that I'm having a hassle...
 	    # even better => only have one argument: vcov => takes "standard"/"hetero"/formulas/data/matrix/function => to implement in the future
 
-	    check_arg_plus(se, "NULL match", .choices = c("standard", "white", "hetero", "cluster", "twoway", "threeway", "fourway", "1", "2", "3", "4"), .message = "Argument argument 'se' should be equal to one of 'standard', 'hetero', 'cluster', 'twoway', 'threeway' or 'fourway'.")
+	    if(do_assign){
+	        check_arg_plus(se, "NULL match", .choices = c("standard", "white", "hetero", "cluster", "twoway", "threeway", "fourway", "1", "2", "3", "4"), .message = "Argument argument 'se' should be equal to one of 'standard', 'hetero', 'cluster', 'twoway', 'threeway' or 'fourway'.")
 
-	    is_se = !is.null(se)
-	    is_cluster = !is.null(cluster)
-	    assign_flags(object$summary_flags, se = se, cluster = cluster, dof = dof)
-	    # We need to clean some arguments...
-	    if(is_se && se %in% c("standard", "white", "hetero")){
-	        cluster = NULL
-	    } else if(is_cluster){
-	        se = NULL
+	        is_se = !is.null(se)
+	        is_cluster = !is.null(cluster)
+	        assign_flags(object$summary_flags, se = se, cluster = cluster, dof = dof)
+	        # We need to clean some arguments...
+	        if(is_se && se %in% c("standard", "white", "hetero")){
+	            cluster = NULL
+	        } else if(is_cluster){
+	            se = NULL
+	        }
 	    }
 	}
 
@@ -426,7 +447,7 @@ summary.fixest = function(object, se = NULL, cluster = NULL, dof = NULL, .vcov, 
 	            }
 	        } else {
 	            # We keep the information on clustering => matters for wald tests of 1st stage
-	            keep_se_info = length(stage) == 1
+	            keep_se_info = length(stage) == 1 && !lean
 	            my_res = summary(object, se = se, cluster = cluster, dof = dof, .vcov = .vcov, lean = lean, forceCovariance = forceCovariance, n = n, nthreads = nthreads, iv = TRUE, keep_se_info = keep_se_info)
 
 	            if(keep_se_info){
@@ -558,7 +579,33 @@ summary.fixest = function(object, se = NULL, cluster = NULL, dof = NULL, .vcov, 
 	object$se = se
 
 	if(lean){
-	    object[c("fixef_id", "residuals", "fitted.values", "scores", "sumFE", "slope_variables_reordered", "y", "weights", "irls_weights", "obsRemoved", "obs_selection", "iv_residuals")] = NULL
+	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE", "slope_variables_reordered", "y", "weights", "irls_weights", "obsRemoved", "obs_selection", "iv_residuals")
+
+	    object[var2clean] = NULL
+
+	    # Pfff, I need to further clean the IV first stages
+	    # => I can't just remove "iv_first_stage" because some stuff in there is needed in fitstat
+	    if(!is.null(object$iv_first_stage)){
+	        # NOTE that I do not compute the SEs of the 1st stages => I only remove stuff!
+	        # If the user wants 1st stage SEs => s/he just need to use the 'stage' argument!
+	        if("fixest" %in% class(object$iv_first_stage)){
+	            tmp = object$iv_first_stage
+	            tmp[var2clean] = NULL
+	            tmp$lean = TRUE
+	            object$iv_first_stage = tmp
+	        } else {
+	            tmp_all = object$iv_first_stage
+	            for(i in seq_along(tmp_all)){
+	                tmp = tmp_all[[i]]
+	                tmp[var2clean] = NULL
+	                tmp$lean = TRUE
+	                tmp_all[[i]] = tmp
+	            }
+	            object$iv_first_stage = tmp_all
+	        }
+	    }
+
+
 	    object$lean = TRUE
 	}
 
@@ -571,10 +618,16 @@ summary.fixest = function(object, se = NULL, cluster = NULL, dof = NULL, .vcov, 
 	    object$summary_from_fit = TRUE
 	} else {
 	    # build_flags does not accept missing arguments
-	    if(missing(se)) se = NULL
-	    if(missing(cluster)) cluster = NULL
 	    if(missing(dof)) dof = NULL
-	    object$summary_flags = build_flags(mc, se = se, cluster = cluster, dof = dof)
+
+	    if(lean && !is.null(cluster_in) &&
+	       !(inherits(cluster_in, "formula") || (!is.list(cluster_in) && length(cluster_in) <= 3))){
+	        # Here => means the user has manually provided a cluster => will be of size N at least
+	        # To respect lean = TRUE we keep no memory of this choice
+	        se_in = cluster_in = NULL
+	    }
+
+	    object$summary_flags = build_flags(mc, se = se_in, cluster = cluster_in, dof = dof)
 	    object$summary_from_fit = NULL
 	}
 
@@ -2666,6 +2719,10 @@ i = function(var, f, f2, ref, drop, keep, drop2, keep2){
         is_na_all = is.na(var) | is.na(f)
         if(IS_F2) is_na_all = is_na_all | is.na(f2)
 
+        # Conversion of var to numeric if logical
+        # => that makes sense now, if the user isn't happy => f2 (before that the automatic conversion wouldn't leave room to really use logicals)
+        if(is.logical(var)) var = as.numeric(var)
+
         if(!is.numeric(var)){
             IS_FACTOR_INTER = TRUE
             # It's an interaction between factors
@@ -3959,9 +4016,9 @@ fitstat_register = function(type, fun, alias){
 #' Computes various fit statistics for \code{fixest} estimations.
 #'
 #' @param x A \code{fixest} estimation.
-#' @param type Character vector. The type of fit statistic to be computed. The classic ones are: n, rmse, r2, pr2, f, wald, ivf, ivwald. You have the full list in the details section. Further, you can register your own types with \code{\link[fixest]{fitstat_register}}.
+#' @param type Character vector or one sided formula. The type of fit statistic to be computed. The classic ones are: n, rmse, r2, pr2, f, wald, ivf, ivwald. You have the full list in the details section or use \code{show_types = TRUE}. Further, you can register your own types with \code{\link[fixest]{fitstat_register}}.
 #' @param simplify Logical, default is \code{FALSE}. By default a list is returned whose names are the selected types. If \code{simplify = TRUE} and only one type is selected, then the element is directly returned (ie will not be nested in a list).
-#' @param verbose Logical, default is \code{TRUE}. If \code{TRUE}, an object of class \code{fixest_fitstat} is returned (so its associated print method will be triggerrd). If \code{FALSE} a simple list is returned instead.
+#' @param verbose Logical, default is \code{TRUE}. If \code{TRUE}, an object of class \code{fixest_fitstat} is returned (so its associated print method will be triggered). If \code{FALSE} a simple list is returned instead.
 #' @param show_types Logical, default is \code{FALSE}. If \code{TRUE}, only prompts all available types.
 #' @param ... Other elements to be passed to other methods and may be used to compute the statistics (for example you can pass on arguments to compute the VCOV when using \code{type = "g"} or \code{type = "wald"}.).
 #'
@@ -3974,16 +4031,17 @@ fitstat_register = function(type, fun, alias){
 #' The types are case sensitive, please use lower case only. The types available are:
 #'
 #' \itemize{
-#' \item{n, ll, aic, bic, rmse}{The number of observations, the log-likelihood, the AIC, the BIC and the root mean squared error, respectively.}
-#' \item{g}{The effective sample size. This is used only when the standard-errors are clustered and is used when computing the p-values of the coefficients.}
-#' \item{r2, ar2, wr2, awr2, pr2, apr2, wpr2, awpr2}{All r2 that can be obtained with the function \code{\link[fixest]{r2}}. The \code{a} stands for 'adjusted', the \code{w} for 'within' and the \code{p} for 'pseudo'. Note that the order of the letters \code{a}, \code{w} and \code{p} does not matter.}
-#' \item{f, wf}{The F-tests of nullity of the coefficients. The \code{w} stands for 'within'. These types return the following values: stat, p, df1 and df2. If you want to display only one of these, use their name after a dot: e.g. \code{f.stat} will give the statistic of the F-test, or \code{wf.p} will give the p-values of the F-test on the projected model (i.e. projected onto the fixed-effects).}
-#' \item{wald}{Wald test of joint nullity of the coefficients. This test always excludes the intercept and the fixed-effects. These type returns the following values: stat, p, df1, df2 and vcov. The element \code{vcov} reports the way the VCOV matrix was computed since it directly influences this statistic.}
-#' \item{ivf, ivf1, ivf2, ivfall}{These statistics are specific to IV estimations. They report either the IV F-test of the first stage (\code{ivf} or \code{ivf1}), of the second stage (\code{ivf2}) or of both (\code{ivfall}). The F-test of the first stage is commonly named weak instrument test. The value of \code{ivfall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage F-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivf1} would also be displayed on the 2nd stage estimation). These types return the following values: stat, p, df1 and df2.}
-#' \item{ivwald, ivwald1, ivwald2, ivwaldall}{These statistics are specific to IV estimations. They report either the IV Wald-test of the first stage (\code{ivwald} or \code{ivwald1}), of the second stage (\code{ivwald2}) or of both (\code{ivwaldall}). The Wald-test of the first stage is commonly named weak instrument test. The value of \code{ivwaldall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage Wald-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivwald1} would also be displayed on the 2nd stage estimation). These types return the following values: stat, p, df1, df2, and vcov.}
-#' \item{wh}{This statistic is specific to IV estimations. Wu-Hausman endogeneity test. H0 is the absence of endogeneity of the instrumented variables. It returns the following values: stat, p, df1, df2.}
-#' \item{sargan}{Sargan test of overidentifying restrictions. H0: the instruments are not correlated with the second stage residuals. It returns the following values: stat, p, df.}
-#' \item{lr, wlr}{Likelihood ratio and within likelihood ratio tests. It returns the following elements: stat, p, df. Concerning the within-LR test, note that, coutrary to estimations with \code{femlm} or \code{feNmlm}, estimations with \code{feglm}/\code{fepois} need to estimate the model with fixed-effects only which may prove time-consuming (depending on your model). Bottom line, if you really need the within-LR and estimate a Poisson model, use \code{femlm} instead of \code{fepois} (the former uses direct ML maximisation for which the only FEs model is a by product).}
+#' \item{\code{n}, \code{ll}, \code{aic}, \code{bic}, \code{rmse}: }{The number of observations, the log-likelihood, the AIC, the BIC and the root mean squared error, respectively.}
+#' \item{\code{g}: }{The effective sample size. This is used only when the standard-errors are clustered and is used when computing the p-values of the coefficients.}
+#' \item{\code{r2}, \code{ar2}, \code{wr2}, \code{awr2}, \code{pr2}, \code{apr2}, \code{wpr2}, \code{awpr2}: }{All r2 that can be obtained with the function \code{\link[fixest]{r2}}. The \code{a} stands for 'adjusted', the \code{w} for 'within' and the \code{p} for 'pseudo'. Note that the order of the letters \code{a}, \code{w} and \code{p} does not matter.}
+#' \item{\code{theta}: }{The over-dispersion parameter in Negative Binomial models. Low values mean high overdispersion. }
+#' \item{\code{f}, \code{wf}: }{The F-tests of nullity of the coefficients. The \code{w} stands for 'within'. These types return the following values: \code{stat}, \code{p}, \code{df1} and \code{df2}. If you want to display only one of these, use their name after a dot: e.g. \code{f.stat} will give the statistic of the F-test, or \code{wf.p} will give the p-values of the F-test on the projected model (i.e. projected onto the fixed-effects).}
+#' \item{\code{wald}: }{Wald test of joint nullity of the coefficients. This test always excludes the intercept and the fixed-effects. These type returns the following values: \code{stat}, \code{p}, \code{df1}, \code{df2} and \code{vcov}. The element \code{vcov} reports the way the VCOV matrix was computed since it directly influences this statistic.}
+#' \item{\code{ivf}, \code{ivf1}, \code{ivf2}, \code{ivfall}: }{These statistics are specific to IV estimations. They report either the IV F-test (namely the Cragg-Donald F statistic) of the first stage (\code{ivf} or \code{ivf1}), of the second stage (\code{ivf2}) or of both (\code{ivfall}). The F-test of the first stage is commonly named weak instrument test. The value of \code{ivfall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage F-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivf1} would also be displayed on the 2nd stage estimation). These types return the following values: \code{stat}, \code{p}, \code{df1} and \code{df2}.}
+#' \item{\code{ivwald}, \code{ivwald1}, \code{ivwald2}, \code{ivwaldall}: }{These statistics are specific to IV estimations. They report either the IV Wald-test of the first stage (\code{ivwald} or \code{ivwald1}), of the second stage (\code{ivwald2}) or of both (\code{ivwaldall}). The Wald-test of the first stage is commonly named weak instrument test. The value of \code{ivwaldall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage Wald-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivwald1} would also be displayed on the 2nd stage estimation). These types return the following values: \code{stat}, \code{p}, \code{df1}, \code{df2}, and \code{vcov}.}
+#' \item{\code{wh}: }{This statistic is specific to IV estimations. Wu-Hausman endogeneity test. H0 is the absence of endogeneity of the instrumented variables. It returns the following values: \code{stat}, \code{p}, \code{df1}, \code{df2}.}
+#' \item{\code{sargan}: }{Sargan test of overidentifying restrictions. H0: the instruments are not correlated with the second stage residuals. It returns the following values: \code{stat}, \code{p}, \code{df}.}
+#' \item{\code{lr}, \code{wlr}: }{Likelihood ratio and within likelihood ratio tests. It returns the following elements: \code{stat}, \code{p}, \code{df}. Concerning the within-LR test, note that, contrary to estimations with \code{femlm} or \code{feNmlm}, estimations with \code{feglm}/\code{fepois} need to estimate the model with fixed-effects only which may prove time-consuming (depending on your model). Bottom line, if you really need the within-LR and estimate a Poisson model, use \code{femlm} instead of \code{fepois} (the former uses direct ML maximization for which the only FEs model is a by product).}
 #' }
 #'
 #'
@@ -4644,7 +4702,7 @@ fitstat_validate = function(x, vector = FALSE){
 
     pblm = setdiff(x, c(fitstat_type_allowed, "DEFAULT"))
     if(length(pblm) > 0){
-        stop_up("Argument 'x' must be a one sided formula (or a character vector) containing valid types from the function x (see details in ?x or use x(show_types = TRUE)). The type", enumerate_items(pblm, "s.is.quote"), " not valid.")
+        stop_up("In fitstat, argument 'x' must be a one sided formula (or a character vector) containing valid types from the function fitstat (see details in ?fitstat or use fitstat(show_types = TRUE)). The type", enumerate_items(pblm, "s.is.quote"), " not valid.")
     }
 
     if(length(x) == 0){

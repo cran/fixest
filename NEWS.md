@@ -1,5 +1,27 @@
 
-# fixest 0.8.1
+# fixest 0.8.2
+
+## Bugs
+
+  - Fix bug in IV estimations when `lean = TRUE` (thanks to @reifjulian [#88](https://github.com/lrberge/fixest/issues/88)).
+  
+  - Fix various bugs related to the use of `summary` when `lean = TRUE` in the estimation.
+  
+  - Fix bug preventing `se = "cluster"` to be used in `etable` (thanks to Caleb Kwon).
+  
+  - Fix bug `etable` not escaping variable names properly when `sdBelow = FALSE` (thanks to Jeppe Viero).
+  
+  - Fix bug in IV estimation with `lean = TRUE`.
+  
+  - Fix bug preventing the return of demeaned variables in IV estimations (thanks to @amarbler [#94](https://github.com/lrberge/fixest/issues/94)).
+
+## Other
+
+ - `i()` now automatically converts its first argument to numeric if it was of type logical. The user can still pass logicals to the argument `f2` if the expected behavior is really to treat it as a logical.
+ 
+ - Improve `fitstat` help and error messages.
+
+# fixest 0.8.1 (2021-01-13)
 
 ## Bugs
 
@@ -26,7 +48,7 @@ zozotintin [#81](https://github.com/lrberge/fixest/issues/81)).
  
  - Fix occasional bug in the ordering of sub-selections of multiple estimations. 
  
-# Sun and Abraham (forthcoming, Journal of Econometrics) method for staggered DiD
+## Sun and Abraham method for staggered DiD
 
  - For staggered difference-in-difference analyzes: the method of Sun and Abraham (forthcoming, Journal of Econometrics) has been implemented. 
  
@@ -36,7 +58,7 @@ zozotintin [#81](https://github.com/lrberge/fixest/issues/81)).
  
  - For details, check out the help page of the function `aggregate` or the staggered DiD section in the vignette [fixest walkthrough](https://CRAN.R-project.org/package=fixest/vignettes/fixest_walkthrough.html).
  
-# New features
+## New features
 
  - Function `i()` now has the new arguments `f2`, `drop2` and `keep2` which allows the interaction of two factors (useful for staggered DiD estimations).
  
@@ -49,7 +71,7 @@ zozotintin [#81](https://github.com/lrberge/fixest/issues/81)).
  - Argument `split` now accepts variable names.
  
 
-# Other
+## Other
 
   - More coherence regarding the use of `summary` applied to models for which the SEs were computed at estimation time. Now there is a memory of how the SEs were computed, so that, for example, if only the argument `dof` is passed to `summary`, then the SEs will be clustered in the same way as estimation time and only `dof` will change.
   

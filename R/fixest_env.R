@@ -2156,13 +2156,14 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
     assign("warn", warn, env)
     assign("mem.clean", mem.clean, env)
     assign("nthreads", nthreads, env)
+    assign("demeaned", demeaned, env)
 
     # Summary
     assign("do_summary", do_summary, env)
+    assign("lean", lean, env)
     if(do_summary){
         assign("cluster", cluster, env)
         assign("se", se, env)
-        assign("lean", lean, env)
         assign("dof", dof, env)
 
         assign("summary_flags", build_flags(mc_origin, se = se, cluster = cluster_origin, dof = dof), env)
