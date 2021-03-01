@@ -928,7 +928,6 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 
 	        }
 
-
 	        if(n_vars_X == 0){
 	            ZX_demean = iv.mat_demean
 	            ZX = iv.mat
@@ -3266,7 +3265,7 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 		res$theta = theta
 
 		if(notes && theta > 1000){
-			message("Very high value of theta (", theta, "). There is no sign of overdisperion, you may consider a Poisson model.")
+			message("Very high value of theta (", theta, "). There is no sign of overdispersion, you may consider a Poisson model.")
 		}
 
 	}

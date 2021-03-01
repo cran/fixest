@@ -3139,10 +3139,16 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
             res[[length(res)]] = value2stringCall(rhs, call = TRUE, check = check)
         }
 
-        return(res)
-    }
+        fml = res
 
-    if(check) check_arg(fml, .type = "formula mbt", .up = 1)
+        # NOTA: version < 0.8.3 we had return(res)
+        # now we allow for macro implementation ex post
+        # This entails a 50% performance drop in terms of speed.
+        # Now, without macro variables, speed is at 30us while it was 20us before
+
+    } else if(check){
+        check_arg(fml, .type = "formula mbt", .up = 1)
+    }
 
     macros = parse_macros(..., from_xpd = TRUE, check = check)
 
@@ -3198,7 +3204,6 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
 
     fml
 }
-
 
 
 #' Fast transform of any type of vector(s) into an integer vector
@@ -3934,7 +3939,7 @@ print.fixest_fitstat = function(x, na.rm = FALSE, ...){
 
         if(grepl("::", type, fixed = TRUE)){
             dict = getFixest_dict()
-            rename_fun = function(x) paste0(dict_type[x[1]], ", ", dict_apply(x[2], dict))
+            rename_fun = function(x) paste0(dict_type[x[1]], ", ", paste(sapply(x[-1], dict_apply, dict = dict), collapse = "::"))
             test_name = rename_fun(strsplit(type, "::")[[1]])
             qui_right[i] = TRUE
         } else {
@@ -5350,6 +5355,13 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
     if(useModel.matrix){
         # to catch the NAs, model.frame needs to be used....
         linear.mat = stats::model.matrix(fml[c(1, 3)], stats::model.frame(fml[c(1, 3)], data, na.action=na.pass))
+
+        if(fake_intercept){
+            who_int = which("(Intercept)" %in% colnames(linear.mat))
+            if(length(who_int) > 0){
+                linear.mat = linear.mat[, -who_int, drop = FALSE]
+            }
+        }
     } else {
         linear.mat = prepare_matrix(fml, data, fake_intercept)
     }

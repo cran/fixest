@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2021-02-11" />
+<meta name="date" content="2021-03-01" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -273,7 +273,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2021-02-11</h4>
+<h4 class="date">2021-03-01</h4>
 
 </div>
 
@@ -1020,7 +1020,7 @@ setFixest_fml(..ctrl = ~poly(x2, 2) + poly(x3, 2))
 # Accessing them
 xpd(y ~ x1 + ..ctrl)
 #&gt; y ~ x1 + poly(x2, 2) + poly(x3, 2)
-#&gt; &lt;environment: 0x000000001f684520&gt;
+#&gt; &lt;environment: 0x000000001f689b38&gt;
 
 # Definition at run time
 vars = c(&quot;x2&quot;, &quot;x2^2&quot;, &quot;x3&quot;)
@@ -1028,11 +1028,11 @@ for(i in 1:3){
   print(xpd(y ~ x1 + ..ctrl, ..ctrl = vars[1:i]))
 }
 #&gt; y ~ x1 + x2
-#&gt; &lt;environment: 0x000000001ed82d38&gt;
+#&gt; &lt;environment: 0x000000001edac3e0&gt;
 #&gt; y ~ x1 + x2 + x2^2
-#&gt; &lt;environment: 0x000000001ed3b7b8&gt;
+#&gt; &lt;environment: 0x000000001ed51588&gt;
 #&gt; y ~ x1 + x2 + x2^2 + x3
-#&gt; &lt;environment: 0x000000001ed09dc8&gt;</code></pre>
+#&gt; &lt;environment: 0x000000001ed0ef20&gt;</code></pre>
 <p>Macro variables must start with two dots. As seen in the example, once set globally they can be directly accessed with <code>xpd</code>. In the example, <code>xpd</code> redefines the formula at run-time by having a character vector as input.</p>
 <p>All <code>fixest</code> estimations call <code>xpd</code> internally if appropriate. This means that the following code works just fine:</p>
 <pre class="r"><code>feols(y ~ x1 + ..ctrl, base)
@@ -1054,7 +1054,7 @@ for(i in 1:3){
 xpd(Armed.Forces ~ Population + ..(&quot;GNP|ployed&quot;), data = longley)
 #&gt; Armed.Forces ~ Population + GNP.deflator + GNP + Unemployed + 
 #&gt;     Employed
-#&gt; &lt;environment: 0x000000001df8cf90&gt;</code></pre>
+#&gt; &lt;environment: 0x000000001dfab6c8&gt;</code></pre>
 <p>Again, since <code>xpd</code> is called internally, the following works:</p>
 <pre class="r"><code>feols(Armed.Forces ~ Population + ..(&quot;GNP|ployed&quot;), longley)
 #&gt; OLS estimation, Dep. Var.: Armed.Forces
