@@ -579,7 +579,7 @@ summary.fixest = function(object, se = NULL, cluster = NULL, dof = NULL, .vcov, 
 	object$se = se
 
 	if(lean){
-	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE", "slope_variables_reordered", "y", "weights", "irls_weights", "obsRemoved", "obs_selection", "iv_residuals")
+	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE", "slope_variables_reordered", "y", "weights", "irls_weights", "obsRemoved", "obs_selection", "iv_residuals", "fitted.values_demean")
 
 	    object[var2clean] = NULL
 
@@ -2698,6 +2698,7 @@ i = function(var, f, f2, ref, drop, keep, drop2, keep2){
     f_num = is.numeric(f)
 
     IS_F2 = FALSE
+    f2_num = FALSE
     if(!missing(f2)){
 
         if(length(f2) == 1 && !"ref" %in% names(mc)){
@@ -2721,7 +2722,11 @@ i = function(var, f, f2, ref, drop, keep, drop2, keep2){
 
         # Conversion of var to numeric if logical
         # => that makes sense now, if the user isn't happy => f2 (before that the automatic conversion wouldn't leave room to really use logicals)
-        if(is.logical(var)) var = as.numeric(var)
+        if(is.logical(var)){
+            var = as.numeric(var)
+        } else if(is.factor(var) && length(levels(var)) == 2 && all(c(0, 1) %in% levels(var))){
+            var = as.numeric(as.character(var))
+        }
 
         if(!is.numeric(var)){
             IS_FACTOR_INTER = TRUE
@@ -3943,7 +3948,16 @@ print.fixest_fitstat = function(x, na.rm = FALSE, ...){
             test_name = rename_fun(strsplit(type, "::")[[1]])
             qui_right[i] = TRUE
         } else {
-            test_name = dict_type[type]
+            if(type %in% names(dict_type)){
+                test_name = dict_type[type]
+            } else if(!grepl(".", type, fixed = TRUE)) {
+                warning("Current type '", type, "' has no alias.")
+                test_name = type
+            } else {
+                type_split = strsplit(type, ".", fixed = TRUE)[[1]]
+                test_name = paste0(dict_type[type_split[1]], ", ", dict_type[type_split[2]])
+            }
+
         }
 
         if(length(v) == 1){
@@ -4037,13 +4051,13 @@ fitstat_register = function(type, fun, alias){
 #'
 #' \itemize{
 #' \item{\code{n}, \code{ll}, \code{aic}, \code{bic}, \code{rmse}: }{The number of observations, the log-likelihood, the AIC, the BIC and the root mean squared error, respectively.}
-#' \item{\code{g}: }{The effective sample size. This is used only when the standard-errors are clustered and is used when computing the p-values of the coefficients.}
+#' \item{\code{g}: }{The degrees of freedom used to compute the t-test (it influences the p-values of the coefficients). When the VCOV is clustered, this value is equal to the minimum cluster size, otherwise, it is equal to the sample size minus the number of variables.}
 #' \item{\code{r2}, \code{ar2}, \code{wr2}, \code{awr2}, \code{pr2}, \code{apr2}, \code{wpr2}, \code{awpr2}: }{All r2 that can be obtained with the function \code{\link[fixest]{r2}}. The \code{a} stands for 'adjusted', the \code{w} for 'within' and the \code{p} for 'pseudo'. Note that the order of the letters \code{a}, \code{w} and \code{p} does not matter.}
 #' \item{\code{theta}: }{The over-dispersion parameter in Negative Binomial models. Low values mean high overdispersion. }
 #' \item{\code{f}, \code{wf}: }{The F-tests of nullity of the coefficients. The \code{w} stands for 'within'. These types return the following values: \code{stat}, \code{p}, \code{df1} and \code{df2}. If you want to display only one of these, use their name after a dot: e.g. \code{f.stat} will give the statistic of the F-test, or \code{wf.p} will give the p-values of the F-test on the projected model (i.e. projected onto the fixed-effects).}
 #' \item{\code{wald}: }{Wald test of joint nullity of the coefficients. This test always excludes the intercept and the fixed-effects. These type returns the following values: \code{stat}, \code{p}, \code{df1}, \code{df2} and \code{vcov}. The element \code{vcov} reports the way the VCOV matrix was computed since it directly influences this statistic.}
 #' \item{\code{ivf}, \code{ivf1}, \code{ivf2}, \code{ivfall}: }{These statistics are specific to IV estimations. They report either the IV F-test (namely the Cragg-Donald F statistic) of the first stage (\code{ivf} or \code{ivf1}), of the second stage (\code{ivf2}) or of both (\code{ivfall}). The F-test of the first stage is commonly named weak instrument test. The value of \code{ivfall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage F-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivf1} would also be displayed on the 2nd stage estimation). These types return the following values: \code{stat}, \code{p}, \code{df1} and \code{df2}.}
-#' \item{\code{ivwald}, \code{ivwald1}, \code{ivwald2}, \code{ivwaldall}: }{These statistics are specific to IV estimations. They report either the IV Wald-test of the first stage (\code{ivwald} or \code{ivwald1}), of the second stage (\code{ivwald2}) or of both (\code{ivwaldall}). The Wald-test of the first stage is commonly named weak instrument test. The value of \code{ivwaldall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage Wald-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivwald1} would also be displayed on the 2nd stage estimation). These types return the following values: \code{stat}, \code{p}, \code{df1}, \code{df2}, and \code{vcov}.}
+#' \item{\code{ivwald}, \code{ivwald1}, \code{ivwald2}, \code{ivwaldall}: }{These statistics are specific to IV estimations. They report either the IV Wald-test of the first stage (\code{ivwald} or \code{ivwald1}), of the second stage (\code{ivwald2}) or of both (\code{ivwaldall}). The Wald-test of the first stage is commonly named weak instrument test. Note that if the estimation was done with a robust VCOV, this is also known as the Kleibergen-Paap Wald test. The value of \code{ivwaldall} is only useful in \code{\link[fixest]{etable}} when both the 1st and 2nd stages are displayed (it leads to the 1st stage Wald-test(s) to be displayed on the 1st stage estimation(s), and the 2nd stage one on the 2nd stage estimation -- otherwise, \code{ivwald1} would also be displayed on the 2nd stage estimation). These types return the following values: \code{stat}, \code{p}, \code{df1}, \code{df2}, and \code{vcov}.}
 #' \item{\code{wh}: }{This statistic is specific to IV estimations. Wu-Hausman endogeneity test. H0 is the absence of endogeneity of the instrumented variables. It returns the following values: \code{stat}, \code{p}, \code{df1}, \code{df2}.}
 #' \item{\code{sargan}: }{Sargan test of overidentifying restrictions. H0: the instruments are not correlated with the second stage residuals. It returns the following values: \code{stat}, \code{p}, \code{df}.}
 #' \item{\code{lr}, \code{wlr}: }{Likelihood ratio and within likelihood ratio tests. It returns the following elements: \code{stat}, \code{p}, \code{df}. Concerning the within-LR test, note that, contrary to estimations with \code{femlm} or \code{feNmlm}, estimations with \code{feglm}/\code{fepois} need to estimate the model with fixed-effects only which may prove time-consuming (depending on your model). Bottom line, if you really need the within-LR and estimate a Poisson model, use \code{femlm} instead of \code{fepois} (the former uses direct ML maximization for which the only FEs model is a by product).}
@@ -4107,7 +4121,7 @@ fitstat = function(x, type, simplify = FALSE, verbose = TRUE, show_types = FALSE
         comp_types = c("f", "wf", "ivf", "ivf1", "ivf2", "ivfall", "wald", "ivwald", "ivwald1", "ivwald2", "ivwaldall", "wh", "sargan", "lr", "wlr")
         full_comp_types = paste(comp_types, rep(c("stat", "p"), each = length(comp_types)), sep = ".")
 
-        comp_alias = c(f = "F-test", wf = "F-test (projected)", ivfall = "F-test (IV only)", ivf1 = "F-test (1st stage)", ivf2 = "F-test (2nd stage)", wald = "Wald (joint nullity)", ivwaldall = "Wald (IV only)", ivwald1 = "Wald (1st stage)", ivwald2 = "Wald (2nd stage)", wh = "Wu-Hausman", sargan = "Sargan", lr = "LR", wlr = "LR (within)")
+        comp_alias = c(f = "F-test", wf = "F-test (projected)", ivfall = "F-test (IV only)", ivf1 = "F-test (1st stage)", ivf2 = "F-test (2nd stage)", wald = "Wald (joint nullity)", ivwaldall = "Wald (IV only)", ivwald1 = "Wald (1st stage)", ivwald2 = "Wald (2nd stage)", wh = "Wu-Hausman", sargan = "Sargan", lr = "LR", wlr = "LR (within)", df1 = "DoF (first)", df2 = "DoF (second)", df = "DoF")
         my_names = paste(names(comp_alias), rep(c("stat", "p"), each = length(comp_alias)), sep = ".")
         full_comp_alias = setNames(paste0(comp_alias, ", ", rep(c("stat.", "p-value"), each = length(comp_alias))), my_names)
 
@@ -4152,6 +4166,11 @@ fitstat = function(x, type, simplify = FALSE, verbose = TRUE, show_types = FALSE
         if(length(vec) == 1) return(vec)
 
         if(value != ""){
+
+            if(!value %in% names(vec)){
+                stop_up("'", value, "' is not a valid component of the statistic '", root, "'. Only the following are valid: ", enumerate_items(names(vec), "quote"), ".")
+            }
+
             return(vec[[value]])
         } else if(IS_ETABLE){
             return(vec[1])
@@ -4191,7 +4210,7 @@ fitstat = function(x, type, simplify = FALSE, verbose = TRUE, show_types = FALSE
             my_vcov = x$cov.scaled
 
             G = attr(my_vcov, "g")
-            if(is.null(G)) G = x$nobs
+            if(is.null(G)) G = x$nobs - x$nparams
 
             res_all[[type]] = G
 
@@ -4729,6 +4748,7 @@ fitstat_validate = function(x, vector = FALSE){
 #' @param x A \code{fixest} object.
 #' @param agg A character scalar describing the variable names to be aggregated, it is pattern-based. All variables that match the pattern will be aggregated. It must be of the form \code{"(root)"}, the parentheses must be there and the resulting variable name will be \code{"root"}. You can add another root with parentheses: \code{"(root1)regex(root2)"}, in which case the resulting name is \code{"root1::root2"}. To name the resulting variable differently you can pass a named vector: \code{c("name" = "pattern")} or \code{c("name" = "pattern(root2)")}. It's a bit intricate sorry, please see the examples.
 #' @param full Logical scalar, defaults to \code{FALSE}. If \code{TRUE}, then all coefficients are returned, not only the aggregated coefficients.
+#' @param use_weights Logical, default is \code{TRUE}. If the estimation was weighted, whether the aggregation should take into account the weights. Basically if the weights reflected frequency it should be \code{TRUE}.
 #' @param ... Arguments to be passed to \code{\link[fixest]{summary.fixest}}.
 #'
 #' @details
@@ -4809,7 +4829,7 @@ fitstat_validate = function(x, vector = FALSE){
 #' # With etable
 #' etable(res_naive, res_cohort, agg = "(ti.*nt)::(-?[[:digit:]]+):gro")
 #'
-aggregate.fixest = function(x, agg, full = FALSE, ...){
+aggregate.fixest = function(x, agg, full = FALSE, use_weights = TRUE, ...){
     # Aggregates the value of coefficients
 
     check_arg(x, "class(fixest) mbt")
@@ -4868,7 +4888,12 @@ aggregate.fixest = function(x, agg, full = FALSE, ...){
         v = name_df[i, 2]
         v_names = cname_select[root == r & val == v]
 
-        shares = colSums(sign(mm[, v_names, drop = FALSE]))
+        if(use_weights && !is.null(x$weights)){
+            shares = colSums(x$weights * sign(mm[, v_names, drop = FALSE]))
+        } else {
+            shares = colSums(sign(mm[, v_names, drop = FALSE]))
+        }
+
         shares = shares / sum(shares)
 
         # The coef
@@ -5232,7 +5257,10 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
     data_list <- eval(all_vars_call, base)
 
     # Handling the multi columns case (ex: bs(x1), splines)
-    if(any(lengths(data_list) != nrow(base))){
+    # NOTA: I need to add a check for i() because of 1 value interactions
+    #       not caught by the != nber of obs
+    qui_inter = grepl("\\bi(nteract)?\\(", all_var_names)
+    if(any(lengths(data_list) != nrow(base)) || any(qui_inter)){
 
         all_n = as.vector(lengths(data_list) / nrow(base))
 
@@ -5247,7 +5275,7 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
         all_n_vector = rep(all_n, all_n)
 
         new_names = as.list(all_var_names)
-        for(i in which(all_n > 1)){
+        for(i in which(all_n > 1 | qui_inter)){
             my_names = colnames(data_list[[i]])
             if(is.null(my_names)){
                 my_names = 1:all_n[i]
@@ -5378,6 +5406,190 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
 
     linear.mat
 }
+
+
+fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_intercept = FALSE, i_noref = FALSE, subset = FALSE){
+    # Only used within model.matrix and predict
+    # Overlay of fixest_model_matrix to take care of special things, eg:
+    # - poly
+    # - subset
+    # - ?
+
+    #
+    # subset
+    #
+
+    # subset => we allow the extraction of only some variables
+    if(isFALSE(subset)){
+
+        if(!original_data && any(!all.vars(fml[[3]]) %in% names(newdata))){
+            pblm = setdiff(all.vars(fml[[3]]), names(newdata))
+            stop("In 'model.matrix', the variable", enumerate_items(pblm, "is.s.quote"), " in the formula but not in the argument 'data'. Use 'subset = TRUE' to enable the creation of partial data.")
+        }
+
+    } else {
+        vars_keep = names(newdata)
+
+        if(is.character(subset)){
+            # ex: subset = c("x1$", "x2$")
+
+            vars_keep = keep_apply(vars_keep, subset)
+            if(length(vars_keep) == 0){
+                stop("The variables in 'subset' do not match any variable in the 'data'.")
+            }
+
+            if(isFALSE(keep_apply("(Intercept)", subset, logical = TRUE))){
+                fake_intercept = TRUE
+            }
+
+        } else {
+            # intercept always removed if subset = TRUE!!!
+            # that's the point of subset.
+
+            fake_intercept = TRUE
+        }
+
+        if(!all(all.vars(fml[[3]]) %in% vars_keep)){
+
+            terms_all = attr(terms(fml), "term.labels")
+            # We first check pure variables (because non pure variables are slower to check)
+            is_var = grepl("^[\\.[:alpha:]][[:alnum:]\\._]*$", terms_all)
+            terms_drop = is_var & !terms_all %in% vars_keep
+
+            for(i in which(!is_var)){
+                if(any(!all.vars(str2lang(terms_all[i])) %in% vars_keep)){
+                    terms_drop[i] = TRUE
+                }
+            }
+
+            if(all(terms_drop)){
+                stop("Due to the use of the argument 'subset', not a single variable is left.")
+            }
+
+            fml = .xpd(lhs = "y", rhs = terms_all[!terms_drop])
+        }
+    }
+
+    fml_dp = deparse(fml)
+
+    #
+    # poly
+    #
+
+    # We check for the presence of poly only in the case of new data
+    # if it's the original data set, that's OK
+
+    is_poly = FALSE
+    if(!original_data && grepl("(?<![\\.[:alnum:]_])poly\\(", fml_dp, perl = TRUE)){
+        # checking the regex: 87us on a small vector
+
+        poly_parts = strsplit(fml_dp, "(?<![\\.[:alnum:]_])poly\\(", perl = TRUE)[[1]]
+
+        split_by_poly = function(r){
+
+            if(!grepl("(", r, fixed = TRUE) && grepl("\\)$", r)){
+                return(c(paste0("poly(", r), ""))
+            }
+
+            letter_vec = strsplit(r, "")[[1]]
+            open = 1 + cumsum(letter_vec == "(")
+            close = cumsum(letter_vec == ")")
+            index = which.max(close - open == 0)
+
+            c(paste0("poly(", substr(r, 1, index)), substr(r, index + 1, nchar(r)))
+        }
+
+        poly_parts_full = lapply(poly_parts[-1], split_by_poly)
+
+        poly_variables_all = sapply(poly_parts_full, function(x) x[1])
+        rest_all = sapply(poly_parts_full, function(x) x[2])
+
+        poly_variables_unik = unique(poly_variables_all)
+
+        # We now evaluate these in the old data => we get the nber of variables and the coefs
+        data = fetch_data(object, "To apply 'model.matrix.fixest', ")
+
+        poly_call = function(x, ..., degree = 1, coefs = NULL, raw = FALSE, simple = FALSE, data, i){
+            mc = match.call()
+            if(raw == TRUE || !is.null(coefs)){
+                return(list(is_OK = TRUE))
+            }
+
+            # We write evaluate the data to get the coefs
+            # We will return:
+            # - degree
+            # - deparsed call to evaluate
+
+            mc_new = mc
+            mc_new$simple = FALSE
+            mc_new$data = NULL
+            mc_new[[1]] = as.name("poly")
+
+            tmp = eval(mc_new, data)
+
+            mc_new$coefs = attr(tmp, "coefs")
+            res = list(degree = attr(tmp, "degree"), new_call = deparse_long(mc_new))
+
+            res
+        }
+
+        poly_variables_all_new = poly_variables_all
+        old_varname_all = new_varname_all = list()
+        poly_dict_full = c()
+        for(i in seq_along(poly_variables_unik)){
+
+            polyvar = poly_variables_unik[i]
+            my_call_txt = gsub("poly(", "poly_call(", polyvar, fixed = TRUE)
+            my_call_txt = gsub("\\)$", ", data = data)", my_call_txt)
+            info = eval(str2lang(my_call_txt))
+
+            if(isTRUE(info$is_OK)){
+                next
+            }
+
+            old_var_name = paste0(polyvar, info$degree)
+            new_var_name = paste0("POLY__VAR", i, "__", info$degree)
+            poly_dict_full[polyvar] = paste0("(", paste(new_var_name, collapse = " + "), ")")
+
+            poly_variables_all_new[i] = poly_dict_full[polyvar]
+
+            old_varname_all[[length(old_varname_all) + 1]] = old_var_name
+            new_varname_all[[length(new_varname_all) + 1]] = new_var_name
+
+            # Evaluation in the new data
+            tmp = eval(str2lang(info$new_call), newdata)
+            for(j in 1:ncol(tmp)){
+                newdata[[new_var_name[j]]] = tmp[, j]
+            }
+        }
+
+        old_varname_all = unlist(old_varname_all)
+        new_varname_all = unlist(new_varname_all)
+
+        # Now => recreation of the fml
+        if(length(old_varname_all) > 0){
+            is_poly = TRUE
+            fml = as.formula(paste0("y ~ ", poly_parts[1], paste0(poly_variables_all_new, rest_all, collapse = "")))
+        }
+    }
+
+    new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref)
+
+    # Renaming if poly
+    if(is_poly){
+        mat_names = colnames(new_matrix)
+        for(i in seq_along(new_varname_all)){
+            mat_names = gsub(new_varname_all[i], old_varname_all[i], mat_names, fixed = TRUE)
+        }
+        colnames(new_matrix) = mat_names
+    }
+
+    new_matrix
+}
+
+
+
+
 
 fixef_terms = function(fml, stepwise = FALSE, origin_type = "feols"){
     # separate all terms of fml into fixed effects and varying slopes
@@ -7899,7 +8111,9 @@ predict.fixest = function(object, newdata, type = c("response", "link"), na.rm =
 	    }
 	}
 
-	# 1) Cluster
+	#
+	# 1) Fixed-effects (cluster)
+	#
 
 	# init cluster values
 	value_cluster = 0
@@ -7926,9 +8140,8 @@ predict.fixest = function(object, newdata, type = c("response", "link"), na.rm =
 			# Checking if ^ is present
 			if(grepl("\\^", fe_var)){
 			    # If fastCombine was used => we're screwed, impossible to recover
-
-			    if(!is.character(fixef_values_possible)){
-			        stop("You cannot use predict() based on the initial regression since the fixed-effect '", variable, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'combine.quick=FALSE'.")
+			    if(!all(grepl("_", fixef_values_possible, fixed = TRUE))){
+			        stop("You cannot use predict() based on the initial regression since the fixed-effect '", fe_var, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'combine.quick=FALSE'.")
 			    }
 
 			    fe_var_new = gsub("([[:alpha:]_\\.][[:alnum:]_\\.]*(\\^[[:alpha:]_\\.][[:alnum:]_\\.]*)+)",
@@ -8004,7 +8217,9 @@ predict.fixest = function(object, newdata, type = c("response", "link"), na.rm =
 		value_cluster = as.vector(value_cluster)
 	}
 
+	#
 	# 2) Linear values
+	#
 
 	coef = object$coefficients
 
@@ -8033,14 +8248,16 @@ predict.fixest = function(object, newdata, type = c("response", "link"), na.rm =
 		}
 
 		# we create the matrix
-		matrix_linear = error_sender(fixest_model_matrix(rhs_fml, newdata, i_noref = TRUE),
-		                             "Error when creating the linear matrix: ")
+		# matrix_linear = error_sender(fixest_model_matrix(rhs_fml, newdata, i_noref = TRUE), "Error when creating the linear matrix: ")
+		matrix_linear = error_sender(fixest_model_matrix_extra(object = object, newdata = newdata, original_data = FALSE, fml = rhs_fml, i_noref = TRUE), "Error when creating the linear matrix: ")
 
 		keep = intersect(names(coef), colnames(matrix_linear))
 		value_linear = value_linear + as.vector(matrix_linear[, keep, drop = FALSE] %*% coef[keep])
 	}
 
+	#
 	# 3) Non linear terms
+	#
 
 	value_NL = 0
 	NL_fml = object$NL.fml
@@ -8067,7 +8284,9 @@ predict.fixest = function(object, newdata, type = c("response", "link"), na.rm =
 		value_NL = eval(NL_fml[[2]], env)
 	}
 
+	#
 	# 4) offset value
+	#
 
 	value_offset = 0
 	offset = object$call$offset
@@ -8448,7 +8667,7 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
 		#
 
 		# Controlling the clusters
-		do.unclass = TRUE
+		do.unclass = check_nested = TRUE
 		if(missing(cluster) || is.null(cluster)){
 
 			if(is.null(object$fixef_id)){
@@ -8466,6 +8685,7 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
 
 				# in that specific case, there is no need of doing unclass.factor because already done
 				do.unclass = FALSE
+				check_nested = FALSE
 			}
 
 		} else {
@@ -8500,7 +8720,38 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
 					# cluster == names of clusters used in the estimation
 					type_info = paste0(" (", paste0(cluster, collapse = " & "), ")")
 
-					is_nested = which(names(object$fixef_id) %in% cluster)
+					check_nested = FALSE
+					# We do that to avoid checking nestedness later
+					if(all(object$fixef_vars %in% cluster)){
+					    # everyone nested (also works for var1^var2)
+					    is_nested = 1:length(object$fixef_id)
+
+					} else if(!any(grepl("^", object$fixef_vars, fixed = TRUE))){
+					    # simple cases only
+					    is_nested = which(names(object$fixef_id) %in% cluster)
+
+					} else if(!any(grepl("^", cluster, fixed = TRUE))){
+					    # simple cases in cluster
+					    check_var_in_there = function(x){
+					        # cluster is a global
+					        if(x %in% cluster){
+					            return(TRUE)
+
+					        } else if(grepl("^", x, fixed = TRUE)){
+					            x_split = strsplit(x, "^", fixed = TRUE)[[1]]
+					            if(any(x_split %in% cluster)){
+					                return(TRUE)
+					            }
+					        }
+
+					        return(FALSE)
+					    }
+
+					    is_nested = which(sapply(names(object$fixef_id), check_var_in_there))
+					} else {
+					    # too complex to apply tricks => we make real check
+					    check_nested = TRUE
+					}
 
 					cluster = object$fixef_id[cluster]
 
@@ -8713,7 +8964,8 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
 
 		# We recompute K
 		if(dof.adj && dof.fixef.K == "nested" && n_fe_ok >= 1){
-            if(do.unclass){
+
+            if(check_nested){
                 # we need to find out which is nested
                 is_nested = which(cpp_check_nested(object$fixef_id, cluster, object$fixef_sizes, n = n) == 1)
             } else {
@@ -8722,7 +8974,8 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
             }
 
 		    if(length(is_nested) == n_fe){
-		        K = K - (sum(fixef_sizes_ok) - (n_fe_ok - 1))
+		        # All FEs are removed, we add 1 for the intercept
+		        K = K - (sum(fixef_sizes_ok) - (n_fe_ok - 1)) + 1
 		    } else {
 		        if(is_exact && n_fe >= 2){
 		            fe = fixef(object, notes = FALSE)
@@ -8742,6 +8995,7 @@ vcov.fixest = function(object, se, cluster, dof = NULL, attr = FALSE, forceCovar
 		        }
 		    }
 
+		    # below for consistency => should not be triggered
 		    K = max(K, length(object$coefficients) + 1)
 
 		    correction.dof = (n - 1) / (n - K)
@@ -9199,7 +9453,7 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 }
 
 
-#' Design matrix of a \code{femlm} model
+#' Design matrix of a \code{fixest} object
 #'
 #' This function creates the left-hand-side or the right-hand-side(s) of a \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}} estimation.
 #'
@@ -9210,6 +9464,7 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 #' @param data If missing (default) then the original data is obtained by evaluating the \code{call}. Otherwise, it should be a \code{data.frame}.
 #' @param type Character vector or one sided formula, default is "rhs". Contains the type of matrix/data.frame to be returned. Possible values are: "lhs", "rhs", "fixef", "iv.rhs1", "iv.rhs2".
 #' @param na.rm Default is \code{TRUE}. Should observations with NAs be removed from the matrix?
+#' @param subset Logical or character vector. Default is \code{FALSE}. If \code{TRUE}, then the matrix created will be restricted only to the variables contained in the argument \code{data}, which can then contain a subset of the variables used in the estimation. If a character vector, then only the variables matching the elements of the vector via regular expressions will be created.
 #' @param ... Not currently used.
 #'
 #' @return
@@ -9224,15 +9479,23 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 #'
 #' @examples
 #'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width*Petal.Length +
-#'             Petal.Width | Species, iris)
+#' base = iris
+#' names(base) = c("y", "x1", "x2", "x3", "species")
 #'
-#' head(model.matrix(res))
+#' est = feols(y ~ poly(x1, 2) + x2, base)
+#' head(model.matrix(est))
+#'
+#' # Illustration of subset
+#'
+#' # subset => character vector
+#' head(model.matrix(est, subset = "x1"))
+#'
+#' # subset => TRUE, only works with data argument!!
+#' head(model.matrix(est, data = base[, "x1", drop = FALSE], subset = TRUE))
 #'
 #'
 #'
-model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
+model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset = FALSE, ...){
 	# We evaluate the formula with the past call
     # type: lhs, rhs, fixef, iv.endo, iv.inst, iv.rhs1, iv.rhs2
     # if fixef => return a DF
@@ -9245,6 +9508,8 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
     if(isTRUE(object$fromFit)){
         stop("model.matrix method not available for fixest estimations obtained from fit methods.")
     }
+
+    check_arg(subset, "logical scalar | character vector no na")
 
 	# The formulas
 	fml_full = formula(object, type = "full")
@@ -9318,8 +9583,9 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
 	        fml = .xpd(..lhs ~ ..endo + ..rhs, ..lhs = fml[[2]], ..endo = fml_iv[[2]], ..rhs = fml[[3]])
 	    }
 
-	    linear.mat = error_sender(fixest_model_matrix(fml, data, fake_intercept),
-	                              "In 'model.matrix', the RHS could not be evaluated: ")
+	    # linear.mat = error_sender(fixest_model_matrix(fml, data, fake_intercept),
+	    #                           "In 'model.matrix', the RHS could not be evaluated: ")
+	    linear.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data,original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS could not be evaluated: ")
 
         res[["rhs"]] = linear.mat
 	}
@@ -9361,8 +9627,9 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
 	    }
 
 	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-	    iv_rhs1 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
-	                           "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
+	    # iv_rhs1 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
+	    #                        "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
+	    iv_rhs1 = error_sender(fixest_model_matrix_extra(object = object, newdata = data,original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
 
 	    res[["iv.rhs1"]] = iv_rhs1
 	}
@@ -9397,8 +9664,9 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
 	    fml = .xpd(..lhs ~ ..fit + ..rhs, ..lhs = fml[[2]], ..fit = fit_vars, ..rhs = fml[[3]])
 
 	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-	    iv_rhs2 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
-	                           "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
+	    # iv_rhs2 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
+	    #                        "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
+	    iv_rhs2 = error_sender(fixest_model_matrix_extra(object = object, newdata = data,original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
 
 	    res[["iv.rhs2"]] = iv_rhs2
 	}
@@ -9411,31 +9679,33 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, ...){
 	    res = res[[1]]
 	}
 
-
 	#
 	# Removing obs if needed
 	#
 
 	check_0 = FALSE
-	if(original_data && na.rm){
-	    if(!is.null(object$obsRemoved)){
-	        check_0 = TRUE
-	        res = res[-object$obsRemoved, , drop = FALSE]
-	    }
+	if(original_data){
 
 	    for(i in seq_along(object$obs_selection)){
 	        check_0 = TRUE
 	        res = res[object$obs_selection[[i]], , drop = FALSE]
 	    }
+
+	    if(na.rm && !is.null(object$obsRemoved)){
+	        check_0 = TRUE
+	        res = res[-object$obsRemoved, , drop = FALSE]
+	    }
+
+	    na.rm = FALSE
 	}
 
 	if(na.rm){
 
-	    if(!all(sapply(res, is.numeric))){
+	    if(is.numeric(res) || all(sapply(res, is.numeric))){
+	        info = cpp_which_na_inf(res, nthreads = 1)
+	    } else {
 	        info = list(any_na_inf = anyNA(res))
 	        if(info$any_na_inf) info$is_na_inf = !complete.cases(res)
-	    } else {
-	        info = cpp_which_na_inf(res, nthreads = 1)
 	    }
 
 	    if(info$any_na_inf){
@@ -10234,7 +10504,7 @@ getFixest_fml = function(){
 #'
 #'
 #'
-setFixest_estimation = function(fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10, lean = FALSE, verbose = 0, warn = TRUE, combine.quick = NULL, demeaned = FALSE, mem.clean = FALSE, glm.iter = 25, glm.tol = 1e-8, reset = FALSE){
+setFixest_estimation = function(fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10, lean = FALSE, verbose = 0, warn = TRUE, combine.quick = NULL, demeaned = FALSE, mem.clean = FALSE, glm.iter = 25, glm.tol = 1e-8, panel.id = NULL, reset = FALSE){
 
     check_arg_plus(fixef.rm, "match(none, perfect, singleton, both)")
     check_arg(fixef.tol, collin.tol, glm.tol, "numeric scalar GT{0}")
@@ -10242,6 +10512,7 @@ setFixest_estimation = function(fixef.rm = "perfect", fixef.tol = 1e-6, fixef.it
     check_arg(verbose, "integer scalar GE{0}")
     check_arg(lean, warn, demeaned, mem.clean, reset, "logical scalar")
     check_arg(combine.quick, "NULL logical scalar")
+    check_arg(panel.id, "NULL character vector len(,2) no na | os formula")
 
     # Getting the existing defaults
     opts = getOption("fixest_estimation")

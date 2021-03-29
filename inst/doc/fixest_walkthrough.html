@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2021-03-01" />
+<meta name="date" content="2021-03-29" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -273,7 +273,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2021-03-01</h4>
+<h4 class="date">2021-03-29</h4>
 
 </div>
 
@@ -488,15 +488,15 @@ summary(gravity_simple, cluster = ~Origin + Destination)
 </tr>
 <tr class="odd">
 <td align="left">log(dist_km)</td>
-<td align="left">-1.53*** (0.131)</td>
-<td align="left">-1.71*** (0.177)</td>
-<td align="left">-2.17*** (0.171)</td>
+<td align="left">-1.528*** (0.1307)</td>
+<td align="left">-1.711*** (0.1773)</td>
+<td align="left">-2.170*** (0.1714)</td>
 </tr>
 <tr class="even">
 <td align="left">Fixed-Effects:</td>
-<td align="left">—————-</td>
-<td align="left">—————-</td>
-<td align="left">—————-</td>
+<td align="left">——————</td>
+<td align="left">——————</td>
+<td align="left">——————</td>
 </tr>
 <tr class="odd">
 <td align="left">Origin</td>
@@ -524,9 +524,9 @@ summary(gravity_simple, cluster = ~Origin + Destination)
 </tr>
 <tr class="odd">
 <td align="left">_______________</td>
-<td align="left">________________</td>
-<td align="left">________________</td>
-<td align="left">________________</td>
+<td align="left">__________________</td>
+<td align="left">__________________</td>
+<td align="left">__________________</td>
 </tr>
 <tr class="even">
 <td align="left">Family</td>
@@ -536,9 +536,9 @@ summary(gravity_simple, cluster = ~Origin + Destination)
 </tr>
 <tr class="odd">
 <td align="left">S.E.: Clustered</td>
-<td align="left">by: Orig. &amp; De..</td>
-<td align="left">by: Orig. &amp; De..</td>
-<td align="left">by: Orig. &amp; De..</td>
+<td align="left">by: Orig. &amp; Dest.</td>
+<td align="left">by: Orig. &amp; Dest.</td>
+<td align="left">by: Orig. &amp; Dest.</td>
 </tr>
 <tr class="even">
 <td align="left">Observations</td>
@@ -583,7 +583,7 @@ for(i in 0:3){
 <pre class="r"><code>etable(gravity_subfe, cluster = ~Origin+Destination)</code></pre>
 <table>
 <colgroup>
-<col width="19%" />
+<col width="17%" />
 <col width="20%" />
 <col width="20%" />
 <col width="20%" />
@@ -615,24 +615,24 @@ for(i in 0:3){
 </tr>
 <tr class="odd">
 <td align="left">(Intercept)</td>
-<td align="left">24.7*** (1.12)</td>
+<td align="left">24.71*** (1.125)</td>
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="left">log(dist_km)</td>
-<td align="left">-1.03*** (0.158)</td>
-<td align="left">-1.03*** (0.158)</td>
-<td align="left">-1.23*** (0.204)</td>
-<td align="left">-1.52*** (0.128)</td>
+<td align="left">-1.029*** (0.1580)</td>
+<td align="left">-1.029*** (0.1581)</td>
+<td align="left">-1.226*** (0.2045)</td>
+<td align="left">-1.518*** (0.1282)</td>
 </tr>
 <tr class="odd">
 <td align="left">Fixed-Effects:</td>
-<td align="left">—————-</td>
-<td align="left">—————-</td>
-<td align="left">—————-</td>
-<td align="left">—————-</td>
+<td align="left">——————</td>
+<td align="left">——————</td>
+<td align="left">——————</td>
+<td align="left">——————</td>
 </tr>
 <tr class="even">
 <td align="left">Year</td>
@@ -657,17 +657,17 @@ for(i in 0:3){
 </tr>
 <tr class="odd">
 <td align="left">_______________</td>
-<td align="left">________________</td>
-<td align="left">________________</td>
-<td align="left">________________</td>
-<td align="left">________________</td>
+<td align="left">__________________</td>
+<td align="left">__________________</td>
+<td align="left">__________________</td>
+<td align="left">__________________</td>
 </tr>
 <tr class="even">
 <td align="left">S.E.: Clustered</td>
-<td align="left">by: Orig. &amp; De..</td>
-<td align="left">by: Orig. &amp; De..</td>
-<td align="left">by: Orig. &amp; De..</td>
-<td align="left">by: Orig. &amp; De..</td>
+<td align="left">by: Orig. &amp; Dest.</td>
+<td align="left">by: Orig. &amp; Dest.</td>
+<td align="left">by: Orig. &amp; Dest.</td>
+<td align="left">by: Orig. &amp; Dest.</td>
 </tr>
 <tr class="odd">
 <td align="left">Observations</td>
@@ -718,10 +718,10 @@ etable(res_multi, cluster = ~Origin+Destination, tex = TRUE)
 #&gt; Dependent Variable:&amp;\multicolumn{4}{c}{Euros}\\
 #&gt; Model:&amp;(1) &amp; (2) &amp; (3) &amp; (4)\\
 #&gt; \midrule \emph{Variables}&amp;   &amp;   &amp;   &amp;  \\
-#&gt; (Intercept)&amp;24.7$^{***}$ &amp;    &amp;    &amp;   \\
-#&gt;   &amp;(1.12) &amp;    &amp;    &amp;   \\
-#&gt; log(dist\_km)&amp;-1.03$^{***}$ &amp; -1.03$^{***}$ &amp; -1.23$^{***}$ &amp; -1.52$^{***}$\\
-#&gt;   &amp;(0.158) &amp; (0.158) &amp; (0.204) &amp; (0.128)\\
+#&gt; (Intercept)&amp;24.71$^{***}$ &amp;    &amp;    &amp;   \\
+#&gt;   &amp;(1.125) &amp;    &amp;    &amp;   \\
+#&gt; log(dist\_km)&amp;-1.029$^{***}$ &amp; -1.029$^{***}$ &amp; -1.226$^{***}$ &amp; -1.518$^{***}$\\
+#&gt;   &amp;(0.1580) &amp; (0.1581) &amp; (0.2045) &amp; (0.1282)\\
 #&gt; \midrule \emph{Fixed-effects}&amp;   &amp;   &amp;   &amp;  \\
 #&gt; Year &amp;  &amp; Yes &amp; Yes &amp; Yes\\
 #&gt; Destination &amp;  &amp;  &amp; Yes &amp; Yes\\
@@ -906,23 +906,23 @@ est_iv_fe
 #&gt; F-test (1st stage): stat = 4.7226, p = 0.010315, on 2 and 144 DoF.</code></pre>
 <p>When <code>summary</code> shall return more than one element, the object returned is not a regular <code>fixest</code> object but a <code>fixest_multi</code> object. These kind of objects are covered in the vignette: <a href="https://cran.r-project.org/package=fixest/vignettes/multiple_estimations.html">Multiple estimations</a>. You can display the first and second stages in a table with <code>etable</code>:</p>
 <pre class="r"><code>etable(summary(est_iv_fe, stage = 1:2), fitstat = ~ . + ivfall + ivwaldall.p)
-#&gt;                               model 1         model 2        model 3
-#&gt; Dependent Var.:              x_endo_1        x_endo_2              y
-#&gt;                                                                     
-#&gt; x_inst_1                0.706 (0.486) -0.547* (0.081)               
-#&gt; x_inst_2                0.202 (0.143)   0.183 (0.083)               
-#&gt; x1                      0.189 (0.136)   0.153 (0.089) 0.452. (0.153)
-#&gt; x_endo_1                                              0.667* (0.107)
-#&gt; x_endo_2                                               0.414 (0.178)
-#&gt; Fixed-Effects:          ------------- --------------- --------------
-#&gt; fe                                Yes             Yes            Yes
-#&gt; _______________________ _____________ _______________ ______________
-#&gt; S.E.: Clustered                by: fe          by: fe         by: fe
-#&gt; Observations                      150             150            150
-#&gt; R2                            0.96121         0.07234        0.84211
-#&gt; Within R2                     0.33841         0.06392        0.58591
-#&gt; F-test (IV only)               21.285          4.7226         8.2210
-#&gt; Wald (IV only), p-value       2.37e-9         1.37e-9        3.02e-8</code></pre>
+#&gt;                                 model 1           model 2          model 3
+#&gt; Dependent Var.:                x_endo_1          x_endo_2                y
+#&gt;                                                                           
+#&gt; x_inst_1                0.7060 (0.4856) -0.5467* (0.0814)                 
+#&gt; x_inst_2                0.2023 (0.1433)   0.1831 (0.0834)                 
+#&gt; x1                      0.1893 (0.1356)   0.1532 (0.0891) 0.4517. (0.1534)
+#&gt; x_endo_1                                                  0.6667* (0.1066)
+#&gt; x_endo_2                                                   0.4138 (0.1778)
+#&gt; Fixed-Effects:          --------------- ----------------- ----------------
+#&gt; fe                                  Yes               Yes              Yes
+#&gt; _______________________ _______________ _________________ ________________
+#&gt; S.E.: Clustered                  by: fe            by: fe           by: fe
+#&gt; Observations                        150               150              150
+#&gt; R2                              0.96121           0.07234          0.84211
+#&gt; Within R2                       0.33841           0.06392          0.58591
+#&gt; F-test (IV only)                 21.285            4.7226           8.2210
+#&gt; Wald (IV only), p-value         2.37e-9           1.37e-9          3.02e-8</code></pre>
 <p>Here we use <code>stage = 1:2</code> to get all first stage regressions followed by the second stage. Using <code>stage = 2:1</code> would have done the opposite.</p>
 <p>Now some explanations regarding <code>fitstat</code>. The suffix <code>all</code> concerns IV only and means the following: if it’s a first stage regression, then the first-stage F-stat is displayed, otherwise it’s the second stage F-stat. The suffix <code>.p</code> is used in <code>ivwaldall.p</code> to access the p-value and not the statistic. Finally, you can permanently set which fit statistic to display in <code>etable</code> by using <code>setFixest_etable</code>, like for example <code>setFixest_etable(fitstat = ~ . + ivfall + ivwaldall.p)</code>.</p>
 </div>
@@ -953,7 +953,7 @@ est_vs
 #&gt; Varying slopes: x3 (species: 3)
 #&gt; Standard-errors: Clustered (species) 
 #&gt;    Estimate Std. Error t value Pr(&gt;|t|) 
-#&gt; x2 0.450006   0.156193  2.8811 0.102315 
+#&gt; x2 0.450006   0.156731  2.8712 0.102916 
 #&gt; ---
 #&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 #&gt; RMSE: 0.298706     Adj. R2: 0.863506
@@ -1020,7 +1020,7 @@ setFixest_fml(..ctrl = ~poly(x2, 2) + poly(x3, 2))
 # Accessing them
 xpd(y ~ x1 + ..ctrl)
 #&gt; y ~ x1 + poly(x2, 2) + poly(x3, 2)
-#&gt; &lt;environment: 0x000000001f689b38&gt;
+#&gt; &lt;environment: 0x0000000035c63208&gt;
 
 # Definition at run time
 vars = c(&quot;x2&quot;, &quot;x2^2&quot;, &quot;x3&quot;)
@@ -1028,11 +1028,11 @@ for(i in 1:3){
   print(xpd(y ~ x1 + ..ctrl, ..ctrl = vars[1:i]))
 }
 #&gt; y ~ x1 + x2
-#&gt; &lt;environment: 0x000000001edac3e0&gt;
+#&gt; &lt;environment: 0x0000000035e90b88&gt;
 #&gt; y ~ x1 + x2 + x2^2
-#&gt; &lt;environment: 0x000000001ed51588&gt;
+#&gt; &lt;environment: 0x0000000035ec6f88&gt;
 #&gt; y ~ x1 + x2 + x2^2 + x3
-#&gt; &lt;environment: 0x000000001ed0ef20&gt;</code></pre>
+#&gt; &lt;environment: 0x0000000035efd0b0&gt;</code></pre>
 <p>Macro variables must start with two dots. As seen in the example, once set globally they can be directly accessed with <code>xpd</code>. In the example, <code>xpd</code> redefines the formula at run-time by having a character vector as input.</p>
 <p>All <code>fixest</code> estimations call <code>xpd</code> internally if appropriate. This means that the following code works just fine:</p>
 <pre class="r"><code>feols(y ~ x1 + ..ctrl, base)
@@ -1054,7 +1054,7 @@ for(i in 1:3){
 xpd(Armed.Forces ~ Population + ..(&quot;GNP|ployed&quot;), data = longley)
 #&gt; Armed.Forces ~ Population + GNP.deflator + GNP + Unemployed + 
 #&gt;     Employed
-#&gt; &lt;environment: 0x000000001dfab6c8&gt;</code></pre>
+#&gt; &lt;environment: 0x0000000036a78310&gt;</code></pre>
 <p>Again, since <code>xpd</code> is called internally, the following works:</p>
 <pre class="r"><code>feols(Armed.Forces ~ Population + ..(&quot;GNP|ployed&quot;), longley)
 #&gt; OLS estimation, Dep. Var.: Armed.Forces
@@ -1085,21 +1085,21 @@ res_i3 = feols(Ozone ~ Solar.R + i(Month, keep = 5:6), airquality)
 
 etable(res_i1, res_i2, res_i3, dict = c(&quot;6&quot; = &quot;June&quot;, &quot;Month::5&quot; = &quot;May&quot;), 
        order = c(&quot;Int|May&quot;, &quot;Mon&quot;))
-#&gt;                           res_i1           res_i2           res_i3
-#&gt; Dependent Var.:            Ozone            Ozone            Ozone
-#&gt;                                                                   
-#&gt; (Intercept)          3.22 (7.92)   40.1*** (7.83)   25.8*** (6.68)
-#&gt; May                               -36.9*** (8.20)  -24.5*** (6.94)
-#&gt; Month = June         5.07 (11.0)   -31.8** (11.0)    -19.5. (10.5)
-#&gt; Month = 7         31.0*** (8.02)     -5.86 (8.15)                 
-#&gt; Month = 8         36.9*** (8.20)                                  
-#&gt; Month = 9            8.91 (7.76)  -28.0*** (7.84)                 
-#&gt; Solar.R         0.115*** (0.030) 0.115*** (0.030) 0.125*** (0.031)
-#&gt; _______________ ________________ ________________ ________________
-#&gt; S.E. type               Standard         Standard         Standard
-#&gt; Observations                 111              111              111
-#&gt; R2                       0.31974          0.31974          0.22452
-#&gt; Adj. R2                  0.28735          0.28735          0.20278</code></pre>
+#&gt;                             res_i1             res_i2             res_i3
+#&gt; Dependent Var.:              Ozone              Ozone              Ozone
+#&gt;                                                                         
+#&gt; (Intercept)          3.219 (7.919)   40.12*** (7.828)   25.82*** (6.681)
+#&gt; May                                 -36.90*** (8.201)  -24.50*** (6.936)
+#&gt; Month = June         5.069 (10.98)   -31.83** (11.05)    -19.46. (10.46)
+#&gt; Month = 7         31.04*** (8.018)     -5.861 (8.146)                   
+#&gt; Month = 8         36.90*** (8.201)                                      
+#&gt; Month = 9            8.912 (7.763)  -27.99*** (7.845)                   
+#&gt; Solar.R         0.1148*** (0.0300) 0.1148*** (0.0300) 0.1253*** (0.0311)
+#&gt; _______________ __________________ __________________ __________________
+#&gt; S.E. type                 Standard           Standard           Standard
+#&gt; Observations                   111                111                111
+#&gt; R2                         0.31974            0.31974            0.22452
+#&gt; Adj. R2                    0.28735            0.28735            0.20278</code></pre>
 </div>
 <div id="estimating-yearly-treatment-effects" class="section level3" number="3.4.2">
 <h3 number="3.4.2"><span class="header-section-number">3.4.2</span> Estimating yearly treatment effects</h3>
@@ -1230,34 +1230,34 @@ mean(base[base$treat_post == 1, &quot;y_true&quot;])
 <p>This time the aggregation is operated across each cohort for non-negative time to treatment (<code>treatment::[^-]</code>). The previous code also requests that the outcome variable should be named <code>ATT</code>.</p>
 <p>Note that the functions <code>summary</code> and <code>etable</code> now accept the new argument <code>agg</code> which applies the function <code>aggregate</code>:</p>
 <pre class="r"><code>etable(res_cohort, agg = &quot;(ti.*nt)::(-?[[:digit:]])&quot;)
-#&gt;                              res_cohort
-#&gt; Dependent Var.:                       y
-#&gt;                                        
-#&gt; time_to_treatment = -9   0.807. (0.433)
-#&gt; time_to_treatment = -8   -0.431 (0.482)
-#&gt; time_to_treatment = -7   -0.261 (0.335)
-#&gt; time_to_treatment = -6   -0.182 (0.310)
-#&gt; time_to_treatment = -5   -0.338 (0.278)
-#&gt; time_to_treatment = -4    0.005 (0.238)
-#&gt; time_to_treatment = -3   -0.101 (0.262)
-#&gt; time_to_treatment = -2    0.075 (0.248)
-#&gt; time_to_treatment = 0  -4.90*** (0.200)
-#&gt; time_to_treatment = 1  -3.37*** (0.235)
-#&gt; time_to_treatment = 2  -1.95*** (0.278)
-#&gt; time_to_treatment = 3    -0.016 (0.280)
-#&gt; time_to_treatment = 4   1.23*** (0.322)
-#&gt; time_to_treatment = 5   2.66*** (0.334)
-#&gt; time_to_treatment = 6   4.62*** (0.455)
-#&gt; time_to_treatment = 7   5.38*** (0.591)
-#&gt; time_to_treatment = 8   7.67*** (0.339)
-#&gt; Fixed-Effects:         ----------------
-#&gt; id                                  Yes
-#&gt; year                                Yes
-#&gt; ______________________ ________________
-#&gt; S.E.: Clustered                  by: id
-#&gt; Observations                        950
-#&gt; R2                              0.81955
-#&gt; Within R2                       0.75085</code></pre>
+#&gt;                                res_cohort
+#&gt; Dependent Var.:                         y
+#&gt;                                          
+#&gt; time_to_treatment = -9   0.8068. (0.4334)
+#&gt; time_to_treatment = -8   -0.4314 (0.4818)
+#&gt; time_to_treatment = -7   -0.2607 (0.3347)
+#&gt; time_to_treatment = -6   -0.1815 (0.3104)
+#&gt; time_to_treatment = -5   -0.3379 (0.2778)
+#&gt; time_to_treatment = -4    0.0047 (0.2385)
+#&gt; time_to_treatment = -3   -0.1012 (0.2619)
+#&gt; time_to_treatment = -2    0.0750 (0.2475)
+#&gt; time_to_treatment = 0  -4.904*** (0.1998)
+#&gt; time_to_treatment = 1  -3.368*** (0.2352)
+#&gt; time_to_treatment = 2  -1.955*** (0.2780)
+#&gt; time_to_treatment = 3    -0.0160 (0.2798)
+#&gt; time_to_treatment = 4   1.230*** (0.3215)
+#&gt; time_to_treatment = 5   2.658*** (0.3337)
+#&gt; time_to_treatment = 6   4.618*** (0.4549)
+#&gt; time_to_treatment = 7   5.385*** (0.5912)
+#&gt; time_to_treatment = 8   7.670*** (0.3395)
+#&gt; Fixed-Effects:         ------------------
+#&gt; id                                    Yes
+#&gt; year                                  Yes
+#&gt; ______________________ __________________
+#&gt; S.E.: Clustered                    by: id
+#&gt; Observations                          950
+#&gt; R2                                0.81955
+#&gt; Within R2                         0.75085</code></pre>
 </div>
 </div>
 <div id="lagging-variables" class="section level2" number="3.5">
@@ -1271,19 +1271,19 @@ mean(base[base$treat_post == 1, &quot;y_true&quot;])
 est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
 est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)
 etable(est1, est2, est3, order = &quot;f&quot;, drop = &quot;Int&quot;)
-#&gt;                             est1             est2             est3
-#&gt; Dependent Var.:                y           f(y,1)           l(y,1)
-#&gt;                                                                   
-#&gt; f(x1,1)                          0.994*** (0.058)                 
-#&gt; x1              0.995*** (0.053)    0.008 (0.058)   -0.053 (0.060)
-#&gt; l(x1,1)            0.041 (0.054)    0.016 (0.058) 0.987*** (0.061)
-#&gt; l(x1,2)                                              0.022 (0.061)
-#&gt; l(x1,3)                                              0.010 (0.060)
-#&gt; _______________ ________________ ________________ ________________
-#&gt; S.E. type               Standard         Standard         Standard
-#&gt; Observations                 972              864              756
-#&gt; R2                       0.26558          0.25697          0.25875
-#&gt; Adj. R2                  0.26406          0.25438          0.25480</code></pre>
+#&gt;                               est1               est2               est3
+#&gt; Dependent Var.:                  y             f(y,1)             l(y,1)
+#&gt;                                                                         
+#&gt; f(x1,1)                            0.9940*** (0.0579)                   
+#&gt; x1              0.9948*** (0.0532)    0.0081 (0.0584)   -0.0534 (0.0599)
+#&gt; l(x1,1)            0.0410 (0.0540)    0.0157 (0.0585) 0.9871*** (0.0613)
+#&gt; l(x1,2)                                                  0.0220 (0.0607)
+#&gt; l(x1,3)                                                  0.0102 (0.0598)
+#&gt; _______________ __________________ __________________ __________________
+#&gt; S.E. type                 Standard           Standard           Standard
+#&gt; Observations                   972                864                756
+#&gt; R2                         0.26558            0.25697            0.25875
+#&gt; Adj. R2                    0.26406            0.25438            0.25480</code></pre>
 <p>First of all, the value of <code>panel.id</code> corresponds to panel identifiers: first comes the variable identifying the panel-individuals, then comes the variables identifying the time. In the example, the <code>panel.id</code> came in the form of a one-sided formula, but it could equivalently be equal to <code>panel.id = c(&quot;id&quot;, &quot;period&quot;)</code> or <code>panel.id = &quot;id,period&quot;</code>.</p>
 <p>As we can see, in the first estimation, a lag is created with the function <code>l</code>. The second argument of the function consists of a vector giving the lags we want. In this case, <code>l(x1, 0:1)</code> means we want <code>x1</code> and the first lag of <code>x1</code>. This argument accepts negative values which give leads, as shown in the second estimation where <code>l(x1, -1:1)</code> means that we want the first lead of <code>x1</code>, <code>x1</code>, then its first lag. In this example, we also use the first lead of <code>y</code> as a dependent variable with <code>f(y)</code>.</p>
 </div>
@@ -1299,17 +1299,17 @@ est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 # You can use sub selections of the panel data
 est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 etable(est1, est2, est_sub, order = &quot;f&quot;, drop = &quot;Int&quot;)
-#&gt;                             est1             est2         est_sub
-#&gt; Dependent Var.:                y           f(y,1)               y
-#&gt;                                                                  
-#&gt; f(x1,1)                          0.994*** (0.058)                
-#&gt; x1              0.995*** (0.053)    0.008 (0.058) 1.01*** (0.073)
-#&gt; l(x1,1)            0.041 (0.054)    0.016 (0.058)  -0.006 (0.076)
-#&gt; _______________ ________________ ________________ _______________
-#&gt; S.E. type               Standard         Standard        Standard
-#&gt; Observations                 972              864             540
-#&gt; R2                       0.26558          0.25697         0.26258
-#&gt; Adj. R2                  0.26406          0.25438         0.25983</code></pre>
+#&gt;                               est1               est2           est_sub
+#&gt; Dependent Var.:                  y             f(y,1)                 y
+#&gt;                                                                        
+#&gt; f(x1,1)                            0.9940*** (0.0579)                  
+#&gt; x1              0.9948*** (0.0532)    0.0081 (0.0584) 1.013*** (0.0733)
+#&gt; l(x1,1)            0.0410 (0.0540)    0.0157 (0.0585)  -0.0063 (0.0762)
+#&gt; _______________ __________________ __________________ _________________
+#&gt; S.E. type                 Standard           Standard          Standard
+#&gt; Observations                   972                864               540
+#&gt; R2                         0.26558            0.25697           0.26258
+#&gt; Adj. R2                    0.26406            0.25438           0.25983</code></pre>
 <p>Last, if you also use <code>data.table</code>, let’s give an example of lead/lag creation:</p>
 <pre class="r"><code>library(data.table)
 pdat_dt = panel(as.data.table(base_did), ~id+period)

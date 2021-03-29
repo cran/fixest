@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2021-03-01" />
+<meta name="date" content="2021-03-29" />
 
 <title>Multiple estimations</title>
 
@@ -191,7 +191,7 @@ summary {
 
 <h1 class="title toc-ignore">Multiple estimations</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2021-03-01</h4>
+<h4 class="date">2021-03-29</h4>
 
 </div>
 
@@ -282,17 +282,17 @@ res_multi = feols(c(y1, y2) ~ x1 + csw(x2, x2^2) | sw0(species), base, fsplit = 
 <h4>Multiple LHS</h4>
 <p>To perform an estimation on multiple LHS, simply wrap the different LHS in <code>c()</code>:</p>
 <pre class="r"><code>etable(feols(c(y1, y2) ~ x1 + x2, base))</code></pre>
-<pre><code>##                          model 1           model 2
-## Dependent Var.:               y1                y2
-##                                                   
-## (Intercept)      4.19*** (0.097)   3.59*** (0.094)
-## x1              0.542*** (0.069) -0.257*** (0.067)
-## x2               -0.320* (0.160)    0.364* (0.155)
-## _______________ ________________ _________________
-## S.E. type               Standard          Standard
-## Observations                 150               150
-## R2                       0.76626           0.21310
-## Adj. R2                  0.76308           0.20240</code></pre>
+<pre><code>##                            model 1             model 2
+## Dependent Var.:                 y1                  y2
+##                                                       
+## (Intercept)      4.191*** (0.0970)   3.587*** (0.0937)
+## x1              0.5418*** (0.0693) -0.2571*** (0.0669)
+## x2               -0.3196* (0.1605)    0.3640* (0.1550)
+## _______________ __________________ ___________________
+## S.E. type                 Standard            Standard
+## Observations                   150                 150
+## R2                         0.76626             0.21310
+## Adj. R2                    0.76308             0.20240</code></pre>
 </div>
 <div id="multiple-rhs-and-fixed-effects-stepwise-functions" class="section level4">
 <h4>Multiple RHS and fixed-effects: stepwise functions</h4>
@@ -306,49 +306,62 @@ res_multi = feols(c(y1, y2) ~ x1 + csw(x2, x2^2) | sw0(species), base, fsplit = 
 <p>The stepwise functions can be applied both to the linear part and the fixed-effects part of the formula. Note that at most one stepwise function can be applied per part.</p>
 <p>Here is an example:</p>
 <pre class="r"><code>etable(feols(y1 ~ csw(x1, x2) | sw0(species), base, cluster = ~species))</code></pre>
-<pre><code>##                         model 1        model 2         model 3         model 4
-## Dependent Var.:              y1             y1              y1              y1
-##                                                                               
-## (Intercept)      4.31** (0.192) 4.19** (0.244)                                
-## x1              0.409** (0.040) 0.542* (0.112) 0.905** (0.076) 0.906** (0.081)
-## x2                              -0.320 (0.171)                  -0.006 (0.126)
-## Fixed-Effects:  --------------- -------------- --------------- ---------------
-## species                      No             No             Yes             Yes
-## _______________ _______________ ______________ _______________ _______________
-## S.E.: Clustered     by: species    by: species     by: species     by: species
-## Observations                150            150             150             150
-## R2                      0.75995        0.76626         0.83672         0.83673
-## Within R2                    --             --         0.57178         0.57179</code></pre>
+<pre><code>##                           model 1          model 2           model 3
+## Dependent Var.:                y1               y1                y1
+##                                                                     
+## (Intercept)      4.307** (0.1917) 4.191** (0.2443)                  
+## x1              0.4089** (0.0401) 0.5418* (0.1115) 0.9046** (0.0758)
+## x2                                -0.3196 (0.1707)                  
+## Fixed-Effects:  ----------------- ---------------- -----------------
+## species                        No               No               Yes
+## _______________ _________________ ________________ _________________
+## S.E.: Clustered       by: species      by: species       by: species
+## Observations                  150              150               150
+## R2                        0.75995          0.76626           0.83672
+## Within R2                      --               --           0.57178
+##                           model 4
+## Dependent Var.:                y1
+##                                  
+## (Intercept)                      
+## x1              0.9059** (0.0814)
+## x2               -0.0060 (0.1260)
+## Fixed-Effects:  -----------------
+## species                       Yes
+## _______________ _________________
+## S.E.: Clustered       by: species
+## Observations                  150
+## R2                        0.83673
+## Within R2                 0.57179</code></pre>
 <p>As you can see, if the stepwise functions are in both parts, there will be as many estimations as the cardinal product of the two parts.</p>
 </div>
 <div id="split-sample-estimations" class="section level4">
 <h4>Split sample estimations</h4>
 <p>To perform split sample estimations, use either the argument <code>split</code> or <code>fsplit</code>. The argument <code>split</code> accepts a variable that will be treated as a factor, and an estimation will be performed for each sub-sample defined by each level of this variable. The argument <code>fsplit</code> is identical but first adds the full sample.</p>
 <pre class="r"><code>etable(feols(y1 ~ x1 + x2, base, fsplit = ~species))</code></pre>
-<pre><code>##                           model 1         model 2          model 3
-## Sample (species)      Full sample          setosa       versicolor
-## Dependent Var.:                y1              y1               y1
-##                                                                   
-## (Intercept)       4.19*** (0.097) 4.25*** (0.411)  2.38*** (0.449)
-## x1               0.542*** (0.069)   0.399 (0.296) 0.934*** (0.169)
-## x2                -0.320* (0.160)   0.712 (0.487)   -0.320 (0.402)
-## ________________ ________________ _______________ ________________
-## S.E. type                Standard        Standard         Standard
-## Observations                  150              50               50
-## R2                        0.76626         0.11173          0.57432
-## Adj. R2                   0.76308         0.07393          0.55620
-##                           model 4
-## Sample (species)        virginica
-## Dependent Var.:                y1
-##                                  
-## (Intercept)         1.05* (0.514)
-## x1               0.995*** (0.089)
-## x2                  0.007 (0.179)
-## ________________ ________________
-## S.E. type                Standard
-## Observations                   50
-## R2                        0.74689
-## Adj. R2                   0.73612</code></pre>
+<pre><code>##                             model 1           model 2            model 3
+## Sample (species)        Full sample            setosa         versicolor
+## Dependent Var.:                  y1                y1                 y1
+##                                                                         
+## (Intercept)       4.191*** (0.0970) 4.248*** (0.4114)  2.381*** (0.4493)
+## x1               0.5418*** (0.0693)   0.3990 (0.2958) 0.9342*** (0.1693)
+## x2                -0.3196* (0.1605)   0.7121 (0.4874)   -0.3200 (0.4024)
+## ________________ __________________ _________________ __________________
+## S.E. type                  Standard          Standard           Standard
+## Observations                    150                50                 50
+## R2                          0.76626           0.11173            0.57432
+## Adj. R2                     0.76308           0.07393            0.55620
+##                             model 4
+## Sample (species)          virginica
+## Dependent Var.:                  y1
+##                                    
+## (Intercept)         1.052* (0.5139)
+## x1               0.9946*** (0.0893)
+## x2                  0.0071 (0.1795)
+## ________________ __________________
+## S.E. type                  Standard
+## Observations                     50
+## R2                          0.74689
+## Adj. R2                     0.73612</code></pre>
 </div>
 <div id="combining-multiple-estimations" class="section level4">
 <h4>Combining multiple estimations</h4>
@@ -372,32 +385,32 @@ res_multi = feols(c(y1, y2) ~ x1 + csw(x2, x2^2) | sw0(species), base, fsplit = 
 <p>The arguments accept logical values: <code>res_multi[fixef = TRUE, sample = FALSE]</code> will keep <em>all</em> results but will place <code>fixef</code> as the root and <code>sample</code> as the last leaf.</p>
 <p>This subsetting can then be used to easily obtain the appropriate set of results and ordering:</p>
 <pre class="r"><code>etable(res_multi[lhs = 1, fixef = 1, rhs = TRUE, sample = -1])</code></pre>
-<pre><code>##                          model 1          model 2          model 3
-## Sample (species)          setosa       versicolor        virginica
-## Dependent Var.:               y1               y1               y1
-##                                                                   
-## (Intercept)      4.25*** (0.411)  2.38*** (0.449)    1.05* (0.514)
-## x1                 0.399 (0.296) 0.934*** (0.169) 0.995*** (0.089)
-## x2                 0.712 (0.487)   -0.320 (0.402)    0.007 (0.179)
-## x2 square                                                         
-## ________________ _______________ ________________ ________________
-## S.E. type               Standard         Standard         Standard
-## Observations                  50               50               50
-## R2                       0.11173          0.57432          0.74689
-## Adj. R2                  0.07393          0.55620          0.73612
-##                          model 4          model 5          model 6
-## Sample (species)          setosa       versicolor        virginica
-## Dependent Var.:               y1               y1               y1
-##                                                                   
-## (Intercept)      4.00*** (0.489)     0.323 (1.79)     -2.39 (2.17)
-## x1                 0.405 (0.296) 0.901*** (0.171) 0.994*** (0.088)
-## x2                   2.51 (2.01)      3.01 (2.84)      3.50 (2.15)
-## x2 square           -2.91 (3.16)     -1.24 (1.04)   -0.870 (0.534)
-## ________________ _______________ ________________ ________________
-## S.E. type               Standard         Standard         Standard
-## Observations                  50               50               50
-## R2                       0.12786          0.58696          0.76071
-## Adj. R2                  0.07098          0.56002          0.74510</code></pre>
+<pre><code>##                            model 1            model 2            model 3
+## Sample (species)            setosa         versicolor          virginica
+## Dependent Var.:                 y1                 y1                 y1
+##                                                                         
+## (Intercept)      4.248*** (0.4114)  2.381*** (0.4493)    1.052* (0.5139)
+## x1                 0.3990 (0.2958) 0.9342*** (0.1693) 0.9946*** (0.0893)
+## x2                 0.7121 (0.4874)   -0.3200 (0.4024)    0.0071 (0.1795)
+## x2 square                                                               
+## ________________ _________________ __________________ __________________
+## S.E. type                 Standard           Standard           Standard
+## Observations                    50                 50                 50
+## R2                         0.11173            0.57432            0.74689
+## Adj. R2                    0.07393            0.55620            0.73612
+##                            model 4            model 5            model 6
+## Sample (species)            setosa         versicolor          virginica
+## Dependent Var.:                 y1                 y1                 y1
+##                                                                         
+## (Intercept)      4.004*** (0.4892)     0.3234 (1.791)     -2.393 (2.173)
+## x1                 0.4048 (0.2963) 0.9006*** (0.1710) 0.9939*** (0.0878)
+## x2                   2.511 (2.011)      3.015 (2.839)      3.504 (2.153)
+## x2 square           -2.913 (3.157)     -1.236 (1.042)   -0.8703 (0.5340)
+## ________________ _________________ __________________ __________________
+## S.E. type                 Standard           Standard           Standard
+## Observations                    50                 50                 50
+## R2                         0.12786            0.58696            0.76071
+## Adj. R2                    0.07098            0.56002            0.74510</code></pre>
 </div>
 </div>
 <div id="some-notes" class="section level1">

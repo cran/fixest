@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2021-03-01" />
+<meta name="date" content="2021-03-29" />
 
 <title>Exporting estimation tables</title>
 
@@ -191,7 +191,7 @@ summary {
 
 <h1 class="title toc-ignore">Exporting estimation tables</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2021-03-01</h4>
+<h4 class="date">2021-03-29</h4>
 
 </div>
 
@@ -285,10 +285,46 @@ est = feols(Ozone ~ Solar.R + sw0(Wind + Temp) | csw(Month, Day),
 <div id="postprocessing-with-external-functions" class="section level4">
 <h4>Postprocessing with external functions</h4>
 <p>Since the output of <code>etable</code> is a <code>data.frame</code>, any formatting function handling <code>data.frame</code>s can be leveraged. It is then very easy to integrate it into <code>etable</code>. Let’s have an example with the package <code>pander</code>:</p>
-<pre><code>#&gt; Evaluation of the next chunks requires &#39;pander&#39;, which is not present.</code></pre>
 <pre class="r"><code>library(pander)
 
 etable(est, postprocess.df = pandoc.table.return, style = &quot;rmarkdown&quot;)</code></pre>
+<pre><code>#&gt; 
+#&gt; 
+#&gt; |             &amp;nbsp;             |     model 1      |     model 2      |
+#&gt; |:------------------------------:|:----------------:|:----------------:|
+#&gt; |      **Dependent Var.:**       |   Ozone (ppb)    |   Ozone (ppb)    |
+#&gt; |                                |                  |                  |
+#&gt; | **Solar Radiation (Langleys)** | 0.115*** (0.023) |  0.052* (0.020)  |
+#&gt; |      **Wind Speed (mph)**      |                  | -3.11*** (0.799) |
+#&gt; |        **Temperature**         |                  | 1.88*** (0.367)  |
+#&gt; |       **Fixed-Effects:**       | ---------------- | ---------------- |
+#&gt; |           **Month**            |       Yes        |       Yes        |
+#&gt; |            **Day**             |        No        |        No        |
+#&gt; | **__________________________** | ________________ | ________________ |
+#&gt; |      **S.E.: Clustered**       |     by: Day      |     by: Day      |
+#&gt; |        **Observations**        |       111        |       111        |
+#&gt; |             **R2**             |     0.31974      |     0.63686      |
+#&gt; |         **Within R2**          |     0.12245      |     0.53154      |
+#&gt; 
+#&gt; Table: Table continues below
+#&gt; 
+#&gt;  
+#&gt; 
+#&gt; |             &amp;nbsp;             |     model 3     |     model 4      |
+#&gt; |:------------------------------:|:---------------:|:----------------:|
+#&gt; |      **Dependent Var.:**       |   Ozone (ppb)   |   Ozone (ppb)    |
+#&gt; |                                |                 |                  |
+#&gt; | **Solar Radiation (Langleys)** | 0.108** (0.033) |  0.051* (0.024)  |
+#&gt; |      **Wind Speed (mph)**      |                 | -3.29*** (0.778) |
+#&gt; |        **Temperature**         |                 | 2.05*** (0.242)  |
+#&gt; |       **Fixed-Effects:**       | --------------- | ---------------- |
+#&gt; |           **Month**            |       Yes       |       Yes        |
+#&gt; |            **Day**             |       Yes       |       Yes        |
+#&gt; | **__________________________** | _______________ | ________________ |
+#&gt; |      **S.E.: Clustered**       |     by: Day     |     by: Day      |
+#&gt; |        **Observations**        |       111       |       111        |
+#&gt; |             **R2**             |     0.58018     |     0.81604      |
+#&gt; |         **Within R2**          |     0.12074     |     0.61471      |</code></pre>
 <p>What did it do? First, it called the function <code>pandoc.table.return</code> from within <code>etable</code>. Second, the argument <code>style</code> is not from <code>etable</code> but is from <code>pander</code>’s function. Indeed, all the arguments to the postprocessing function are caught and passed to it. So far so good. But you could say: why bother using the posprocessing function when we could just use piping? You’re right, but wait a second for the next section.</p>
 </div>
 <div id="setting-etable-default-values" class="section level4">
@@ -299,6 +335,24 @@ etable(est, postprocess.df = pandoc.table.return, style = &quot;rmarkdown&quot;)
 setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)</code></pre>
 <p>Since now <code>pandoc.table.return</code> is the default postprocessing, <em>all its arguments are added to <code>etable</code></em>. So calls like that are valid even though <code>style</code> or <code>caption</code> are <em>not</em> arguments from <code>etable</code>:</p>
 <pre class="r"><code>etable(est[rhs = 2], style = &quot;rmarkdown&quot;, caption = &quot;New default values&quot;)</code></pre>
+<pre><code>#&gt; 
+#&gt; 
+#&gt; |             &amp;nbsp;             |     model 1      |     model 2      |
+#&gt; |:------------------------------:|:----------------:|:----------------:|
+#&gt; |                                |   Ozone (ppb)    |   Ozone (ppb)    |
+#&gt; |                                |                  |                  |
+#&gt; | **Solar Radiation (Langleys)** |  0.052* (0.020)  |  0.051* (0.024)  |
+#&gt; |      **Wind Speed (mph)**      | -3.11*** (0.799) | -3.29*** (0.778) |
+#&gt; |        **Temperature**         | 1.88*** (0.367)  | 2.05*** (0.242)  |
+#&gt; |     **Month fixed effect**     |       yes        |       yes        |
+#&gt; |      **Day fixed effect**      |                  |       yes        |
+#&gt; | **__________________________** | ________________ | ________________ |
+#&gt; |      **S.E.: Clustered**       |     by: Day      |     by: Day      |
+#&gt; |        **Observations**        |       111        |       111        |
+#&gt; |             **R2**             |     0.63686      |     0.81604      |
+#&gt; |         **Within R2**          |     0.53154      |     0.61471      |
+#&gt; 
+#&gt; Table: New default values</code></pre>
 </div>
 </div>
 </div>
@@ -353,6 +407,26 @@ setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)</cod
                  fitstat = ~ r2 + n, signifCode = NA)</code></pre>
 <p>Now we can access directly the arguments of the postprocessing function and the default style is the one of the second table:</p>
 <pre class="r"><code>etable(est, est_slopes, heavy = &quot;0.14em&quot;, tex = TRUE)</code></pre>
+<pre><code>#&gt; \setlength\heavyrulewidth{0.14em}
+#&gt; \begin{tabular}{lccccc}
+#&gt; \toprule
+#&gt; &amp;\multicolumn{5}{c}{Ozone (ppb)}\\
+#&gt; &amp;(1) &amp; (2) &amp; (3) &amp; (4) &amp; (5)\\
+#&gt; \midrule Solar Radiation (Langleys)&amp;0.115 &amp; 0.052 &amp; 0.108 &amp; 0.051 &amp; 0.056\\
+#&gt;   &amp;(0.023) &amp; (0.020) &amp; (0.033) &amp; (0.024) &amp; (0.023)\\
+#&gt; Wind Speed (mph)&amp;   &amp; -3.11 &amp;    &amp; -3.29 &amp; -3.05\\
+#&gt;   &amp;   &amp; (0.799) &amp;    &amp; (0.778) &amp; (0.822)\\
+#&gt; Temperature&amp;   &amp; 1.88 &amp;    &amp; 2.05 &amp;   \\
+#&gt;   &amp;   &amp; (0.367) &amp;    &amp; (0.242) &amp;   \\
+#&gt;  &amp;  &amp; &amp; &amp; &amp; \\
+#&gt; R$^2$ &amp; 0.31974&amp;0.63686&amp;0.58018&amp;0.81604&amp;0.82896\\
+#&gt; Observations &amp; 111&amp;111&amp;111&amp;111&amp;111\\
+#&gt;  &amp;   &amp;   &amp;   &amp;   &amp;  \\
+#&gt; Month fixed effects &amp; $\checkmark$ &amp; $\checkmark$ &amp; $\checkmark$ &amp; $\checkmark$ &amp; $\checkmark$\\
+#&gt; Day fixed effects &amp;  &amp;  &amp; $\checkmark$ &amp; $\checkmark$ &amp; $\checkmark$\\
+#&gt; Temperature $\times $ Month &amp;  &amp;  &amp;  &amp;  &amp; $\checkmark$\\
+#&gt; \bottomrule
+#&gt; \end{tabular}</code></pre>
 </div>
 </div>
 </div>
@@ -378,6 +452,42 @@ fitstat_register(type = &quot;p_month&quot;, alias = &quot;pvalue (Month)&quot;,
 setFixest_etable(reset = TRUE)
 # Now we display the results with the new fit statistics
 etable(est, fitstat = ~ . + p_s + p_h + p_day + p_month)</code></pre>
+<pre><code>#&gt;                                       model 1            model 2
+#&gt; Dependent Var.:                   Ozone (ppb)        Ozone (ppb)
+#&gt;                                                                 
+#&gt; Solar Radiation (Langleys) 0.1148*** (0.0234)   0.0522* (0.0202)
+#&gt; Wind Speed (mph)                              -3.109*** (0.7986)
+#&gt; Temperature                                    1.875*** (0.3671)
+#&gt; Fixed-Effects:             ------------------ ------------------
+#&gt; Month                                     Yes                Yes
+#&gt; Day                                        No                 No
+#&gt; __________________________ __________________ __________________
+#&gt; S.E.: Clustered                       by: Day            by: Day
+#&gt; Observations                              111                111
+#&gt; R2                                    0.31974            0.63686
+#&gt; Within R2                             0.12245            0.53154
+#&gt; pvalue (standard)                     0.00022            0.02957
+#&gt; pvalue (Heterosk.)                    6.64e-6            0.02268
+#&gt; pvalue (Day)                             3e-5            0.01468
+#&gt; pvalue (Month)                        0.06066            0.26992
+#&gt;                                      model 3            model 4
+#&gt; Dependent Var.:                  Ozone (ppb)        Ozone (ppb)
+#&gt;                                                                
+#&gt; Solar Radiation (Langleys) 0.1078** (0.0329)   0.0509* (0.0236)
+#&gt; Wind Speed (mph)                             -3.289*** (0.7777)
+#&gt; Temperature                                   2.052*** (0.2415)
+#&gt; Fixed-Effects:             ----------------- ------------------
+#&gt; Month                                    Yes                Yes
+#&gt; Day                                      Yes                Yes
+#&gt; __________________________ _________________ __________________
+#&gt; S.E.: Clustered                      by: Day            by: Day
+#&gt; Observations                             111                111
+#&gt; R2                                   0.58018            0.81604
+#&gt; Within R2                            0.12074            0.61471
+#&gt; pvalue (standard)                    0.00196            0.03720
+#&gt; pvalue (Heterosk.)                   0.00103            0.02815
+#&gt; pvalue (Day)                         0.00263            0.03881
+#&gt; pvalue (Month)                       0.02676            0.29967</code></pre>
 <p>The function <code>fitstat_register</code> is a tool to add fit statistics in the <code>fitstat</code> engine. The first argument, <code>type</code>, is the code name by which the statistic is to be summoned. The argument <code>alias</code> provides the row name of the statistics: how it should look in the table. Finally in the <code>fun</code> argument is the function computing the statistic. That function must apply to a <code>fixest</code> estimation and must also return a single value.</p>
 <p>Once these statistics are registered, they can seamlessly be summoned with the argument <code>fitstat</code> and will appear in the order the user provide. Note that the dot in <code>fitstat = ~ . + p_s + etc</code> represents the default statistics to be displayed and need not be there.</p>
 </div>
