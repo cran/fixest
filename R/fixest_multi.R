@@ -110,8 +110,8 @@ setup_multi = function(index, all_names, data, simplify = TRUE){
 #' res = feols(y ~ csw(x1, x2, x3), base, split = ~species)
 #'
 #' # By default, the type is "short"
-#' # You can stil use the arguments from summary.fixest
-#' summary(res, cluster = ~ species)
+#' # You can still use the arguments from summary.fixest
+#' summary(res, se = "hetero")
 #'
 #' summary(res, type = "long")
 #'
@@ -120,7 +120,8 @@ setup_multi = function(index, all_names, data, simplify = TRUE){
 #' summary(res, type = "se_compact")
 #'
 #'
-summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NULL, dof = NULL, .vcov, stage = 2, lean = FALSE, n, ...){
+summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NULL, dof = NULL,
+                                .vcov, stage = 2, lean = FALSE, n = 1000, ...){
     dots = list(...)
     data = attr(object, "data")
 
@@ -134,7 +135,8 @@ summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NUL
     if(is.null(est_1$cov.scaled) || !isTRUE(dots$fromPrint)){
 
         for(i in 1:length(data)){
-            data[[i]] = summary(data[[i]], se = se, cluster = cluster, dof = dof, .vcov = .vcov, stage = stage, lean = lean, n = n, ...)
+            data[[i]] = summary(data[[i]], se = se, cluster = cluster, dof = dof,
+                                .vcov = .vcov, stage = stage, lean = lean, n = n, ...)
         }
 
         # In IV: multiple estimations can be returned
@@ -166,6 +168,7 @@ summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NUL
         if(!"lhs" %in% names(index)){
             res$lhs = sapply(data, function(x) as.character(x$fml[[2]]))
         }
+
         for(my_dim in names(index)){
             res[[my_dim]] = sfill(as.character(factor(tree[[my_dim]], labels = all_names[[my_dim]])), right = TRUE)
         }
@@ -715,12 +718,126 @@ set_index_multi = function(x, vmax, all_names){
 
 
 
+#' Extracts the coefficients of fixest_multi objects
+#'
+#' Utility to extract the coefficients of multiple estimations and rearrange them into a matrix.
+#'
+#' @inheritParams etable
+#'
+#' @param object A \code{fixest_multi} object. Obtained from a multiple estimation.
+#' @param ... Not currently used.
+#'
+#'
+#' @examples
+#'
+#' base = iris
+#' names(base) = c("y", "x1", "x2", "x3", "species")
+#'
+#' # A multiple estimation
+#' est = feols(y ~ x1 + csw0(x2, x3), base)
+#'
+#' # Getting all the coefficients at once,
+#' # each row is a model
+#' coef(est)
+#'
+#' # Example of keep/drop/order
+#' coef(est, keep = "Int|x1", order = "x1")
+#'
+#'
+#' # To change the order of the model, use fixest_multi
+#' # extraction tools:
+#' coef(est[rhs = .N:1])
+#'
+#'
+coef.fixest_multi = function(object, keep, drop, order, ...){
+    # row: model
+    # col: coefficient
+
+    check_arg(keep, drop, order, "NULL character vector no na")
+
+    data = attr(object, "data")
+
+    res_list = list()
+    for(i in seq_along(data)){
+        res_list[[i]] = coef(data[[i]])
+    }
+
+    all_names = unique(unlist(lapply(res_list, names)))
+
+    if(!missnull(keep)) all_names = keep_apply(all_names, keep)
+    if(!missnull(drop)) all_names = drop_apply(all_names, drop)
+    if(!missnull(order)) all_names = order_apply(all_names, order)
+
+    if(length(all_names) == 0) return(NULL)
+
+    nr = length(res_list)
+    nc = length(all_names)
+
+    res_list = lapply(res_list, function(x) x[all_names])
+    res = do.call(rbind, res_list)
+    colnames(res) = all_names
+
+    res
+}
+
+#' @rdname coef.fixest_multi
+coefficients.fixest_multi <- coef.fixest_multi
 
 
+#' Extracts the residuals from a \code{fixest_multi} object
+#'
+#' Utility to extract the residuals from multiple \code{fixest} estimations. If possible, all the residuals are coerced into
+#'
+#' @inheritParams resid.fixest
+#'
+#' @param object A \code{fixes_multi} object.
+#' @param na.rm Logical, default is \code{FALSE}. Should the NAs be kept? If \code{TRUE}, they are removed.
+#'
+#' @return
+#' If all the models return residuals of the same length, a matrix is returned. Otherwise, a \code{data.frame} is returned.
+#'
+#' @examples
+#'
+#' base = iris
+#' names(base) = c("y", "x1", "x2", "x3", "species")
+#'
+#' # A multiple estimation
+#' est = feols(y ~ x1 + csw0(x2, x3), base)
+#'
+#' # We can get all the residuals at once,
+#' # each column is a model
+#' head(resid(est))
+#'
+#' # We can select/order the model using fixest_multi extraction
+#' head(resid(est[rhs = .N:1]))
+#'
+resid.fixest_multi = function(object, type = c("response", "deviance", "pearson", "working"), na.rm = FALSE, ...){
+
+    # Je fais un prototype pour le moment, je l'ameliorerai apres (07-04-2021)
+
+    check_arg_plus(type, "match")
+    check_arg_plus(na.rm, "logical scalar")
+
+    data = attr(object, "data")
+
+    res_list = list()
+    for(i in seq_along(data)){
+        res_list[[i]] = resid(data[[i]], type = type, na.rm = na.rm)
+    }
+
+    n_all = sapply(res_list, length)
+
+    if(all(n_all == n_all[1])){
+        res = do.call(cbind, res_list)
+    } else {
+        res = res_list
+    }
+
+    res
+}
 
 
-
-
-
+#' @rdname resid.fixest_multi
+residuals.fixest_multi <- resid.fixest_multi
 
 

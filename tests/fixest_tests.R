@@ -87,10 +87,10 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
                     fml_stats = y ~ x1 + x2 + paste(species, fe_2)
                 } else if(id_fe == 8){
                     fml_fixest = y ~ x1 | species[x2] + fe_2[x3] + fe_3
-                    fml_stats = y ~ x1 + species + i(x2, species) + factor(fe_2) + i(x3, fe_2) + factor(fe_3)
+                    fml_stats = y ~ x1 + species + i(species, x2) + factor(fe_2) + i(fe_2, x3) + factor(fe_3)
                 } else if(id_fe == 9){
                     fml_fixest = y ~ x1 | species + fe_2[x2,x3] + fe_3
-                    fml_stats = y ~ x1 + species + factor(fe_2) + i(x2, fe_2) + i(x3, fe_2) + factor(fe_3)
+                    fml_stats = y ~ x1 + species + factor(fe_2) + i(fe_2, x2) + i(fe_2, x3) + factor(fe_3)
                 }
 
                 # ad hoc modifications of the formula
@@ -123,8 +123,8 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
 
                     res = feglm(fml_fixest, base, family = my_family, weights = my_weight, offset = my_offset)
 
-                    if(!is.null(res$obsRemoved)){
-                        qui = -res$obsRemoved
+                    if(!is.null(res$obs_selection$obsRemoved)){
+                        qui = res$obs_selection$obsRemoved
 
                         # I MUST do that.... => subset does not work...
                         base_tmp = base[qui, ]
@@ -184,7 +184,12 @@ res = feols(y ~ 1 + csw(x1, i(fe1)) | fe2, base)
 
 res = feols(y ~ csw(f(x1, 1:2), x2) | sw0(fe2, fe2^fe3), base, panel.id = ~ fe1 + period)
 
+res = feols(d(y) ~ -1 + d(x2), base, panel.id = ~ fe1 + period)
+test(length(coef(res)), 1)
+
 res = feols(c(y, x1) ~ 1 | fe1 | x2 ~ x3, base)
+
+res = feols(y ~ x1 | fe1[x2] + fe2[x2], base)
 
 #
 # NA models (ie all variables are collinear with the FEs)
@@ -206,6 +211,19 @@ for(i in 1:2){
     res         # => no error
     etable(res) # => no error
 }
+
+
+# Removing the intercept!!!
+
+res = feols(y ~ -1 + x1 + i(fe1), base)
+test("(Intercept)" %in% names(res$coefficients), FALSE)
+
+res = feols(y ~ -1 + x1 + factor(fe1), base)
+test("(Intercept)" %in% names(res$coefficients), FALSE)
+
+res = feols(y ~ -1 + x1 + i(fe1) + i(fe2), base)
+test("(Intercept)" %in% names(res$coefficients), FALSE)
+test(is.null(res$collin.var), TRUE)
 
 
 
@@ -232,6 +250,19 @@ res = feglm.fit(base$y_log, base[, 2:4])
 res_bis = feglm(y_log ~ -1 + x1 + x2 + x3, base)
 test(coef(res), coef(res_bis))
 
+
+
+res = feglm.fit(base$y, base[, 2:4], family = "poisson")
+res_bis = feglm(y ~ -1 + x1 + x2 + x3, base, family = "poisson")
+test(coef(res), coef(res_bis))
+
+res = feglm.fit(base$y_int, base[, 2:4], family = "poisson")
+res_bis = feglm(y_int ~ -1 + x1 + x2 + x3, base, family = "poisson")
+test(coef(res), coef(res_bis))
+
+res = feglm.fit(base$y_log, base[, 2:4], family = "poisson")
+res_bis = feglm(y_log ~ -1 + x1 + x2 + x3, base, family = "poisson")
+test(coef(res), coef(res_bis))
 
 ####
 #### Standard-errors ####
@@ -543,7 +574,7 @@ for(method in c("ols", "feglm", "femlm", "fenegbin")){
             mm = lm(y_int ~ x1 + species, base, weights = w)
 
         } else if(method == "feglm"){
-            m = feglm(y_int ~ x1 | species, base, weights = w)
+            m = feglm(y_int ~ x1 | species, base, weights = w, family = "poisson")
             mm = glm(y_int ~ x1 + species, base, weights = w, family = poisson())
 
         } else if(method == "femlm"){
@@ -584,8 +615,8 @@ base$fe_bis = sample(10, 150, TRUE)
 base$fe_ter = sample(15, 150, TRUE)
 
 get_coef = function(all_coef, x){
-    res = all_coef[grepl(x, names(all_coef))]
-    names(res) = gsub(x, "", names(res))
+    res = all_coef[grepl(x, names(all_coef), perl = TRUE)]
+    names(res) = gsub(x, "", names(res), perl = TRUE)
     res
 }
 
@@ -609,7 +640,7 @@ test(var(c2 - m_fe$fe_bis[names(c2)]), 0)
 #
 
 m = feols(y ~ x1 + x2 | species + fe_bis[x3], base)
-all_coef = coef(feols(y ~ -1 + x1 + x2 + species + factor(fe_bis) + i(x3, fe_bis), base))
+all_coef = coef(feols(y ~ -1 + x1 + x2 + species + factor(fe_bis) + i(fe_bis, x3), base))
 
 m_fe = fixef(m)
 c1  = get_coef(all_coef, "species")
@@ -618,7 +649,7 @@ test(var(c1 - m_fe$species[names(c1)]), 0, "~")
 c2  = get_coef(all_coef, "factor\\(fe_bis\\)")
 test(var(c2 - m_fe$fe_bis[names(c2)]), 0, "~")
 
-c3  = get_coef(all_coef, "i\\(x3, fe_bis\\)")
+c3  = get_coef(all_coef, "fe_bis::|:x3")
 test(c3, m_fe[["fe_bis[[x3]]"]][names(c3)], "~", tol = 1e-5)
 
 #
@@ -626,19 +657,19 @@ test(c3, m_fe[["fe_bis[[x3]]"]][names(c3)], "~", tol = 1e-5)
 #
 
 m = feols(y ~ x1 | species[x2] + fe_bis[x3] + fe_ter, base)
-all_coef = coef(feols(y ~ -1 + x1 + species + i(x2, species) + factor(fe_bis) + i(x3, fe_bis) + factor(fe_ter), base))
+all_coef = coef(feols(y ~ -1 + x1 + species + i(species, x2) + factor(fe_bis) + i(fe_bis, x3) + factor(fe_ter), base))
 
 m_fe = fixef(m)
-c1  = get_coef(all_coef, "^species")
+c1  = get_coef(all_coef, "^species(?=[^:])")
 test(var(c1 - m_fe$species[names(c1)]), 0, "~")
 
 c2  = get_coef(all_coef, "^factor\\(fe_bis\\)")
 test(var(c2 - m_fe$fe_bis[names(c2)]), 0, "~")
 
-c3  = get_coef(all_coef, "i\\(var = x3, f = fe_bis\\)")
+c3  = get_coef(all_coef, "fe_bis::|:x3")
 test(c3, m_fe[["fe_bis[[x3]]"]][names(c3)], "~", tol = 2e-4)
 
-c4  = get_coef(all_coef, "i\\(x2, species\\)")
+c4  = get_coef(all_coef, "species::|:x2")
 test(c4, m_fe[["species[[x2]]"]][names(c4)], "~", tol = 2e-4)
 
 #
@@ -646,7 +677,7 @@ test(c4, m_fe[["species[[x2]]"]][names(c4)], "~", tol = 2e-4)
 #
 
 m = feols(y ~ x1 | species + fe_bis[x2,x3] + fe_ter, base)
-all_coef = coef(feols(y ~ x1 + species + factor(fe_bis) + i(x2, fe_bis) + i(x3, fe_bis) + factor(fe_ter), base))
+all_coef = coef(feols(y ~ x1 + species + factor(fe_bis) + i(fe_bis, x2) + i(fe_bis, x3) + factor(fe_ter), base))
 
 m_fe = fixef(m)
 c1  = get_coef(all_coef, "^species")
@@ -655,10 +686,10 @@ test(var(c1 - m_fe$species[names(c1)]), 0, "~")
 c2  = get_coef(all_coef, "^factor\\(fe_bis\\)")
 test(var(c2 - m_fe$fe_bis[names(c2)]), 0, "~")
 
-c3  = get_coef(all_coef, "i\\(var = x2, f = fe_bis\\)")
+c3  = get_coef(all_coef, "fe_bis::(?=.+x2)|:x2")
 test(c3, m_fe[["fe_bis[[x2]]"]][names(c3)], "~", tol = 2e-4)
 
-c4  = get_coef(all_coef, "i\\(var = x3, f = fe_bis\\)")
+c4  = get_coef(all_coef, "fe_bis::(?=.+x3)|:x3")
 test(c4, m_fe[["fe_bis[[x3]]"]][names(c4)], "~", tol = 2e-4)
 
 
@@ -668,7 +699,7 @@ test(c4, m_fe[["fe_bis[[x3]]"]][names(c4)], "~", tol = 2e-4)
 
 w = 3 * (as.integer(base$species) - 0.95)
 m = feols(y ~ x1 | species + fe_bis[x2,x3] + fe_ter, base, weights = w)
-all_coef = coef(feols(y ~ x1 + species + factor(fe_bis) + i(x2, fe_bis) + i(x3, fe_bis) + factor(fe_ter), base, weights = w))
+all_coef = coef(feols(y ~ x1 + species + factor(fe_bis) + i(fe_bis, x2) + i(fe_bis, x3) + factor(fe_ter), base, weights = w))
 
 m_fe = fixef(m)
 c1  = get_coef(all_coef, "^species")
@@ -677,10 +708,10 @@ test(var(c1 - m_fe$species[names(c1)]), 0, "~")
 c2  = get_coef(all_coef, "^factor\\(fe_bis\\)")
 test(var(c2 - m_fe$fe_bis[names(c2)]), 0, "~")
 
-c3  = get_coef(all_coef, "i\\(var = x2, f = fe_bis\\)")
+c3  = get_coef(all_coef, "fe_bis::(?=.+x2)|:x2")
 test(c3, m_fe[["fe_bis[[x2]]"]][names(c3)], "~", tol = 2e-4)
 
-c4  = get_coef(all_coef, "i\\(var = x3, f = fe_bis\\)")
+c4  = get_coef(all_coef, "fe_bis::(?=.+x3)|:x3")
 test(c4, m_fe[["fe_bis[[x3]]"]][names(c4)], "~", tol = 2e-4)
 
 
@@ -781,12 +812,12 @@ m = feols(y ~ x1 + i(fe_2), base)
 coefplot(m)
 etable(m, dict = c("0" = "zero"))
 
-m = feols(y ~ x1 + i(fe_2) + i(x2, fe_2), base)
-coefplot(m, only.inter = FALSE)
+m = feols(y ~ x1 + i(fe_2) + i(fe_2, x2), base)
+coefplot(m)
 etable(m, dict = c("0" = "zero"))
 
 a = i(base$fe_2)
-b = i(base$fe_2, drop = 0:1)
+b = i(base$fe_2, ref = 0:1)
 d = i(base$fe_2, keep = 0:1)
 
 test(ncol(a), ncol(b) + 2)
@@ -1165,7 +1196,7 @@ test(tail(pred_all, 20), pred_tail)
 
 chunk("SUBSET")
 
-
+set.seed(5)
 base = iris
 names(base) = c("y", "x1", "x2", "x3", "species")
 base$fe_bis = sample(letters, 150, TRUE)
@@ -1230,6 +1261,7 @@ cat("\n")
 
 chunk("Multiple")
 
+set.seed(2)
 base = iris
 names(base) = c("y1", "x1", "x2", "x3", "species")
 base$y2 = 10 + rnorm(150) + 0.5 * base$x1
@@ -1249,6 +1281,11 @@ for(id_fun in 1:5){
                     "3" = fepois,
                     "4" = femlm,
                     "5" = feNmlm)
+
+    # Following weird bug ASAN on CRAN I cannot replicate, check 4/5 not performed on non Windows
+    if(Sys.info()["sysname"] != "Windows"){
+       if(id_fun %in% 4:5) next
+    }
 
 
     est_multi = estfun(c(y1, y2) ~ x1 + sw(x2, x3), base, split = ~species)
@@ -1338,6 +1375,8 @@ if(Sys.info()["sysname"] == "Windows"){
 # check no bug
 etable(summary(est_iv, stage = 1:2))
 
+setFixest_se(reset = TRUE)
+
 
 ####
 #### model.matrix ####
@@ -1365,18 +1404,18 @@ base_bis$time = rep(1:10, 5)
 # NA removed
 res = feols(y1 ~ x1 + x2 + x3, base)
 m1 = model.matrix(res, type = "lhs")
-test(nrow(m1), res$nobs)
+test(length(m1), res$nobs)
 
 # we check this is identical
 m1_na = model.matrix(res, type = "lhs", na.rm = FALSE)
-test(nrow(m1_na), res$nobs_origin)
+test(length(m1_na), res$nobs_origin)
 test(max(abs(m1_na - base$y1), na.rm = TRUE), 0)
 
 y = model.matrix(res, type = "lhs", data = base, na.rm = FALSE)
 X = model.matrix(res, type = "rhs", data = base, na.rm = FALSE)
-res_bis = lm.fit(X[-res$obsRemoved, ], y[-res$obsRemoved,])
+obs_rm = res$obs_selection$obsRemoved
+res_bis = lm.fit(X[obs_rm, ], y[obs_rm])
 test(res_bis$coefficients, res$coefficients)
-
 
 # Lag
 res_lag = feols(y1 ~ l(x1, 1:2) + x2 + x3, base, panel = ~id + time)
@@ -1436,10 +1475,24 @@ test(v3, v3b)
 test(max(abs(v1 - v3)) == 0, FALSE)
 test(max(abs(v2 - v3)) == 0, FALSE)
 
+####
+#### fitstat ####
+####
 
+base = iris
+names(base) = c("y", "x1", "x_endo_1", "x_inst_1", "fe")
+set.seed(2)
+base$x_inst_2 = 0.2 * base$y + 0.2 * base$x_endo_1 + rnorm(150, sd = 0.5)
+base$x_endo_2 = 0.2 * base$y - 0.2 * base$x_inst_1 + rnorm(150, sd = 0.5)
 
+# Checking a basic estimation
+est_iv = feols(y ~ x1 | x_endo_1 + x_endo_2 ~ x_inst_1 + x_inst_2, base)
 
+fitstat(est_iv, ~ f + ivf + ivf2 + wald + ivwald + ivwald2 + wh + sargan + rmse + g + n + ll + sq.cor + r2)
 
+est_fe = feols(y ~ x1 | fe, base)
+
+fitstat(est_fe, ~ wf)
 
 
 

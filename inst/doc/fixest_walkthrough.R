@@ -41,10 +41,7 @@ print(gravity_pois)
 summary(gravity_pois, se = "twoway")
 
 ## ---- eval = FALSE------------------------------------------------------------
-#  # Equivalent ways of clustering the SEs:
-#  # One-way clustering is deduced from the arguent 'cluster'
-#  # - using the vector:
-#  summary(gravity_pois, cluster = trade$Product)
+#  # Two ways to summon clustering on the Product variable
 #  # - by reference:
 #  summary(gravity_pois, cluster = "Product")
 #  # - with a formula:
@@ -55,11 +52,8 @@ summary(gravity_pois, cluster = ~Product)
 
 ## -----------------------------------------------------------------------------
 gravity_simple = fepois(Euros ~ log(dist_km), trade)
-# Two way clustering is deduced from the argument 'cluster'
-# Using data:
-summary(gravity_simple, cluster = trade[, c("Origin", "Destination")])
-# Using a formula (note that the values of the variables are 
-#  fetched directly in the original database):
+# We use a formula to specify the variables used for two way clustering
+# (note that the values of the variables are fetched directly in the original database)
 summary(gravity_simple, cluster = ~Origin + Destination)
 
 ## -----------------------------------------------------------------------------
@@ -153,27 +147,102 @@ summary(est_iv_fe, stage = 1)
 etable(summary(est_iv_fe, stage = 1:2), fitstat = ~ . + ivfall + ivwaldall.p)
 
 ## -----------------------------------------------------------------------------
-base_vs = iris
-names(base_vs) = c(paste0("x", 1:4), "species")
+# Our base data for this section
+base = iris
+names(base) = c("y", paste0("x", 1:3), "fe1")
+# Create another "fixed-effect"
+base$fe2 = rep(letters[1:5], 30)
+head(base)
 
 ## -----------------------------------------------------------------------------
-est_vs = feols(x1 ~ x2 | species[x3], base_vs)
+est_comb = feols(y ~ x1 | fe1^fe2, base)
+est_comb
+
+## -----------------------------------------------------------------------------
+fixef(est_comb)[[1]]
+
+## -----------------------------------------------------------------------------
+head(base)
+
+## -----------------------------------------------------------------------------
+est_vs = feols(y ~ x1 | fe1[x2], base)
 est_vs
 
 ## -----------------------------------------------------------------------------
 summary(fixef(est_vs))
 
 ## -----------------------------------------------------------------------------
-# we create another "fixed-effect"
-base_vs$fe = rep(1:5, 30)
-head(base_vs)
+data(airquality)
+res_i1 = feols(Ozone ~ Solar.R + i(Month), airquality)
+res_i2 = feols(Ozone ~ Solar.R + i(Month, ref = 8), airquality)
+res_i3 = feols(Ozone ~ Solar.R + i(Month, keep = 5:6), airquality)
+
+etable(res_i1, res_i2, res_i3, dict = c("6" = "June", "Month::5" = "May"), 
+       order = c("Int|May", "Mon"))
+
+## ---- eval = TRUE-------------------------------------------------------------
+# Sample data illustrating the DiD
+data(base_did)
+head(base_did)
+
+## ---- eval = TRUE-------------------------------------------------------------
+# Estimation of treatment × period effects
+# We also add individual and period fixed-effects:
+est_did = feols(y ~ x1 + i(period, treat, 5) | id + period, base_did)
+est_did
+
+## ---- fig.width=7-------------------------------------------------------------
+iplot(est_did)
 
 ## -----------------------------------------------------------------------------
-est_comb = feols(x1 ~ x2 | species^fe, base_vs)
-est_comb
+data(base_stagg)
+
+head(base_stagg)
+
+## ---- echo=FALSE--------------------------------------------------------------
+if(requireNamespace("ggplot2", quietly = TRUE)){
+  library(ggplot2)
+  ggplot(aggregate(base_stagg[, c('year_treated', 'treatment_effect_true')], 
+                   by = list(year = base_stagg$year, group = to_integer(base_stagg$year_treated)), 
+                   mean), 
+         aes(year, group, fill = year>=year_treated, alpha = treatment_effect_true)) + 
+    geom_tile(colour = "white", lwd = 1) + 
+    scale_fill_brewer('Treated?', palette = 'Set1') +
+    scale_alpha('Avg. treatment\neffect') +
+    labs(x = 'Year', y = 'Group') +
+    theme_minimal()
+} else {
+  print("This graph requires ggplot2 which is currently not available.")
+}
 
 ## -----------------------------------------------------------------------------
-fixef(est_comb)[[1]]
+# "Naive" TWFE DiD (note that the time to treatment for the never treated is -1000)
+# (by using ref = c(-1, -1000) we exclude the period just before the treatment and 
+# the never treated)
+res_twfe = feols(y ~ x1 + i(time_to_treatment, treated, ref = c(-1, -1000)) | id + year, base_stagg)
+
+# To implement the Sun and Abraham (2020) method,
+# we use the sunab(cohort, period) function
+res_sa20 = feols(y ~ x1 + sunab(year_treated, year) | id + year, base_stagg)
+
+## -----------------------------------------------------------------------------
+# Plot the two TWFE results
+iplot(list(res_twfe, res_sa20), sep = 0.5)
+
+# Add the true results
+att_true = tapply(base_stagg$treatment_effect_true, base_stagg$time_to_treatment, mean)[-1]
+points(-9:8, att_true, pch = 15, col = 4)
+
+legend("topleft", col = c(1, 4, 2), pch = c(20, 17, 15), 
+       legend = c("TWFE", "Truth", "Sun & Abraham (2020)"))
+
+## -----------------------------------------------------------------------------
+# The full ATT
+summary(res_sa20, agg = "att")
+
+## -----------------------------------------------------------------------------
+# Full disaggregation (you could have used summary instead of etable)
+head(etable(res_sa20, agg = FALSE), 20)
 
 ## -----------------------------------------------------------------------------
 base = iris
@@ -198,91 +267,6 @@ xpd(Armed.Forces ~ Population + ..("GNP|ployed"), data = longley)
 
 ## -----------------------------------------------------------------------------
 feols(Armed.Forces ~ Population + ..("GNP|ployed"), longley)
-
-## -----------------------------------------------------------------------------
-data(airquality)
-res_i1 = feols(Ozone ~ Solar.R + i(Month), airquality)
-res_i2 = feols(Ozone ~ Solar.R + i(Month, ref = 8), airquality)
-res_i3 = feols(Ozone ~ Solar.R + i(Month, keep = 5:6), airquality)
-
-etable(res_i1, res_i2, res_i3, dict = c("6" = "June", "Month::5" = "May"), 
-       order = c("Int|May", "Mon"))
-
-## ---- eval = TRUE-------------------------------------------------------------
-# Sample data illustrating the DiD
-data(base_did)
-head(base_did)
-
-## ---- eval = TRUE-------------------------------------------------------------
-# Estimation of yearly treatment effect
-# We also add individual/time fixed-effects:
-est_did = feols(y ~ x1 + i(treat, period, 5) | id + period, base_did)
-est_did
-
-## ---- fig.width=7-------------------------------------------------------------
-coefplot(est_did)
-
-## -----------------------------------------------------------------------------
-
-#
-# Data
-#
-
-set.seed(1)
-n_group = 20
-n_per_group = 5
-id_i = paste0((1:n_group), ":", rep(1:n_per_group, each = n_group))
-id_t = 1:10
-base = expand.grid(id = id_i, year = id_t)
-base$group = as.numeric(gsub(":.+", "", base$id))
-base$year_treated = base$group
-base$year_treated[base$group > 10] = 10000
-base$treat_post = (base$year >= base$year_treated) * 1
-base$time_to_treatment = pmax(base$year - base$year_treated, -1000)
-base$treated = (base$year_treated < 10000) * 1
-# The effect of the treatment is cohort specific and increases with time
-base$y_true = base$treat_post * (1 + 1 * base$time_to_treatment - 1 * base$group)
-base$y = base$y_true + rnorm(nrow(base))
-
-# Note that the time_to_treatment for controls is set to -1000
-
-# we need to drop the always treated
-base = base[base$group > 1,]
-
-#
-# Estimations
-#
-
-# "Regular" DiD
-res_naive = feols(y ~ i(treated, time_to_treatment, ref = -1, drop = -1000) | id + year, base)
-
-# with cohort x time to treatment dummies
-res_cohort = feols(y ~ i(time_to_treatment, f2 = group, drop = c(-1, -1000)) | id + year, base)
-
-# Looking at the difference between estimates
-coefplot(res_naive, ylim = c(-6, 8))
-att_true = tapply(base$y_true, base$time_to_treatment, mean)[-1]
-points(-9:8 + 0.15, att_true, pch = 15, col = 2)
-
-# SA method: we aggregate the effects for each period
-agg_coef = aggregate(res_cohort, "(ti.*nt)::(-?[[:digit:]])")
-x = c(-9:-2, 0:8) + .35
-points(x, agg_coef[, 1], pch = 17, col = 4)
-ci_low = agg_coef[, 1] - 1.96 * agg_coef[, 2]
-ci_up = agg_coef[, 1] + 1.96 * agg_coef[, 2]
-segments(x0 = x, y0 = ci_low, x1 = x, y1 = ci_up, col = 4)
-legend("topleft", col = c(1, 2, 4), pch = c(20, 15, 17), legend = c("Naive", "True", "Sun & Abraham"))
-
-print(agg_coef)
-
-
-## -----------------------------------------------------------------------------
-# The full ATT
-aggregate(res_cohort, c("ATT" = "treatment::[^-]"))
-mean(base[base$treat_post == 1, "y_true"])
-
-## -----------------------------------------------------------------------------
-etable(res_cohort, agg = "(ti.*nt)::(-?[[:digit:]])")
 
 ## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)

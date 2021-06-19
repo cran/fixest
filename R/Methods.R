@@ -98,7 +98,7 @@ deviance.fixest = function(object, ...){
         stop("The method 'deviance.fixest' cannot be applied to a 'lean' summary. Please apply it to the estimation object directly.")
     }
 
-    if(method == "feols" || (method %in% c("femlm", "feNmlm") && family == "gaussian")){
+    if(method %in% c("feols", "feols.fit") || (method %in% c("femlm", "feNmlm") && family == "gaussian")){
         res = sum(w * r**2)
 
     } else if(method %in% c("fepois", "feglm")){
@@ -165,34 +165,27 @@ hatvalues.fixest = function(model, ...){
 
     validate_dots()
 
-    method = model$method
+    method = model$method_type
     family = model$family
 
     msg = "hatvalues.fixest: 'hatvalues' is not implemented for estimations with fixed-effects."
 
+    # An error is in fact nicer than a message + NA return due to the interplay with sandwich
+    if(!is.null(model$fixef_id)){
+        stop(msg)
+    }
+
     if(method == "feols"){
-
-        if(!is.null(model$fixef_id)){
-            message(msg)
-            return(rep(NA_real_, model$nobs))
-        }
-
         X = model.matrix(model)
 
         res = cpp_diag_XUtX(X, model$cov.unscaled / model$sigma2)
 
-    } else if(method %in% c("fepois", "feglm")){
-
-        if(!is.null(model$fixef_id)){
-            message(msg)
-            return(rep(NA_real_, model$nobs))
-        }
-
+    } else if(method == "feglm"){
         XW = model.matrix(model) * sqrt(model$irls_weights)
         res = cpp_diag_XUtX(XW, model$cov.unscaled)
 
     } else {
-        stop("'hatvalues' is not currently implemented for function ", method, ".")
+        stop("'hatvalues' is currently not implemented for function ", method, ".")
     }
 
     res
@@ -265,14 +258,14 @@ NULL
 bread.fixest = function(x, ...){
     validate_dots()
 
-    method = x$method
+    method = x$method_type
     family = x$family
 
     if(method == "feols"){
 
         res = x$cov.unscaled / x$sigma2 * x$nobs
 
-    } else if(method %in% c("fepois", "feglm")){
+    } else if(method == "feglm"){
 
         res = x$cov.unscaled * x$nobs
 

@@ -18,6 +18,9 @@
 #' @param demeaned Logical, default is \code{FALSE}. Only used in the presence of fixed-effects: should the centered variables be returned? If \code{TRUE}, it creates the items \code{y_demeaned} and \code{X_demeaned}.
 #' @param notes Logical. By default, two notes are displayed: when NAs are removed (to show additional information) and when some observations are removed because of collinearity. To avoid displaying these messages, you can set \code{notes = FALSE}. You can remove these messages permanently by using \code{setFixest_notes(FALSE)}.
 #' @param collin.tol Numeric scalar, default is \code{1e-10}. Threshold deciding when variables should be considered collinear and subsequently removed from the estimation. Higher values means more variables will be removed (if there is presence of collinearity). One signal of presence of collinearity is t-stats that are extremely low (for instance when t-stats < 1e-3).
+#' @param y Numeric vector/matrix/data.frame of the dependent variable(s). Multiple dependent variables will return a \code{fixest_multi} object.
+#' @param X Numeric matrix of the regressors.
+#' @param fixef_df Matrix/data.frame of the fixed-effects.
 #'
 #' @details
 #' The method used to demean each variable along the fixed-effects is based on Berge (2018), since this is the same problem to solve as for the Gaussian case in a ML setup.
@@ -48,19 +51,19 @@
 #'
 #' @section Interactions:
 #'
-#' You can interact a numeric variable with a "factor-like" variable by using \code{interact(var, fe, ref)}, where \code{fe} is the variable to be interacted with and the argument \code{ref} is a value of \code{fe} taken as a reference (optional). Instead of using the function \code{\link[fixest:i]{interact}}, you can use the alias \code{i(var, fe, ref)}.
+#' You can interact a numeric variable with a "factor-like" variable by using \code{i(factor_var, continuous_var, ref)}, where \code{continuous_var} will be interacted with each value of \code{factor_var} and the argument \code{ref} is a value of \code{factor_var} taken as a reference (optional).
 #'
 #' Using this specific way to create interactions leads to a different display of the interacted values in \code{\link[fixest]{etable}} and offers a special representation of the interacted coefficients in the function \code{\link[fixest]{coefplot}}. See examples.
 #'
-#'  It is important to note that *if you do not care about the standard-errors of the interactions*, then you can add interactions in the fixed-effects part of the formula (using the syntax fe[[var]], as explained in the section \dQuote{Varying slopes}).
+#'  It is important to note that *if you do not care about the standard-errors of the interactions*, then you can add interactions in the fixed-effects part of the formula, it will be incomparably faster (using the syntax \code{factor_var[continuous_var]}, as explained in the section \dQuote{Varying slopes}).
 #'
-#' The function \code{\link[fixest:i]{interact}} has in fact more arguments, please see details in its associated help page.
+#' The function \code{\link[fixest:i]{i}} has in fact more arguments, please see details in its associated help page.
 #'
 #' @section On standard-errors:
 #'
 #' Standard-errors can be computed in different ways, you can use the arguments \code{se} and \code{dof} in \code{\link[fixest]{summary.fixest}} to define how to compute them. By default, in the presence of fixed-effects, standard-errors are automatically clustered.
 #'
-#' The following vignette: \href{https://cran.r-project.org/package=fixest/vignettes/standard_errors.html}{On standard-errors} describes in details how the standard-errors are computed in \code{fixest} and how you can replicate standard-errors from other software.
+#' The following vignette: \href{https://lrberge.github.io/fixest/articles/standard_errors.html}{On standard-errors} describes in details how the standard-errors are computed in \code{fixest} and how you can replicate standard-errors from other software.
 #'
 #' You can use the functions \code{\link[fixest]{setFixest_se}} and \code{\link[fixest:dof]{setFixest_dof}} to permanently set the way the standard-errors are computed.
 #'
@@ -73,22 +76,24 @@
 #'
 #' Of course you can still add the fixed-effects, but the IV formula must always come last, like in \code{fml = y ~ x1 | fe1 + fe2 | x_endo ~ x_inst}.
 #'
+#' If you want to estimate a model without exogenous variables, use \code{"1"} as a placeholder: e.g. \code{fml = y ~ 1 | x_endo + x_inst}.
+#'
 #' By default, the second stage regression is returned. You can access the first stage(s) regressions either directly in the slot \code{iv_first_stage} (not recommended), or using the argument \code{stage = 1} from the function \code{\link[fixest]{summary.fixest}}. For example \code{summary(iv_est, stage = 1)} will give the first stage(s). Note that using summary you can display both the second and first stages at the same time using, e.g., \code{stage = 1:2} (using \code{2:1} would reverse the order).
 #'
 #'
 #' @section Multiple estimations:
 #'
-#' Multiple estimations can be performed at once, they just have to be specified in the formula. Multiple estimations yield a \code{fixest_multi} object which is \sQuote{kind of} a list of all the results but includes specific methods to access the results in a handy way.
+#' Multiple estimations can be performed at once, they just have to be specified in the formula. Multiple estimations yield a \code{fixest_multi} object which is \sQuote{kind of} a list of all the results but includes specific methods to access the results in a handy way. Please have a look at the dedicated vignette: \href{https://lrberge.github.io/fixest/articles/multiple_estimations.html}{Multiple estimations}.
 #'
-#' To include mutliple dependent variables, wrap them in \code{c()} (\code{list()} also works). For instance \code{fml = c(y1, y2) ~ x1} would estimate the model \code{fml = y1 ~ x1} and then the model \code{fml = y2 ~ x1}.
+#' To include multiple dependent variables, wrap them in \code{c()} (\code{list()} also works). For instance \code{fml = c(y1, y2) ~ x1} would estimate the model \code{fml = y1 ~ x1} and then the model \code{fml = y2 ~ x1}.
 #'
-#' To include multiple independent variables, you need to use the stepwise functions. There are 4 stepwise functions associated to 4 short aliases. These are a) stepwise, stepwise0, cstepwise, cstepwise0, and b) sw, sw0, csw, csw0. Let's explain that.
-#' Assume you have the following formula: \code{fml = y ~ x1 + sw(x2, x3)}. The stepwise function \code{sw} will estimate the following two models: \code{y ~ x1 + x2} and \code{y ~ x1 + x3}. That is, each element in \code{sw()} is sequentially, and separately, added to the formula. Would have you used \code{sw0} in lieu of \code{sw}, then the model \code{y ~ x1} would also have been estimated. The \code{0} in the name means that the model wihtout any stepwise element also needs to be estimated.
+#' To include multiple independent variables, you need to use the stepwise functions. There are 4 stepwise functions: \code{sw}, \code{sw0}, \code{csw}, \code{csw0}. Of course \code{sw} stands for stepwise, and \code{csw} for cumulative stepwise. Let's explain that.
+#' Assume you have the following formula: \code{fml = y ~ x1 + sw(x2, x3)}. The stepwise function \code{sw} will estimate the following two models: \code{y ~ x1 + x2} and \code{y ~ x1 + x3}. That is, each element in \code{sw()} is sequentially, and separately, added to the formula. Would have you used \code{sw0} in lieu of \code{sw}, then the model \code{y ~ x1} would also have been estimated. The \code{0} in the name means that the model without any stepwise element also needs to be estimated.
 #' Finally, the prefix \code{c} means cumulative: each stepwise element is added to the next. That is, \code{fml = y ~ x1 + csw(x2, x3)} would lead to the following models \code{y ~ x1 + x2} and \code{y ~ x1 + x2 + x3}. The \code{0} has the same meaning and would also lead to the model without the stepwise elements to be estimated: in other words, \code{fml = y ~ x1 + csw0(x2, x3)} leads to the following three models: \code{y ~ x1}, \code{y ~ x1 + x2} and \code{y ~ x1 + x2 + x3}.
 #'
 #' Multiple independent variables can be combined with multiple dependent variables, as in \code{fml = c(y1, y2) ~ cw(x1, x2, x3)} which would lead to 6 estimations. Multiple estimations can also be combined to split samples (with the arguments \code{split}, \code{fsplit}).
 #'
-#' Fixed-effects cannot be included in a stepwise fashion: they are there or not and stay the same for all estimations.
+#' You can also add fixed-effects in a stepwise fashion. Note that you cannot perform stepwise estimations on the IV part of the formula (\code{feols} only).
 #'
 #' A note on performance. The feature of multiple estimations has been highly optimized for \code{feols}, in particular in the presence of fixed-effects. It is faster to estimate multiple models using the formula rather than with a loop. For non-\code{feols} models using the formula is roughly similar to using a loop performance-wise.
 #'
@@ -124,7 +129,7 @@
 #' \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
 #' \item{offset}{(When relevant.) The offset formula.}
 #' \item{weights}{(When relevant.) The weights formula.}
-#' \item{obsRemoved}{(When relevant.) Vector of observations that were removed because of NA values.}
+#' \item{obs_selection}{(When relevant.) List containing vectors of integers. It represents the sequential selection of observation vis a vis the original data set.}
 #' \item{collin.var}{(When relevant.) Vector containing the variables removed because of collinearity.}
 #' \item{collin.coef}{(When relevant.) Vector of coefficients, where the values of the variables removed because of collinearity are NA.}
 #' \item{collin.min_norm}{The minimal diagonal value of the Cholesky decomposition. Small values indicate possible presence collinearity.}
@@ -199,7 +204,7 @@
 #'
 #' data(base_did)
 #' # We interact the variable 'period' with the variable 'treat'
-#' est_did = feols(y ~ x1 + i(treat, period, 5) | id+period, base_did)
+#' est_did = feols(y ~ x1 + i(period, treat, 5) | id+period, base_did)
 #'
 #' # Now we can plot the result of the interaction with coefplot
 #' coefplot(est_did)
@@ -392,6 +397,7 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 	#
 	# Multi LHS and RHS ####
 	#
+
 
 	do_multi_lhs = get("do_multi_lhs", env)
 	do_multi_rhs = get("do_multi_rhs", env)
@@ -877,6 +883,14 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 	    n_endo = length(iv_lhs)
 	    lean = get("lean", env)
 
+	    # Simple check that the function is not misused
+	    pblm = intersect(iv_lhs_names, colnames(X))
+	    if(length(pblm) > 0){
+	        any_exo = length(setdiff(colnames(X), iv_lhs_names)) > 0
+	        msg = if(any_exo) "" else " If there is no exogenous variable, just use '1' in the first part of the formula."
+	        stop("Endogenous variables should not be used as exogenous regressors. The variable", enumerate_items(pblm, "s.quote.were"), " found in the first part of the multipart formula: ", ifsingle(pblm, "it", "they"), " should not be there.", msg)
+	    }
+
 	    if(isFixef){
 	        # we batch demean first
 
@@ -948,7 +962,7 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 
 	            my_res = feols(env = current_env, xwx = ZXtZX, xwy = ZXtu[[i]],
 	                           X_demean = ZX_demean, y_demean = iv_lhs_demean[[i]],
-	                           add_fitted_demean = TRUE, iv_call = TRUE)
+	                           add_fitted_demean = TRUE, iv_call = TRUE, notes = FALSE)
 
 	            # For the F-stats
 	            if(n_vars_X == 0){
@@ -1010,7 +1024,7 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 	        current_env = reshape_env(env, rhs = UX)
 	        res_second_stage = feols(env = current_env, xwx = UXtUX, xwy = UXty,
 	                                 X_demean = UX_demean, y_demean = y_demean,
-	                                 resid_1st_stage = resid_s1, iv_call = TRUE)
+	                                 resid_1st_stage = resid_s1, iv_call = TRUE, notes = FALSE)
 
 	        # For the F-stats
 	        if(n_vars_X == 0){
@@ -1064,11 +1078,14 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 
 	        for(i in 1:n_endo){
 	            current_env = reshape_env(env, lhs = iv_lhs[[i]], rhs = ZX, fml_iv_endo = iv_lhs_names[i])
-	            my_res = feols(env = current_env, xwx = ZXtZX, xwy = ZXtu[[i]], iv_call = TRUE)
+	            my_res = feols(env = current_env, xwx = ZXtZX, xwy = ZXtu[[i]],
+	                           iv_call = TRUE, notes = FALSE)
 
 	            # For the F-stats
-	            fit_no_inst = ols_fit(iv_lhs[[i]], X, w = weights, correct_0w = FALSE, collin.tol = collin.tol, nthreads = nthreads,
-	                                  xwx = ZXtZX[-(1:K + is_int), -(1:K + is_int), drop = FALSE], xwy = ZXtu[[i]][-(1:K + is_int)])
+	            fit_no_inst = ols_fit(iv_lhs[[i]], X, w = weights, correct_0w = FALSE,
+	                                  collin.tol = collin.tol, nthreads = nthreads,
+	                                  xwx = ZXtZX[-(1:K + is_int), -(1:K + is_int), drop = FALSE],
+	                                  xwy = ZXtu[[i]][-(1:K + is_int)])
 	            my_res$ssr_no_inst = cpp_ssq(fit_no_inst$residuals, weights)
 
 	            my_res$iv_stage = 1
@@ -1121,7 +1138,7 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 
 	        current_env = reshape_env(env, rhs = UX)
 	        res_second_stage = feols(env = current_env, xwx = UXtUX, xwy = UXty,
-	                                 resid_1st_stage = resid_s1, iv_call = TRUE)
+	                                 resid_1st_stage = resid_s1, iv_call = TRUE, notes = FALSE)
 
 	        # For the F-stats
 	        fit_no_endo = ols_fit(y, X, w = weights, correct_0w = FALSE,
@@ -1161,11 +1178,16 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 
 	    df1 = n_endo
 	    df2 = length(y) - (res_second_stage$nparams + df1)
-	    qui = df1 + 1:df1 + ("(Intercept)" %in% names(res_second_stage$coefficients))
-	    my_coef = fit_wh$coefficients[qui]
-	    vcov_wh = fit_wh$xwx_inv[qui, qui] * cpp_ssq(fit_wh$residuals, weights) / df2
-	    stat = drop(my_coef %*% solve(vcov_wh) %*% my_coef) / df1
-	    p = pf(stat, df1, df2, lower.tail = FALSE)
+	    if(any(fit_wh$is_excluded)){
+	        stat = p = NA
+	    } else {
+	        qui = df1 + 1:df1 + ("(Intercept)" %in% names(res_second_stage$coefficients))
+	        my_coef = fit_wh$coefficients[qui]
+	        vcov_wh = fit_wh$xwx_inv[qui, qui] * cpp_ssq(fit_wh$residuals, weights) / df2
+	        stat = drop(my_coef %*% solve(vcov_wh) %*% my_coef) / df1
+	        p = pf(stat, df1, df2, lower.tail = FALSE)
+	    }
+
 	    res_second_stage$iv_wh = list(stat = stat, p = p, df1 = df1, df2 = df2)
 
 	    #
@@ -1192,22 +1214,53 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 	        res_second_stage$iv_sargan = list(stat = stat, p = p, df = df)
 	    }
 
+	    # extra information
+	    res_second_stage$iv_inst_names_xpd = res_first_stage[[1]]$iv_inst_names_xpd
+	    res_second_stage$iv_endo_names_fit = paste0("fit_", res_second_stage$iv_endo_names)
+
+	    # Collinearity message
+
+	    collin.vars = c(res_second_stage$collin.var, res_first_stage[[1]]$collin.var)
+	    res_second_stage$collin.var = unique(collin.vars)
+	    if(notes && length(collin.vars) > 0){
+	        coll.endo = intersect(collin.vars, res_second_stage$iv_endo_names_fit)
+	        coll.inst = intersect(collin.vars, res_second_stage$iv_inst_names_xpd)
+	        coll.exo = setdiff(collin.vars, c(coll.endo, coll.inst))
+
+	        n_c = length(collin.vars)
+	        n_c_endo = length(coll.endo)
+	        n_c_inst = length(coll.inst)
+	        n_c_exo = length(coll.exo)
+
+	        msg_endo = msg_exo = msg_inst = NULL
+	        if(n_c_endo > 0){
+	            msg_endo = paste0("The endogenous regressor", plural(n_c_endo), " ", enumerate_items(coll.endo, "quote", nmax = 3))
+	        } else if(n_c_inst > 0){
+	            msg_inst = paste0("the instrument", plural(n_c_inst), " ", enumerate_items(coll.inst, "quote", nmax = 3))
+	        } else if(n_c_exo > 0){
+	            msg_exo = paste0("the exogenous variable", plural(n_c_exo), " ", enumerate_items(coll.exo, "quote", nmax = 3))
+	        }
+
+	        msg = enumerate_items(c(msg_endo, msg_inst, msg_exo))
+	        msg = gsub("^t", "T", msg)
+	        message(msg, " ", plural(n_c, "has"), " been removed because of collinearity (see $collin.var).")
+
+	    }
+
 	    # if lean = TRUE: we clean the IV residuals (which were needed so far)
 	    if(lean){
 	        for(i in 1:n_endo){
 	            res_first_stage[[i]]$residuals = NULL
 	            res_first_stage[[i]]$fitted.values = NULL
+	            res_first_stage[[i]]$fitted.values_demean = NULL
 	        }
 
 	        res_second_stage$residuals = NULL
 	        res_second_stage$fitted.values = NULL
+	        res_second_stage$fitted.values_demean = NULL
 	    }
 
-	    if(n_endo == 1){
-	        res_second_stage$iv_first_stage = res_first_stage[[1]]
-	    } else {
-	        res_second_stage$iv_first_stage = res_first_stage
-	    }
+	    res_second_stage$iv_first_stage = res_first_stage
 
 	    # meta info
 	    res_second_stage$iv_stage = 2
@@ -1258,7 +1311,6 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 		    gc()
 		}
 
-
 		vars_demean = cpp_demean(y, X, weights, iterMax = fixef.iter,
 		                            diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
 		                            fe_id_list = fixef_id_list, table_id_I = fixef_table_vector,
@@ -1284,7 +1336,7 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 		if(any(abs(slope_flag) > 0) && any(res$iterations > 300)){
 		    # Maybe we have a convergence problem
 		    # This is poorly coded, but it's a temporary fix
-		    opt_fe <- check_conv(y_demean, X_demean, fixef_id_list, slope_flag, slope_vars, weights)
+		    opt_fe = check_conv(y_demean, X_demean, fixef_id_list, slope_flag, slope_vars, weights)
 
 		    # This is a bit too rough a check but it should catch the most problematic cases
 		    if(any(opt_fe > 1e-4)){
@@ -1515,12 +1567,12 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 		se = sqrt(se)
 
 		# coeftable
-		zvalue <- coef/se
-		pvalue <- 2*pt(-abs(zvalue), max(n - df_k, 1))
+		zvalue = coef/se
+		pvalue = 2*pt(-abs(zvalue), max(n - df_k, 1))
 
-		coeftable <- data.frame("Estimate"=coef, "Std. Error"=se, "t value"=zvalue, "Pr(>|t|)"=pvalue)
-		names(coeftable) <- c("Estimate", "Std. Error", "t value",  "Pr(>|t|)")
-		row.names(coeftable) <- names(coef)
+		coeftable = data.frame("Estimate"=coef, "Std. Error"=se, "t value"=zvalue, "Pr(>|t|)"=pvalue)
+		names(coeftable) = c("Estimate", "Std. Error", "t value",  "Pr(>|t|)")
+		row.names(coeftable) = names(coef)
 
 		attr(se, "type") = attr(coeftable, "type") = "Standard"
 		res$coeftable = coeftable
@@ -1563,19 +1615,22 @@ feols = function(fml, data, weights, offset, subset, split, fsplit, cluster, se,
 	    cluster = get("cluster", env)
 	    lean = get("lean", env)
 	    dof = get("dof", env)
+	    agg = get("agg", env)
 	    summary_flags = get("summary_flags", env)
 
 	    # If lean = TRUE, 1st stage residuals are still needed for the 2nd stage
 	    if(isTRUE(dots$iv_call) && lean){
 	        r = res$residuals
 	        fv = res$fitted.values
+	        fvd = res$fitted.values_demean
 	    }
 
-	    res = summary(res, se = se, cluster = cluster, dof = dof, lean = lean, summary_flags = summary_flags)
+	    res = summary(res, se = se, cluster = cluster, agg = agg, dof = dof, lean = lean, summary_flags = summary_flags)
 
 	    if(isTRUE(dots$iv_call) && lean){
 	        res$residuals = r
 	        res$fitted.values = fv
+	        res$fitted.values_demean = fvd
 	    }
 	}
 
@@ -1682,12 +1737,55 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 }
 
 
+#' @rdname feols
+feols.fit = function(y, X, fixef_df, offset, split, fsplit, cluster, se, dof, weights, subset,
+                     fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000,
+                     collin.tol = 1e-10, nthreads = getFixest_nthreads(), lean = FALSE, warn = TRUE,
+                     notes = getFixest_notes(), mem.clean = FALSE, verbose = 0, only.env = FALSE, env, ...){
+
+
+    if(missing(weights)) weights = NULL
+
+    time_start = proc.time()
+
+    if(missing(env)){
+        set_defaults("fixest_estimation")
+        call_env = new.env(parent = parent.frame())
+
+        env = try(fixest_env(y = y, X = X, fixef_df = fixef_df, offset = offset, weights = weights, subset = subset, split = split, fsplit = fsplit, cluster = cluster, se = se, dof = dof, fixef.rm = fixef.rm, fixef.tol=fixef.tol, fixef.iter=fixef.iter, collin.tol = collin.tol, nthreads = nthreads, lean = lean, warn=warn, notes=notes, verbose = verbose, mem.clean = mem.clean, origin = "feols.fit", mc_origin = match.call(), call_env = call_env, ...), silent = TRUE)
+
+    } else if((r <- !is.environment(env)) || !isTRUE(env$fixest_env)){
+        stop("Argument 'env' must be an environment created by a fixest estimation. Currently it is not ", ifelse(r, "an", "a 'fixest'"), " environment.")
+    }
+
+    if("try-error" %in% class(env)){
+        mc = match.call()
+        origin = ifelse(is.null(mc$origin), "feols.fit", mc$origin)
+        stop(format_error_msg(env, origin))
+    }
+
+    check_arg(only.env, "logical scalar")
+    if(only.env){
+        return(env)
+    }
+
+    verbose = get("verbose", env)
+    if(verbose >= 2) cat("Setup in ", (proc.time() - time_start)[3], "s\n", sep="")
+
+    # workhorse is feols (OK if error msg leads to feols [clear enough])
+    res = feols(env = env)
+
+    res
+
+}
+
+
 #' Fixed-effects GLM estimations
 #'
 #' Estimates GLM models with any number of fixed-effects.
 #'
-#' @inheritParams feols
 #' @inheritParams femlm
+#' @inheritParams feols
 #' @inheritSection feols Combining the fixed-effects
 #' @inheritSection feols Varying slopes
 #' @inheritSection feols Lagging variables
@@ -1695,16 +1793,13 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 #' @inheritSection feols On standard-errors
 #' @inheritSection feols Multiple estimations
 #'
-#' @param family Family to be used for the estimation. Defaults to \code{poisson()}. See \code{\link[stats]{family}} for details of family functions.
+#' @param family Family to be used for the estimation. Defaults to \code{gaussian()}. See \code{\link[stats]{family}} for details of family functions.
 #' @param start Starting values for the coefficients. Can be: i) a numeric of length 1 (e.g. \code{start = 0}), ii) a numeric vector of the exact same length as the number of variables, or iii) a named vector of any length (the names will be used to initialize the appropriate coefficients). Default is missing.
 #' @param etastart Numeric vector of the same length as the data. Starting values for the linear predictor. Default is missing.
 #' @param mustart Numeric vector of the same length as the data. Starting values for the vector of means. Default is missing.
 #' @param fixef.tol Precision used to obtain the fixed-effects. Defaults to \code{1e-6}. It corresponds to the maximum absolute difference allowed between two coefficients of successive iterations.
 #' @param glm.iter Number of iterations of the glm algorithm. Default is 25.
 #' @param glm.tol Tolerance level for the glm algorithm. Default is \code{1e-8}.
-#' @param y Numeric vector of the dependent variable.
-#' @param X Numeric matrix of the regressors.
-#' @param fixef_mat Matrix/data.frame of the fixed-effects.
 #' @param verbose Integer. Higher values give more information. In particular, it can detail the number of iterations in the demeaning algoritmh (the first number is the left-hand-side, the other numbers are the right-hand-side variables). It can also detail the step-halving algorithm.
 #' @param notes Logical. By default, three notes are displayed: when NAs are removed, when some fixed-effects are removed because of only 0 (or 0/1) outcomes, or when a variable is dropped because of collinearity. To avoid displaying these messages, you can set \code{notes = FALSE}. You can remove these messages permanently by using \code{setFixest_notes(FALSE)}.
 #'
@@ -1726,7 +1821,7 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 #' \item{y}{(When relevant.) The dependent variable (used to compute the within-R2 when fixed-effects are present).}
 #' \item{convStatus}{Logical, convergence status of the IRWLS algorithm.}
 #' \item{irls_weights}{The weights of the last iteration of the IRWLS algorithm.}
-#' \item{obsRemoved}{(When relevant.) Vector of observations that were removed because of NA values or because of only 0/1 outcome within a fixed-effect (depends on the family though).}
+#' \item{obs_selection}{(When relevant.) List containing vectors of integers. It represents the sequential selection of observation vis a vis the original data set.}
 #' \item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 #' \item{coefficients}{The named vector of estimated coefficients.}
 #' \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
@@ -1772,19 +1867,19 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 #'
 #' @examples
 #'
-#' # Default is a poisson model
-#' res = feglm(Sepal.Length ~ Sepal.Width + Petal.Length | Species, iris)
+#' # Poisson estimation
+#' res = feglm(Sepal.Length ~ Sepal.Width + Petal.Length | Species, iris, "poisson")
 #'
 #' # You could also use fepois
 #' res_pois = fepois(Sepal.Length ~ Sepal.Width + Petal.Length | Species, iris)
 #'
 #' # With the fit method:
-#' res_fit = feglm.fit(iris$Sepal.Length, iris[, 2:3], iris$Species)
+#' res_fit = feglm.fit(iris$Sepal.Length, iris[, 2:3], iris$Species, "poisson")
 #'
 #' # All results are identical:
 #' etable(res, res_pois, res_fit)
 #'
-#' # Note that you have more examples in feols
+#' # Note that you have many more examples in feols
 #'
 #' #
 #' # Multiple estimations:
@@ -1817,7 +1912,7 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 #' est_split[sample = 1:2, lhs = 1, rhs = 1]
 #'
 #'
-feglm = function(fml, data, family = "poisson", offset, weights, subset, split, fsplit, cluster, se, dof, panel.id, start = NULL,
+feglm = function(fml, data, family = "gaussian", offset, weights, subset, split, fsplit, cluster, se, dof, panel.id, start = NULL,
                  etastart = NULL, mustart = NULL, fixef, fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10,
                  glm.iter = 25, glm.tol = 1e-8, nthreads = getFixest_nthreads(), lean = FALSE,
                  warn = TRUE, notes = getFixest_notes(), verbose = 0, combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
@@ -1859,7 +1954,7 @@ feglm = function(fml, data, family = "poisson", offset, weights, subset, split, 
 
 
 #' @rdname feglm
-feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit, cluster, se, dof, weights, subset, start = NULL,
+feglm.fit = function(y, X, fixef_df, family = "gaussian", offset, split, fsplit, cluster, se, dof, weights, subset, start = NULL,
                      etastart = NULL, mustart = NULL, fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000,
                      collin.tol = 1e-10, glm.iter = 25, glm.tol = 1e-8, nthreads = getFixest_nthreads(), lean = FALSE, warn = TRUE,
                      notes = getFixest_notes(), mem.clean = FALSE, verbose = 0, only.env = FALSE, env, ...){
@@ -1880,7 +1975,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         # main variables
         if(missing(y)) y = get("lhs", env)
         if(missing(X)) X = get("linear.mat", env)
-        if(!missing(fixef_mat) && is.null(fixef_mat)){
+        if(!missing(fixef_df) && is.null(fixef_df)){
             assign("isFixef", FALSE, env)
         }
 
@@ -1920,7 +2015,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         set_defaults("fixest_estimation")
         call_env = new.env(parent = parent.frame())
 
-        env = try(fixest_env(y = y, X = X, fixef_mat = fixef_mat, family = family, nthreads = nthreads, lean = lean, offset = offset, weights = weights, subset = subset, split = split, fsplit = fsplit, cluster = cluster, se = se, dof = dof, linear.start = start, etastart=etastart, mustart=mustart, fixef.rm = fixef.rm, fixef.tol = fixef.tol, fixef.iter = fixef.iter, collin.tol = collin.tol, glm.iter = glm.iter, glm.tol = glm.tol, notes=notes, mem.clean = mem.clean, warn=warn, verbose = verbose, origin = "feglm.fit", mc_origin = match.call(), call_env = call_env, ...), silent = TRUE)
+        env = try(fixest_env(y = y, X = X, fixef_df = fixef_df, family = family, nthreads = nthreads, lean = lean, offset = offset, weights = weights, subset = subset, split = split, fsplit = fsplit, cluster = cluster, se = se, dof = dof, linear.start = start, etastart=etastart, mustart=mustart, fixef.rm = fixef.rm, fixef.tol = fixef.tol, fixef.iter = fixef.iter, collin.tol = collin.tol, glm.iter = glm.iter, glm.tol = glm.tol, notes=notes, mem.clean = mem.clean, warn=warn, verbose = verbose, origin = "feglm.fit", mc_origin = match.call(), call_env = call_env, ...), silent = TRUE)
 
         if("try-error" %in% class(env)){
             stop(format_error_msg(env, "feglm.fit"))
@@ -1997,7 +2092,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
     nthreads = get("nthreads", env)
     isWeight = length(weights) > 1
     isOffset = length(offset) > 1
-    nobs <- length(y)
+    nobs = length(y)
     onlyFixef = length(X) == 1
 
     # the preformatted results
@@ -2197,7 +2292,8 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         # STEP HALVING
         #
 
-        if(!is.finite(dev) || dev_evol > 0 || !valideta(eta) || !validmu(mu)){
+        no_SH = is.finite(dev) && (abs(dev_evol) < glm.tol || abs(dev_evol)/(0.1 + abs(dev)) < glm.tol)
+        if(no_SH == FALSE && (!is.finite(dev) || dev_evol > 0 || !valideta(eta) || !validmu(mu))){
 
             if(!is.finite(dev)){
                 # we report step-halving but only for non-finite deviances
@@ -2314,6 +2410,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         collin.adj = sum(wols$is_excluded)
     }
 
+    res$nparams = res$nparams - collin.adj
 
     res$irls_weights = w # weights from the iteratively reweighted least square
 
@@ -2341,7 +2438,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         weighted_resids = wols$residuals * res$irls_weights
         # res$dispersion = sum(weighted_resids ** 2) / sum(res$irls_weights)
         # I use the second line to fit GLM's
-        res$dispersion = sum(weighted_resids * wols$residuals) / (res$nobs - res$nparams)
+        res$dispersion = sum(weighted_resids * wols$residuals) / max(res$nobs - res$nparams, 1)
     }
 
     res$working_residuals = wols$residuals
@@ -2386,19 +2483,19 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         se = sqrt(se)
 
         # coeftable
-        zvalue <- coef/se
+        zvalue = coef/se
         use_t = !family$family %in% c("poisson", "binomial")
         if(use_t){
-            pvalue <- 2*pt(-abs(zvalue), max(res$nobs - res$nparams, 1))
+            pvalue = 2*pt(-abs(zvalue), max(res$nobs - res$nparams, 1))
             ctable_names = c("Estimate", "Std. Error", "t value",  "Pr(>|t|)")
         } else {
-            pvalue <- 2*pnorm(-abs(zvalue))
+            pvalue = 2*pnorm(-abs(zvalue))
             ctable_names = c("Estimate", "Std. Error", "z value",  "Pr(>|z|)")
         }
 
-        coeftable <- data.frame("Estimate"=coef, "Std. Error"=se, "z value"=zvalue, "Pr(>|z|)"=pvalue)
-        names(coeftable) <- ctable_names
-        row.names(coeftable) <- names(coef)
+        coeftable = data.frame("Estimate"=coef, "Std. Error"=se, "z value"=zvalue, "Pr(>|z|)"=pvalue)
+        names(coeftable) = ctable_names
+        row.names(coeftable) = names(coef)
 
         attr(se, "type") = attr(coeftable, "type") = "Standard"
         res$coeftable = coeftable
@@ -2415,7 +2512,6 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
     n = length(y)
     res$nobs = n
 
-    res$nparams = res$nparams - collin.adj
     df_k = res$nparams
 
     # r2s
@@ -2464,7 +2560,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
             gc()
         }
 
-        model_null = feglm.fit(X = matrix(1, nrow = n, ncol = 1), fixef_mat = NULL, env = env, lean_internal = TRUE)
+        model_null = feglm.fit(X = matrix(1, nrow = n, ncol = 1), fixef_df = NULL, env = env, lean_internal = TRUE)
         ll_null = model_null$loglik
         fitted_null = model_null$fitted.values
     }
@@ -2496,12 +2592,13 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
         cluster = get("cluster", env)
         lean = get("lean", env)
         dof = get("dof", env)
+        agg = get("agg", env)
         summary_flags = get("summary_flags", env)
 
         # To compute the RMSE and lean = TRUE
         if(lean) res$ssr = cpp_ssq(res$residuals, weights)
 
-        res = summary(res, se = se, cluster = cluster, dof = dof, lean = lean, summary_flags = summary_flags)
+        res = summary(res, se = se, cluster = cluster, agg = agg, dof = dof, lean = lean, summary_flags = summary_flags)
     }
 
     return(res)
@@ -2540,7 +2637,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
 #' \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
 #' \item{convStatus}{Logical, convergence status.}
 #' \item{message}{The convergence message from the optimization procedures.}
-#' \item{obsRemoved}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
+#' \item{obs_selection}{(When relevant.) List containing vectors of integers. It represents the sequential selection of observation vis a vis the original data set.}
 #' \item{fixef_removed}{(When relevant.) In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 #' \item{coefficients}{The named vector of estimated coefficients.}
 #' \item{coeftable}{The table of the coefficients with their standard errors, z-values and p-values.}
@@ -2641,7 +2738,7 @@ feglm.fit = function(y, X, fixef_mat, family = "poisson", offset, split, fsplit,
 #'
 #'
 #'
-femlm <- function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), start = 0, fixef, fixef.rm = "perfect",
+femlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"), start = 0, fixef, fixef.rm = "perfect",
 						offset, subset, split, fsplit, cluster, se, dof, panel.id, fixef.tol = 1e-5, fixef.iter = 10000,
 						nthreads = getFixest_nthreads(), lean = FALSE, verbose = 0, warn = TRUE,
 						notes = getFixest_notes(), theta.init, combine.quick, mem.clean = FALSE, only.env = FALSE, env, ...){
@@ -2806,7 +2903,7 @@ fepois = function(fml, data, offset, weights, subset, split, fsplit, cluster, se
 #' \item{fixef_vars}{The names of each fixed-effect dimension.}
 #' \item{fixef_id}{The list (of length the number of fixed-effects) of the fixed-effects identifiers for each observation.}
 #' \item{fixef_sizes}{The size of each fixed-effect (i.e. the number of unique identifierfor each fixed-effect dimension).}
-#' \item{obsRemoved}{In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the row numbers of the observations that were removed. Also reports the NA observations that were removed.}
+#' \item{obs_selection}{(When relevant.) List containing vectors of integers. It represents the sequential selection of observation vis a vis the original data set.}
 #' \item{fixef_removed}{In the case there were fixed-effects and some observations were removed because of only 0/1 outcome within a fixed-effect, it gives the list (for each fixed-effect dimension) of the fixed-effect identifiers that were removed.}
 #' \item{theta}{In the case of a negative binomial estimation: the overdispersion parameter.}
 #'
@@ -3010,7 +3107,7 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 	# Maximizing the likelihood
 	#
 
-	opt <- try(stats::nlminb(start=start, objective=femlm_ll, env=env, lower=lower, upper=upper, gradient=gradient, hessian=hessian, control=opt.control), silent = TRUE)
+	opt = try(stats::nlminb(start=start, objective=femlm_ll, env=env, lower=lower, upper=upper, gradient=gradient, hessian=hessian, control=opt.control), silent = TRUE)
 
 	if("try-error" %in% class(opt)){
 		# We return the coefficients (can be interesting for debugging)
@@ -3034,7 +3131,7 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 			convStatus = FALSE
 		}
 
-		coef <- opt$par
+		coef = opt$par
 	}
 
 
@@ -3088,10 +3185,10 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 
 	# Variance
 
-	var <- NULL
+	var = NULL
 	try(var <- solve(hessian_noBounded), silent = TRUE)
 	if(is.null(var)){
-		warning_msg = paste(warning_msg, "The information matrix is singular: presence of collinearity. Use function collinearity() to pinpoint the problems.")
+		warning_msg = paste(warning_msg, "The information matrix is singular: presence of collinearity.")
 		var = hessian_noBounded * NA
 		se = diag(var)
 	} else {
@@ -3114,8 +3211,8 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 		names(se) = params
 	}
 
-	zvalue <- coef/se
-	pvalue <- 2*pnorm(-abs(zvalue))
+	zvalue = coef/se
+	pvalue = 2*pnorm(-abs(zvalue))
 
 	# We add the information on the bound for the se & update the var to drop the bounded vars
 	se_format = se
@@ -3124,9 +3221,9 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 		se_format[isBounded] = boundText
 	}
 
-	coeftable <- data.frame("Estimate"=coef, "Std. Error"=se_format, "z value"=zvalue, "Pr(>|z|)"=pvalue, stringsAsFactors = FALSE)
-	names(coeftable) <- c("Estimate", "Std. Error", "z value",  "Pr(>|z|)")
-	row.names(coeftable) <- params
+	coeftable = data.frame("Estimate"=coef, "Std. Error"=se_format, "z value"=zvalue, "Pr(>|z|)"=pvalue, stringsAsFactors = FALSE)
+	names(coeftable) = c("Estimate", "Std. Error", "z value",  "Pr(>|z|)")
+	row.names(coeftable) = params
 
 	attr(se, "type") = attr(coeftable, "type") = "Standard"
 
@@ -3135,13 +3232,13 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 	exp_mu = mu_both$exp_mu
 
 	# calcul pseudo r2
-	loglik <- -opt$objective # moins car la fonction minimise
-	ll_null <- model0$loglik
+	loglik = -opt$objective # moins car la fonction minimise
+	ll_null = model0$loglik
 
 	# dummies are constrained, they don't have full dof (cause you need to take one value off for unicity)
 	# this is an approximation, in some cases there can be more than one ref. But good approx.
 	nparams = res$nparams
-	pseudo_r2 <- 1 - (loglik - nparams + 1) / ll_null
+	pseudo_r2 = 1 - (loglik - nparams + 1) / ll_null
 
 	# Calcul residus
 	expected.predictor = famFuns$expected.predictor(mu, exp_mu, env)
@@ -3270,7 +3367,7 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 
 	}
 
-	class(res) <- "fixest"
+	class(res) = "fixest"
 
 	if(verbose > 0){
 		cat("\n")
@@ -3282,12 +3379,13 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 	    cluster = get("cluster", env)
 	    lean = get("lean", env)
 	    dof = get("dof", env)
+	    agg = get("agg", env)
 	    summary_flags = get("summary_flags", env)
 
 	    # To compute the RMSE and lean = TRUE
 	    if(lean) res$ssr = cpp_ssq(res$residuals)
 
-	    res = summary(res, se = se, cluster = cluster, dof = dof, lean = lean, summary_flags = summary_flags)
+	    res = summary(res, se = se, cluster = cluster, dof = dof, agg = agg, lean = lean, summary_flags = summary_flags)
 	}
 
 	return(res)
@@ -3562,17 +3660,17 @@ multi_fixef = function(env, estfun){
             fixef_terms = fixef_terms_full$fml_terms
 
             # FEs
-            fixef_mat = error_sender(prepare_df(fixef_terms_full$fe_vars, data, combine.quick),
+            fixef_df = error_sender(prepare_df(fixef_terms_full$fe_vars, data, combine.quick),
                                      "Problem evaluating the fixed-effects part of the formula:\n")
 
-            fixef_vars = names(fixef_mat)
+            fixef_vars = names(fixef_df)
 
             # Slopes
             isSlope = any(fixef_terms_full$slope_flag != 0)
             slope_vars_list = list(0)
             if(isSlope){
 
-                slope_mat = error_sender(prepare_df(fixef_terms_full$slope_vars, data),
+                slope_df = error_sender(prepare_df(fixef_terms_full$slope_vars, data),
                                          "Problem evaluating the variables with varying slopes in the fixed-effects part of the formula:\n")
 
                 slope_flag = fixef_terms_full$slope_flag
@@ -3580,9 +3678,9 @@ multi_fixef = function(env, estfun){
                 slope_vars_list = fixef_terms_full$slope_vars_list
 
                 # Further controls
-                not_numeric = !sapply(slope_mat, is.numeric)
+                not_numeric = !sapply(slope_df, is.numeric)
                 if(any(not_numeric)){
-                    stop("In the fixed-effects part of the formula (i.e. in ", as.character(fml_fixef[2]), "), variables with varying slopes must be numeric. Currently variable", enumerate_items(names(slope_mat)[not_numeric], "s.is.quote"), " not.")
+                    stop("In the fixed-effects part of the formula (i.e. in ", as.character(fml_fixef[2]), "), variables with varying slopes must be numeric. Currently variable", enumerate_items(names(slope_df)[not_numeric], "s.is.quote"), " not.")
                 }
 
                 # slope_flag: 0: no Varying slope // > 0: varying slope AND fixed-effect // < 0: varying slope WITHOUT fixed-effect
@@ -3597,22 +3695,22 @@ multi_fixef = function(env, estfun){
             # NA
             #
 
-            for(j in seq_along(fixef_mat)){
-                if(!is.numeric(fixef_mat[[j]]) && !is.character(fixef_mat[[j]])){
-                    fixef_mat[[j]] = as.character(fixef_mat[[j]])
+            for(j in seq_along(fixef_df)){
+                if(!is.numeric(fixef_df[[j]]) && !is.character(fixef_df[[j]])){
+                    fixef_df[[j]] = as.character(fixef_df[[j]])
                 }
             }
 
-            is_NA = !complete.cases(fixef_mat)
+            is_NA = !complete.cases(fixef_df)
 
             if(isSlope){
                 # Convert to double
-                who_not_double = which(sapply(slope_mat, is.integer))
-                for(i in who_not_double){
-                    slope_mat[[i]] = as.numeric(slope_mat[[i]])
+                who_not_double = which(sapply(slope_df, is.integer))
+                for(j in who_not_double){
+                    slope_df[[j]] = as.numeric(slope_df[[j]])
                 }
 
-                info = cpppar_which_na_inf_df(slope_mat, nthreads)
+                info = cpppar_which_na_inf_df(slope_df, nthreads)
                 if(info$any_na_inf){
                     is_NA = is_NA | info$is_na_inf
                 }
@@ -3623,10 +3721,10 @@ multi_fixef = function(env, estfun){
                 my_env = reshape_env(env = env, obs2keep = which(!is_NA))
 
                 # NA removal in fixef
-                fixef_mat = fixef_mat[!is_NA, , drop = FALSE]
+                fixef_df = fixef_df[!is_NA, , drop = FALSE]
 
                 if(isSlope){
-                    slope_mat = slope_mat[!is_NA, , drop = FALSE]
+                    slope_df = slope_df[!is_NA, , drop = FALSE]
                 }
             } else {
                 my_env = new.env(parent = env)
@@ -3663,7 +3761,7 @@ multi_fixef = function(env, estfun){
 
             # We delay the computation by using isSplit = TRUE and split.full = FALSE
             # Real QUF will be done in the last reshape env
-            info_fe = setup_fixef(fixef_mat = fixef_mat, lhs = lhs, fixef_vars = fixef_vars, fixef.rm = fixef.rm, family = family, isSplit = TRUE, split.full = FALSE, origin_type = origin_type, isSlope = isSlope, slope_flag = slope_flag, slope_mat = slope_mat, slope_vars_list = slope_vars_list, nthreads = nthreads)
+            info_fe = setup_fixef(fixef_df = fixef_df, lhs = lhs, fixef_vars = fixef_vars, fixef.rm = fixef.rm, family = family, isSplit = TRUE, split.full = FALSE, origin_type = origin_type, isSlope = isSlope, slope_flag = slope_flag, slope_df = slope_df, slope_vars_list = slope_vars_list, nthreads = nthreads)
 
             fixef_id        = info_fe$fixef_id
             fixef_names     = info_fe$fixef_names
@@ -3698,6 +3796,9 @@ multi_fixef = function(env, estfun){
             res = get("res", my_env)
             res$fml_all$fixef = fml_fixef
             res$fixef_vars = fixef_vars
+            if(isSlope){
+                res$fixef_terms = fixef_terms
+            }
             assign("res", res, my_env)
 
             #
@@ -3707,7 +3808,7 @@ multi_fixef = function(env, estfun){
             my_env_est = reshape_env(my_env, assign_fixef = TRUE)
 
         } else {
-            # No fixed-effect // new.env is indispensible => otherwise multi RHS/LHS not possible
+            # No fixed-effect // new.env is indispensable => otherwise multi RHS/LHS not possible
             my_env_est = reshape_env(env)
         }
 

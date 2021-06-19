@@ -6,28 +6,30 @@ useDynLib(fixest, .registration = TRUE)
 
 # main funs
 export(feNmlm, femlm, feols, feglm, fepois, fenegbin)
-export(feglm.fit)
+export(feglm.fit, feols.fit)
 # etable
 export(etable, style.tex, style.df)
+export(extraline_register)
 # misc funs
 export(collinearity)
 export(r2, fitstat, fitstat_register, wald)
+export(fixest_startup_msg)
 # did
 export(did_means)
 # graph
-export(coefplot)
+export(coefplot, iplot)
 # small funs
 export(coeftable, ctable, se, tstat, pvalue)
 # dof
-export(dof)
+export(dof, degrees_freedom)
 # Lag related
 export(panel, unpanel, f, l, d)
 # interactions
-export(i, interact)
+export(i)
 # macro
 export(xpd)
 # utilities
-export(to_integer, demean)
+export(to_integer, demean, obs)
 # setters & getters
 exportPattern("^(s|g)etFixest")
 
@@ -42,7 +44,6 @@ S3method(summary, fixest.fixef)
 S3method(summary, fixest)
 S3method(summary, fixest_list)
 S3method(aggregate, fixest)
-export(summ) # alias for summary.fixest
 S3method(plot, fixest.fixef)
 S3method("[", fixest_panel) # Lag related
 # fixest_multi
@@ -82,6 +83,12 @@ S3method(sigma, fixest)
 S3method(weights, fixest)
 S3method(hatvalues, fixest)
 
+# Stats methods => fixest_multi
+S3method(coef, fixest_multi)
+S3method(coefficients, fixest_multi)
+S3method(resid, fixest_multi)
+S3method(residuals, fixest_multi)
+
 # nlme method
 S3method(fixef, fixest)
 
@@ -112,9 +119,9 @@ importFrom(stats, model.matrix, sigma, deviance, weights, terms,
              nobs, AIC, BIC, update, predict, fitted, fitted.values,
 			  resid, residuals, logLik, coef, coefficients, lag,
 			  confint, vcov, binomial, setNames, complete.cases, pchisq, pf,
-			  aggregate)
+			  aggregate, cancor, rnorm)
 
-importFrom(utils, combn, head, tail)
+importFrom(utils, combn, head, tail, packageVersion)
 
 importFrom(Rcpp, evalCpp)
 
@@ -125,5 +132,6 @@ importFrom(graphics, par, plot, box, axis, abline, points, text, title,
 importFrom(grDevices, rgb, col2rgb)
 
 importFrom(methods, formalArgs)
+
 
 
