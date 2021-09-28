@@ -145,8 +145,8 @@ for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
                 }
 
                 test(coef(res)["x1"], coef(res_bis)["x1"], "~", tol)
-                test(se(res, se = "st", dof = dof(adj = adj))["x1"], se(res_bis)["x1"], "~", tol)
-                test(pvalue(res, se = "st", dof = dof(adj = adj))["x1"], pvalue(res_bis)["x1"], "~", tol*10**(model == "negbin"))
+                test(se(res, se = "st", ssc = ssc(adj = adj))["x1"], se(res_bis)["x1"], "~", tol)
+                test(pvalue(res, se = "st", ssc = ssc(adj = adj))["x1"], pvalue(res_bis)["x1"], "~", tol*10**(model == "negbin"))
                 # cat("Model: ", model, ", FE: ", id_fe, ", weight: ", use_weights,  ", offset: ", use_offset, "\n", sep="")
 
             }
@@ -291,26 +291,26 @@ est = feols(y ~ x | fe1 + fe2, base)
 
 # Default: fixef.K = "nested"
 #  => adjustment K = 1 + 5 (i.e. x + fe2)
-test(attr(vcov(est, dof = dof(fixef.K = "nested"), attr = TRUE), "dof.K"), 6)
+test(attr(vcov(est, ssc = ssc(fixef.K = "nested"), attr = TRUE), "dof.K"), 6)
 
 # fixef.K = FALSE
 #  => adjustment K = 1 (i.e. only x)
-test(attr(vcov(est, dof = dof(fixef.K = "none"), attr = TRUE), "dof.K"), 1)
+test(attr(vcov(est, ssc = ssc(fixef.K = "none"), attr = TRUE), "dof.K"), 1)
 
 # fixef.K = TRUE
 #  => adjustment K = 1 + 3 + 5 - 1 (i.e. x + fe1 + fe2 - 1 restriction)
-test(attr(vcov(est, dof = dof(fixef.K = "full"), attr = TRUE), "dof.K"), 8)
+test(attr(vcov(est, ssc = ssc(fixef.K = "full"), attr = TRUE), "dof.K"), 8)
 
 # fixef.K = TRUE & fixef.exact = TRUE
 #  => adjustment K = 1 + 3 + 5 - 2 (i.e. x + fe1 + fe2 - 2 restrictions)
-test(attr(vcov(est, dof = dof(fixef.K = "full", fixef.force_exact = TRUE), attr = TRUE), "dof.K"), 7)
+test(attr(vcov(est, ssc = ssc(fixef.K = "full", fixef.force_exact = TRUE), attr = TRUE), "dof.K"), 7)
 
 #
 # Manual checks of the SEs
 #
 
 n = est$nobs
-VCOV_raw = est$cov.unscaled / ((n - 1) / (n - est$nparams))
+VCOV_raw = est$cov.iid / ((n - 1) / (n - est$nparams))
 
 # standard
 for(k_val in c("none", "nested", "full")){
@@ -319,49 +319,51 @@ for(k_val in c("none", "nested", "full")){
         K = switch(k_val, none = 1, nested = 8, full = 8)
         my_adj = ifelse(adj, (n - 1) / (n - K), 1)
 
-        test(vcov(est, se = "standard", dof = dof(adj = adj, fixef.K = k_val)), VCOV_raw * my_adj)
+        test(vcov(est, se = "standard", ssc = ssc(adj = adj, fixef.K = k_val)), VCOV_raw * my_adj)
 
         # cat("adj = ", adj, " ; fixef.K = ", k_val, "\n", sep = "")
     }
 }
 
 # Clustered, fe1
-VCOV_raw = est$cov.unscaled / est$sigma2
-H = vcovClust(est$fixef_id$fe1, VCOV_raw, scores = est$scores, dof = FALSE)
+VCOV_raw = est$cov.iid / est$sigma2
+H = vcovClust(est$fixef_id$fe1, VCOV_raw, scores = est$scores, adj = FALSE)
+n = nobs(est)
 
 for(tdf in c("conventional", "min")){
     for(k_val in c("none", "nested", "full")){
         for(c_adj in c(FALSE, TRUE)){
-            for(adj in c(FALSE, TRUE))
+            for(adj in c(FALSE, TRUE)){
 
                 K = switch(k_val, none = 1, nested = 6, full = 8)
-            cluster_factor = ifelse(c_adj, 3/2, 1)
-            df = ifelse(tdf == "min", 2, 20 - 8)
-            my_adj = ifelse(adj, (n - 1) / (n - K), 1)
+                cluster_factor = ifelse(c_adj, 3/2, 1)
+                df = ifelse(tdf == "min", 2, 20 - K)
+                my_adj = ifelse(adj, (n - 1) / (n - K), 1)
 
-            V = H * cluster_factor
+                V = H * cluster_factor
 
-            # test SE
-            test(vcov(est, se = "cluster", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj)), V * my_adj)
+                # test SE
+                test(vcov(est, se = "cluster", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj)), V * my_adj)
 
-            # test pvalue
-            my_tstat = tstat(est, se = "cluster", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj))
-            test(pvalue(est, se = "cluster", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj, t.df = tdf)), 2*pt(-abs(my_tstat), df))
+                # test pvalue
+                my_tstat = tstat(est, se = "cluster", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj))
+                test(pvalue(est, se = "cluster", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj, t.df = tdf)), 2*pt(-abs(my_tstat), df))
 
-            # cat("adj = ", adj, " ; fixef.K = ", k_val, " ; cluster.adj = ", c_adj, " t.df = ", tdf, "\n", sep = "")
+                # cat("adj = ", adj, " ; fixef.K = ", k_val, " ; cluster.adj = ", c_adj, " t.df = ", tdf, "\n", sep = "")
+            }
         }
     }
 }
 
 
 # 2-way Clustered, fe1 fe2
-VCOV_raw = est$cov.unscaled / est$sigma2
-M_i  = vcovClust(est$fixef_id$fe1, VCOV_raw, scores = est$scores, dof = FALSE)
-M_t  = vcovClust(est$fixef_id$fe2, VCOV_raw, scores = est$scores, dof = FALSE)
-M_it = vcovClust(paste(base$fe1, base$fe2), VCOV_raw, scores = est$scores, dof = FALSE, do.unclass = TRUE)
+VCOV_raw = est$cov.iid / est$sigma2
+M_i  = vcovClust(est$fixef_id$fe1, VCOV_raw, scores = est$scores, adj = FALSE)
+M_t  = vcovClust(est$fixef_id$fe2, VCOV_raw, scores = est$scores, adj = FALSE)
+M_it = vcovClust(paste(base$fe1, base$fe2), VCOV_raw, scores = est$scores, adj = FALSE, do.unclass = TRUE)
 
 M_i + M_t - M_it
-vcov(est, se = "two", dof = dof(adj = FALSE, cluster.adj = FALSE))
+vcov(est, se = "two", ssc = ssc(adj = FALSE, cluster.adj = FALSE))
 
 for(cdf in c("conventional", "min")){
     for(tdf in c("conventional", "min")){
@@ -381,16 +383,16 @@ for(cdf in c("conventional", "min")){
                         V = M_i + M_t - M_it
                     }
 
-                    df = ifelse(tdf == "min", 2, 20 - 8)
+                    df = ifelse(tdf == "min", 2, 20 - K)
                     my_adj = ifelse(adj, (n - 1) / (n - K), 1)
 
                     # test SE
-                    test(vcov(est, se = "two", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf)),
+                    test(vcov(est, se = "two", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf)),
                          V * my_adj)
 
                     # test pvalue
-                    my_tstat = tstat(est, se = "two", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf))
-                    test(pvalue(est, se = "two", dof = dof(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf, t.df = tdf)),
+                    my_tstat = tstat(est, se = "two", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf))
+                    test(pvalue(est, se = "two", ssc = ssc(adj = adj, fixef.K = k_val, cluster.adj = c_adj, cluster.df = cdf, t.df = tdf)),
                          2*pt(-abs(my_tstat), df))
 
                     # cat("adj = ", adj, " ; fixef.K = ", k_val, " ; cluster.adj = ", c_adj, " t.df = ", tdf, "\n", sep = "")
@@ -409,8 +411,8 @@ library(sandwich)
 
 # Data generation
 set.seed(0)
-N <- 20; G <- N/5; T <- N/G
-d <- data.frame( y=rnorm(N), x=rnorm(N), grp=rep(1:G,T), tm=rep(1:T,each=G) )
+N = 20; G = N/5; T = N/G
+d = data.frame( y=rnorm(N), x=rnorm(N), grp=rep(1:G,T), tm=rep(1:T,each=G) )
 
 # Estimations
 est_lm    = lm(y ~ x + as.factor(grp) + as.factor(tm), data=d)
@@ -429,14 +431,10 @@ test(se(est_feols, se = "st")["x"], se(est_lm)["x"])
 # Clustered by grp
 se_CL_grp_lm_HC1 = sqrt(vcovCL(est_lm, cluster = d$grp, type = "HC1")["x", "x"])
 se_CL_grp_lm_HC0 = sqrt(vcovCL(est_lm, cluster = d$grp, type = "HC0")["x", "x"])
-se_CL_grp_stata  = 0.165385 # vce(cluster grp)
 
 # How to get the lm
-test(se(est_feols, dof = dof(fixef.K = "full")), se_CL_grp_lm_HC1)
-test(se(est_feols, dof = dof(adj = FALSE, fixef.K = "full")), se_CL_grp_lm_HC0)
-
-# How to get the Stata
-test(se(est_feols), se_CL_grp_stata, "~")
+test(se(est_feols, ssc = ssc(fixef.K = "full")), se_CL_grp_lm_HC1)
+test(se(est_feols, ssc = ssc(adj = FALSE, fixef.K = "full")), se_CL_grp_lm_HC0)
 
 #
 # Heteroskedasticity-robust
@@ -446,7 +444,7 @@ se_white_lm_HC1 = sqrt(vcovHC(est_lm, type = "HC1")["x", "x"])
 se_white_lm_HC0 = sqrt(vcovHC(est_lm, type = "HC0")["x", "x"])
 
 test(se(est_feols, se = "hetero"), se_white_lm_HC1)
-test(se(est_feols, se = "hetero", dof = dof(adj = FALSE, cluster.adj = FALSE)), se_white_lm_HC0)
+test(se(est_feols, se = "hetero", ssc = ssc(adj = FALSE, cluster.adj = FALSE)), se_white_lm_HC0)
 
 #
 # Two way
@@ -456,7 +454,7 @@ test(se(est_feols, se = "hetero", dof = dof(adj = FALSE, cluster.adj = FALSE)), 
 se_CL_2w_lm    = sqrt(vcovCL(est_lm, cluster = ~ grp + tm, type = "HC1")["x", "x"])
 se_CL_2w_feols = se(est_feols, se = "twoway")
 
-test(se(est_feols, se = "twoway", dof = dof(fixef.K = "full", cluster.df = "conv")), se_CL_2w_lm)
+test(se(est_feols, se = "twoway", ssc = ssc(fixef.K = "full", cluster.df = "conv")), se_CL_2w_lm)
 
 #
 # Checking the calls work properly
@@ -541,10 +539,111 @@ test(se(est_pois, cluster = ~Origin_na^Destination), "err")
 
 test(se(est_pois, se = "cluster", cluster = ~Origin_na^not_there), "err")
 
-test(se(est_pois, se = "twoway", cluster = c("Origin^Destination", "Product", "error")), "err")
-test(se(est_pois, se = "twoway", cluster = base[, 1:4]), "err")
-test(se(est_pois, se = "twoway", cluster = ~Origin+Destination+Product), "err")
-test(se(est_pois, se = "fourway", cluster = ~Origin+Destination+Product), "err")
+#
+# Checking that the aliases work fine
+#
+
+se_hetero = se(est_pois, se = "hetero")
+se_hc1    = se(est_pois, se = "hc1")
+se_white  = se(est_pois, se = "white")
+
+test(se_hetero, se_hc1)
+test(se_hetero, se_white)
+
+#
+# New argument vcov
+#
+
+# We mostly check the absence of errors
+data(base_did)
+
+est_panel = feols(y ~ x1, base_did, panel.id = ~id + period, subset = 1:500)
+
+se_est = se(est_panel)
+test(se(est_panel, ~id), se_est)
+
+# changing ssc argument
+test(se(est_panel, ssc = ssc(adj = FALSE)), se(est_panel, ~id + ssc(adj = FALSE)))
+
+# using vcov_cluster
+test(se_est, se(est_panel, vcov_cluster("id")))
+test(se_est, se(vcov_cluster(est_panel, "id")))
+
+# NW
+se_NW = se(est_panel, "NW")
+test(se_NW, se(est_panel, NW ~ id + period))
+test(se_NW, se(est_panel, newey ~ id + period))
+test(se_NW, se(est_panel, vcov_NW("id", "period")))
+test(se_NW, se(est_panel, vcov_NW(time = "period"))) # here unit is deduced
+
+se_NW2 = se(est_panel, NW(2))
+test(se_NW2, se(est_panel, NW(2) ~ id + period))
+test(se_NW2, se(est_panel, vcov_NW(lag = 2)))
+
+# errors
+est = feols(y ~ x1, base_did)
+test(se(est, NW ~ period), "err")
+
+# DK
+se_DK = se(est_panel, "DK")
+test(se_DK, se(est_panel, DK ~ period))
+test(se_DK, se(est_panel, dris ~ period))
+test(se_DK, se(est_panel, vcov_DK("period")))
+
+se_DK2 = se(est_panel, DK(2))
+test(se_DK2, se(est_panel, DK(2) ~ period))
+test(se_DK2, se(est_panel, vcov_DK(lag = 2)))
+
+
+# Conley
+data(quakes)
+
+est = feols(depth ~ mag, quakes, "conley")
+
+se_conley = se(est)
+test(se_conley, se(est, conley(90) ~ 1))
+test(se_conley, se(est, conley(90) ~ lat + long))
+
+se_conley200 = se(est, conley(200) ~ lat + long)
+test(se_conley200, se(est, vcov_conley(cutoff = 200)))
+test(se_conley200, se(est, vcov_conley("lat", "long", cutoff = 200)))
+
+se_conleyExtra = se(est, conley(pixel = 20, distance = "spherical"))
+test(se_conleyExtra, se(vcov_conley(est, pixel = 20, distance = "spherical")))
+
+
+# Checking the value of Conley SEs with equivalences
+# we generate data that leads to simple values
+base = iris
+names(base) = c("y", "x1", "x2", "x3", "species")
+
+# scattered along 111km
+base$lat = rep(seq(-0.5, 0.5, length.out = 50), 3)
+
+# scattered across very long distances
+base$lon = rep(c(0, 80, 160), each = 50)
+
+est = feols(y ~ x1, base)
+
+# Equivalence 1 -- clustered SEs
+se_clu = se(est, ~lon + ssc(adj = FALSE, cluster.adj = FALSE))
+test(se_clu, se(est, conley(200) ~ ssc(adj = FALSE)))
+
+# Equivalence 2 -- White SEs
+se_hc1 = se(est, hetero ~ ssc(adj = FALSE, cluster.adj = FALSE))
+test(se_hc1, se(est, conley(1) ~ ssc(adj = FALSE)))
+
+
+#
+# ssc with custom t.df values
+#
+
+est = feols(y ~ x1 + x2, base)
+
+m = summary(est, ssc = ssc(t.df = 5))
+
+test(m$coeftable[, 4], 2*pt(-abs(m$coeftable[, 3]), 5))
+
 
 ####
 #### Residuals ####
@@ -784,7 +883,7 @@ for(useWeights in c(FALSE, TRUE)){
             }
 
             test(coef(res)["x1"], coef(res_bis)["x1"], "~")
-            test(se(res, se = "st", dof = dof(adj=adj))["x1"], se(res_bis)["x1"], "~")
+            test(se(res, se = "st", ssc = ssc(adj=adj))["x1"], se(res_bis)["x1"], "~")
             # cat("Weight: ", useWeights, ", model: ", model, ", FE: ", use_fe, "\n", sep="")
 
         }
@@ -800,9 +899,8 @@ cat("\n")
 
 chunk("Interact")
 
-base = iris
-names(base) = c("y", "x1", "x2", "x3", "species")
-base$fe_2 = round(rnorm(150))
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+base$fe_2 = round(seq(-5, 5, length.out = 150))
 
 #
 # We just ensure it works without error
@@ -823,6 +921,22 @@ d = i(base$fe_2, keep = 0:1)
 test(ncol(a), ncol(b) + 2)
 test(ncol(d), 2)
 
+#
+# binning
+#
+
+m = feols(y ~ x1 + i(fe_2, bin = list("0" = -1:1)), base)
+test(length(coef(m)), 12 - 2)
+
+# SA
+data(base_stagg)
+res_sunab = feols(y ~ x1 + sunab(year_treated, year, bin = "bin::2"), base_stagg)
+iplot(res_sunab)
+test(length(coef(res_sunab)), 15)
+
+res_sunab = feols(y ~ x1 + sunab(year_treated, year, bin.rel = "bin::2"), base_stagg)
+iplot(res_sunab)
+test(length(coef(res_sunab)), 12)
 
 
 ####
@@ -927,11 +1041,11 @@ test(vcov(est_pois, cluster = ~id), vcovCL(est_pois, cluster = ~id, type = "HC1"
 
 est = feols(y ~ x1 + I(x1**2) | id, base_did)
 
-test(vcov(est, cluster = ~id, dof = dof(adj = FALSE)), vcovCL(est, cluster = ~id))
+test(vcov(est, cluster = ~id, ssc = ssc(adj = FALSE)), vcovCL(est, cluster = ~id))
 
 est_pois = fepois(as.integer(y) + 20 ~ x1 + I(x1**2) | id, base_did)
 
-test(vcov(est_pois, cluster = ~id, dof = dof(adj = FALSE)), vcovCL(est_pois, cluster = ~id))
+test(vcov(est_pois, cluster = ~id, ssc = ssc(adj = FALSE)), vcovCL(est_pois, cluster = ~id))
 
 
 
@@ -1127,6 +1241,42 @@ cat("done.\n\n")
 
 
 ####
+#### xpd ####
+####
+
+chunk("xpd")
+
+deparse_long = function(x) deparse(x, width.cutoff = 500)
+
+fml = xpd(y ~ x.[1:5] + z.[2:3])
+test(deparse_long(fml),
+     "y ~ x1 + x2 + x3 + x4 + x5 + z2 + z3")
+
+var = "a"
+fml = xpd(y ~ x.[var])
+test(deparse_long(fml),
+     "y ~ xa")
+
+vars = letters[1:5]
+fml = xpd(y ~ x.[vars] | fe1[[e, f]] + fe2[g])
+test(deparse_long(fml),
+     "y ~ xa + xb + xc + xd + xe | fe1[[e, f]] + fe2[g]")
+
+fml = xpd(y ~ ..x, ..x = "x.[vars]_sq")
+test(deparse_long(fml),
+     "y ~ xa_sq + xb_sq + xc_sq + xd_sq + xe_sq")
+
+# Now we check it works in estimations
+
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+
+i = 1:2
+fml = formula(feols(y ~ x.[i] | species[x3], base))
+test(deparse_long(fml),
+     "y ~ x1 + x2 | species + species[[x3]]")
+
+
+####
 #### predict ####
 ####
 
@@ -1151,7 +1301,7 @@ res = femlm(y ~ x1 | species + fe_bis, base)
 test(predict(res), predict(res, base))
 
 
-# Predict with varying slopes -- That's normal that precision is high (because FEs are computed with low precision)
+# Predict with varying slopes -- That's normal that tolerance is high (because FEs are computed with low precision)
 res = feols(y ~ x1 | species + fe_bis[x3], base)
 test(predict(res), predict(res, base), "~", tol = 1e-4)
 
@@ -1176,11 +1326,11 @@ test(head(predict(res)), predict(res, quoi))
 # prediction with lags
 data(base_did)
 res = feols(y ~ x1 + l(x1), base_did, panel.id = ~ id + period)
-test(predict(res, na.rm = FALSE), predict(res, base_did))
+test(predict(res, sample = "original"), predict(res, base_did))
 
 qui = sample(which(base_did$id %in% 1:5))
 base_bis = base_did[qui, ]
-test(predict(res, na.rm = FALSE)[qui], predict(res, base_bis))
+test(predict(res, sample = "original")[qui], predict(res, base_bis))
 
 # prediction with poly
 res_poly = feols(y ~ poly(x1, 2), base)
@@ -1189,6 +1339,57 @@ pred_head = predict(res_poly, head(base, 20))
 pred_tail = predict(res_poly, tail(base, 20))
 test(head(pred_all, 20), pred_head)
 test(tail(pred_all, 20), pred_tail)
+
+#
+# "Predicting" fixed-effects
+#
+
+
+res = feols(y ~ x1 | species^fe_bis[x2], base, combine.quick = FALSE)
+
+obs_fe = predict(res, fixef = TRUE)
+fe_coef_all = fixef(res, sorted = FALSE)
+
+coef_fe = fe_coef_all[[1]]
+coef_vs = fe_coef_all[[2]]
+
+fe_names = paste0(base$species, "_", base$fe_bis)
+
+test(coef_fe[fe_names], obs_fe[, 1])
+test(coef_vs[fe_names] * base$x2, obs_fe[, 2])
+
+# with coef only
+obs_fe_coef = predict(res, fixef = TRUE, vs.coef = TRUE)
+test(coef_vs[fe_names], obs_fe_coef[, 2])
+
+#
+# SE of prediction
+#
+
+a = lm(y ~ x1 + species, base)
+b = feols(y ~ x1 + species, base)
+
+test(predict(a, se.fit = TRUE)$se.fit, predict(b, se.fit = TRUE)$se.fit)
+
+test(predict(a, se.fit = TRUE, interval = "con")$fit[, 2],
+     predict(b, se.fit = TRUE, interval = "con")$ci_low)
+
+test(predict(a, se.fit = TRUE, interval = "pre")$fit[, 2],
+     predict(b, se.fit = TRUE, interval = "pre")$ci_low)
+
+# With weights
+base$my_w = seq(0.01, 1, length.out = 150)
+aw = lm(y ~ x1 + species, base, weights = base$my_w)
+bw = feols(y ~ x1 + species, base, weights = ~my_w)
+
+test(predict(aw, se.fit = TRUE)$se.fit, predict(bw, se.fit = TRUE)$se.fit)
+
+test(predict(aw, se.fit = TRUE, interval = "con")$fit[, 2],
+     predict(bw, se.fit = TRUE, interval = "con")$ci_low)
+
+test(predict(aw, se.fit = TRUE, interval = "pre")$fit[, 2],
+     predict(bw, se.fit = TRUE, interval = "pre")$ci_low)
+
 
 ####
 #### subset ####
@@ -1344,7 +1545,7 @@ base$x_endo_2 = 0.2 * base$y - 0.2 * base$x_inst_1 + rnorm(150, sd = 0.5)
 
 # Checking a basic estimation
 
-setFixest_se(all = "standard")
+setFixest_vcov(all = "iid")
 
 est_iv = feols(y ~ x1 | x_endo_1 + x_endo_2 ~ x_inst_1 + x_inst_2, base)
 
@@ -1363,7 +1564,7 @@ test(coef(est_iv), coef(res_2nd))
 resid_iv = base$y - predict(res_2nd, data.frame(x1 = base$x1, fit_x_endo_1 = base$x_endo_1, fit_x_endo_2 = base$x_endo_2))
 sigma2_iv = sum(resid_iv**2) / (res_2nd$nobs - res_2nd$nparams)
 
-sum_2nd = summary(res_2nd, .vcov = res_2nd$cov.unscaled / res_2nd$sigma2 * sigma2_iv)
+sum_2nd = summary(res_2nd, .vcov = res_2nd$cov.iid / res_2nd$sigma2 * sigma2_iv)
 
 # We only check that on Windows => avoids super odd bug in fedora devel
 # The worst is that I just can't debug it.... so that's the way it's done.
@@ -1375,7 +1576,7 @@ if(Sys.info()["sysname"] == "Windows"){
 # check no bug
 etable(summary(est_iv, stage = 1:2))
 
-setFixest_se(reset = TRUE)
+setFixest_vcov(reset = TRUE)
 
 
 ####
@@ -1439,6 +1640,40 @@ m_poly_old = model.matrix(res_poly)
 m_poly_new = model.matrix(res_poly, base_bis)
 test(m_poly_old[1:50, 3], m_poly_new[, 3])
 
+
+# fixef
+res = feols(y1 ~ x1 + x2 + x3 | species + fe2, base)
+m_fe = model.matrix(res, type = "fixef")
+test(ncol(m_fe), 2)
+
+# lhs
+m_lhs = model.matrix(res, type = "lhs", na.rm = FALSE)
+test(m_lhs, base$y1)
+
+# IV
+res_iv = feols(y1 ~ x1 | x2 ~ x3, base)
+
+m_rhs1 = model.matrix(res_iv, type = "iv.rhs1")
+test(colnames(m_rhs1)[-1], c("x3", "x1"))
+
+m_rhs2 = model.matrix(res_iv, type = "iv.rhs2")
+test(colnames(m_rhs2)[-1], c("fit_x2", "x1"))
+
+m_endo = model.matrix(res_iv, type = "iv.endo")
+test(colnames(m_endo), "x2")
+
+m_exo  = model.matrix(res_iv, type = "iv.exo")
+test(colnames(m_exo)[-1], "x1")
+
+m_inst  = model.matrix(res_iv, type = "iv.inst")
+test(colnames(m_inst), "x3")
+
+# several
+res_mult = feols(y1 ~ x1 | species | x2 ~ x3, base)
+
+m_lhs_rhs_fixef = model.matrix(res_mult, type = c("lhs", "iv.rhs2", "fixef"), na.rm = FALSE)
+test(names(m_lhs_rhs_fixef), c("y1", "fit_x2", "x1", "species"))
+
 ####
 #### VCOV at estimation ####
 ####
@@ -1450,7 +1685,7 @@ names(base) = c("y", "x1", "x2", "x3", "species")
 base$clu = sample(6, 150, TRUE)
 base$clu[1:5] = NA
 
-est = feols(y ~ x1 | species, base, cluster = ~clu, dof = dof(adj = FALSE))
+est = feols(y ~ x1 | species, base, cluster = ~clu, ssc = ssc(adj = FALSE))
 
 # The three should be identical
 v1 = est$cov.scaled
@@ -1460,16 +1695,16 @@ v1c = summary(est)$cov.scaled
 test(v1, v1b)
 test(v1, v1c)
 
-# Only dof change
-v2 = summary(est, dof = dof())$cov.scaled
-v2b = vcov(est, cluster = ~clu, dof = dof())
+# Only ssc change
+v2 = summary(est, ssc = ssc())$cov.scaled
+v2b = vcov(est, cluster = ~clu, ssc = ssc())
 
 test(v2, v2b)
 test(max(abs(v1 - v2)) == 0, FALSE)
 
 # SE change only
 v3 = summary(est, se = "hetero")$cov.scaled
-v3b = vcov(est, se = "hetero", dof = dof(adj = FALSE))
+v3b = vcov(est, se = "hetero", ssc = ssc(adj = FALSE))
 
 test(v3, v3b)
 test(max(abs(v1 - v3)) == 0, FALSE)
@@ -1478,6 +1713,9 @@ test(max(abs(v2 - v3)) == 0, FALSE)
 ####
 #### fitstat ####
 ####
+
+
+chunk("fitstat")
 
 base = iris
 names(base) = c("y", "x1", "x_endo_1", "x_inst_1", "fe")
@@ -1493,6 +1731,68 @@ fitstat(est_iv, ~ f + ivf + ivf2 + wald + ivwald + ivwald2 + wh + sargan + rmse 
 est_fe = feols(y ~ x1 | fe, base)
 
 fitstat(est_fe, ~ wf)
+
+
+
+####
+#### Argument sliding ####
+####
+
+chunk("argument sliding")
+
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+
+setFixest_estimation(data = base)
+
+raw = feols(y ~ x1 + x2, base, ~species)
+slided = feols(y ~ x1 + x2, ~species)
+
+test(coef(raw), coef(slided))
+
+# Error, with error msg relative to 'data'
+test(feols(y ~ x1 + x2, 1:5), "err")
+
+# should be another estimation
+other_est = feols(y ~ x1 + x2, head(base, 50))
+test(nobs(other_est), 50)
+
+setFixest_estimation(reset = TRUE)
+
+#
+# piping
+#
+
+if(getRversion() >= "4.1.0"){
+    # no vcov
+    p1 = feols(y ~ x1, base)
+    p2 = base |> feols(y ~ x1)
+    test(coef(p1), coef(p2))
+
+    # with vcov
+    p1_se = feols(y ~ x1, base, ~species)
+    p2_se = base |> feols(y ~ x1, ~species)
+    test(se(p1_se), se(p2_se))
+}
+
+
+
+####
+#### Offset ####
+####
+
+chunk("offset")
+
+# we test the different ways to set an offset
+
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+
+o1 = feols(y ~ x1 + offset(x2) + offset(x3^2 + 3), base)
+o2 = feols(y ~ x1, base, offset = ~x2 + x3^2 + 3)
+test(coef(o1), coef(o2))
+
+# error
+test(feols(y ~ x1 + offset(x2), base, offset = ~x3), "err")
+
 
 
 

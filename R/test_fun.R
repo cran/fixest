@@ -11,7 +11,7 @@ error_catcher = function(expr) tryCatch(expr, error = function(e) structure(cond
 test = function(x, y, type = "=", tol = 1e-6){
     mc = match.call()
     IS_Y = TRUE
-    if(missing(type) && is.character(y) && y %in% c("err", "=", "~")){
+    if(missing(type) && length(y) == 1 && is.character(y) && y %in% c("err", "=", "~")){
         IS_Y = FALSE
         type = y
     }
@@ -131,22 +131,41 @@ test = function(x, y, type = "=", tol = 1e-6){
 chunk = function(x) cat(toupper(x), "\n\n")
 
 
-run_test = function(chunk){
+run_test = function(chunk, from){
     test_code = readLines("tests/fixest_tests.R")[-(1:17)]
 
-    if(!missing(chunk)){
+    if(!missing(chunk) || !missing(from)){
+
         qui = which(grepl("^chunk\\(", test_code))
         all_chunks = test_code[qui]
         chunk_names = tolower(gsub(".+\\(\"|\".*", "", all_chunks))
-        check_value_plus(chunk, "multi match | integer vector no na", .choices = chunk_names)
-        if(is.numeric(chunk)){
-            if(any(chunk > length(qui))){
-                stop("There are maximum ", length(qui), " chunks.")
+        n_chunks = length(qui)
+
+        if(!missing(from)){
+            check_value_plus(from, "match | integer scalar no na", .choices = chunk_names)
+
+            if(is.numeric(from)){
+                if(any(from > n_chunks)){
+                    stop("There are maximum ", n_chunks, " chunks.")
+                }
+                chunk_select = from:n_chunks
+            } else {
+                chunk_select = which(chunk_names %in% from):n_chunks
             }
-            chunk_select = sort(unique(chunk))
+
         } else {
-            chunk_select = which(chunk_names %in% chunk)
+            check_value_plus(chunk, "multi match | integer vector no na", .choices = chunk_names)
+
+            if(is.numeric(chunk)){
+                if(any(chunk > n_chunks)){
+                    stop("There are maximum ", n_chunks, " chunks.")
+                }
+                chunk_select = sort(unique(chunk))
+            } else {
+                chunk_select = which(chunk_names %in% chunk)
+            }
         }
+
 
         qui = c(qui, length(test_code))
 
@@ -166,4 +185,41 @@ run_test = function(chunk){
 
     "tests performed successfully"
 }
+
+
+
+non_ascii = function(folder = "R"){
+    # Finds non ascii characters lurking
+
+    all_files = list.files(folder, full.names = TRUE)
+    all_R_text = lapply(all_files, function(x) readLines(x, encoding = "UTF-8"))
+
+    i_non_ascii = which(sapply(all_R_text, function(x) any(grepl("[^ -~\t]", x))))
+    n = length(i_non_ascii)
+
+    if(n == 0) return("No non-ASCII character found.")
+
+    cat("Tip: Type, e.g., 1750G to go to the line in VIM\n\n")
+
+    for(id in seq(n)){
+        i = i_non_ascii[id]
+        cat("File: ", gsub("R/", "", all_files[i]), "\n")
+
+        text = all_R_text[[i]]
+        all_lines = which(grepl("[^ -~\t]", text))
+        for(line in all_lines){
+            cat("-> line ", sfill(line, max(nchar(all_lines))), ":\n===|", text[line], "\n")
+            cat("===|", gsub("[^ -~\t]", "__HERE__", text[line]), "\n")
+
+            if(line != tail(all_lines, 1)) cat("\n")
+        }
+
+        if(id < n) cat("\n ---------- \n\n")
+    }
+}
+
+
+
+
+
 

@@ -5,11 +5,6 @@ knitr::opts_chunk$set(echo = TRUE,
 Sys.setenv(lang = "en")
 
 library(fixest)
-
-if(requireNamespace("plm", quietly = TRUE)) library(plm)
-
-if(requireNamespace("sandwich", quietly = TRUE)) library(sandwich)
-
 setFixest_nthreads(1)
 
 ## -----------------------------------------------------------------------------
@@ -18,139 +13,154 @@ data(trade)
 # OLS estimation
 gravity = feols(log(Euros) ~ log(dist_km) | Destination + Origin + Product + Year, trade)
 # Two-way clustered SEs
-summary(gravity, se = "twoway")
-# Two-way clustered SEs, without DOF correction
-summary(gravity, se = "twoway", dof = dof(adj = FALSE, cluster.adj = FALSE))
-
-## -----------------------------------------------------------------------------
-# Data generation
-set.seed(0)
-N = 20 ; n_id = N/5; n_time = N/n_id
-base = data.frame(y = rnorm(N), x = rnorm(N), id = rep(1:n_id, n_time), 
-                  time = rep(1:n_time, each = n_id))
-
+summary(gravity, vcov = "twoway")
+# Two-way clustered SEs, without small sample correction
+summary(gravity, vcov = "twoway", ssc = ssc(adj = FALSE, cluster.adj = FALSE))
 
 ## ---- echo = FALSE------------------------------------------------------------
-if(!requireNamespace("sandwich", quietly = TRUE)){
+is_plm = requireNamespace("plm", quietly = TRUE)
+is_sandwich = requireNamespace("sandwich", quietly = TRUE)
+
+is_plm = is_plm || is_swandwich
+
+if(!is_plm){
     knitr::opts_chunk$set(eval = FALSE)
-    cat("Evaluation of the next chunks requires 'sandwich', which is not present.")
+    cat("Evaluation of the next chunks requires 'plm' and 'sandwich'. Problem: One of these packages is missing.")
 } else {
     knitr::opts_chunk$set(eval = TRUE)
 }
 
+
 ## -----------------------------------------------------------------------------
 library(sandwich)
+library(plm)
+
+data(Grunfeld)
 
 # Estimations
-res_lm    = lm(y ~ x, base)
-res_feols = feols(y ~ x, base)
+res_lm    = lm(inv ~ capital, Grunfeld)
+res_feols = feols(inv ~ capital, Grunfeld)
 
 # Same standard-errors
 rbind(se(res_lm), se(res_feols))
 
 # Heteroskedasticity-robust covariance
 se_lm_hc    = sqrt(diag(vcovHC(res_lm, type = "HC1")))
-se_feols_hc = se(res_feols, se = "hetero")
+se_feols_hc = se(res_feols, vcov = "hetero")
 rbind(se_lm_hc, se_feols_hc)
 
-## ---- echo = FALSE------------------------------------------------------------
-if(!requireNamespace("plm", quietly = TRUE)){
-    knitr::opts_chunk$set(eval = FALSE)
-    cat("Evaluation of the next chunks requires 'plm', which is not present.")
-} else {
-    knitr::opts_chunk$set(eval = TRUE)
-}
-
 ## -----------------------------------------------------------------------------
-library(plm)
 
 # Estimations
-est_lm    = lm(y ~ x + as.factor(id) + as.factor(time), base)
-est_plm   = plm(y ~ x + as.factor(time), base, index = c("id", "time"), model = "within")
-est_feols = feols(y ~ x | id + time, base)
+est_lm    = lm(inv ~ capital + as.factor(firm) + as.factor(year), Grunfeld)
+est_plm   = plm(inv ~ capital + as.factor(year), Grunfeld, index = c("firm", "year"), model = "within")
+# we use panel.id so that panel VCOVs can be applied directly
+est_feols = feols(inv ~ capital | firm + year, Grunfeld, panel.id = ~firm + year)
 
 #
-# "Standard" standard-errors
+# "iid" standard-errors
 #
 
 # By default fixest clusters the SEs when FEs are present,
-#  so we need to ask for standard SEs explicitly.
-rbind(se(est_lm)["x"], se(est_plm)["x"], se(est_feols, se = "standard"))
+#  so we need to ask for iid SEs explicitly.
+rbind(se(est_lm)["capital"], se(est_plm)["capital"], se(est_feols, vcov = "iid"))
 
 # p-values:
-rbind(pvalue(est_lm)["x"], pvalue(est_plm)["x"], pvalue(est_feols, se = "standard"))
+rbind(pvalue(est_lm)["capital"], pvalue(est_plm)["capital"], pvalue(est_feols, vcov = "iid"))
 
 
 ## -----------------------------------------------------------------------------
-# Clustered by id
-se_lm_id    = sqrt(vcovCL(est_lm, cluster = base$id, type = "HC1")["x", "x"])
-se_plm_id   = sqrt(vcovHC(est_plm, cluster = "group")["x", "x"])
-se_stata_id = 0.165385      # vce(cluster id)
-se_feols_id = se(est_feols) # By default: clustered according to id
+# Clustered by firm
+se_lm_firm    = se(vcovCL(est_lm, cluster = ~firm, type = "HC1"))["capital"]
+se_plm_firm   = se(vcovHC(est_plm, cluster = "group"))["capital"]
+se_stata_firm = 0.06328129    # vce(cluster firm)
+se_feols_firm = se(est_feols) # By default: clustered according to firm
 
-rbind(se_lm_id, se_plm_id, se_stata_id, se_feols_id)
+rbind(se_lm_firm, se_plm_firm, se_stata_firm, se_feols_firm)
 
 ## -----------------------------------------------------------------------------
 # How to get the lm version
-se_feols_id_lm = se(est_feols, dof = dof(fixef.K = "full"))
-rbind(se_lm_id, se_feols_id_lm)
+se_feols_firm_lm = se(est_feols, ssc = ssc(fixef.K = "full"))
+rbind(se_lm_firm, se_feols_firm_lm)
 
 # How to get the plm version
-se_feols_id_plm = se(est_feols, dof = dof(fixef.K = "none", cluster.adj = FALSE))
-rbind(se_plm_id, se_feols_id_plm)
-
-## ---- eval = FALSE------------------------------------------------------------
-#  library(lfe)
-#  
-#  # lfe: clustered by id
-#  est_lfe = felm(y ~ x | id + time | 0 | id, base)
-#  se_lfe_id = se(est_lfe)
-#  
-#  # The two are different, and it cannot be directly replicated by feols
-#  rbind(se_lfe_id, se_feols_id)
-#  #>                     x
-#  #> se_lfe_id   0.1458559
-#  #> se_feols_id 0.1653850
-#  
-#  # You have to provide a custom VCOV to replicate lfe's VCOV
-#  my_vcov = vcov(est_feols, dof = dof(adj = FALSE))
-#  se(est_feols, .vcov = my_vcov * 19/18) # Note that there are 20 observations
-#  #>         x
-#  #> 0.1458559
-#  
-#  # Differently from feols, the SEs in lfe are different if time is not a FE:
-#  # => now SEs are identical.
-#  rbind(se(felm(y ~ x + factor(time) | id | 0 | id, base))["x"],
-#        se(feols(y ~ x + factor(time) | id, base))["x"])
-#  #>             x
-#  #> [1,] 0.165385
-#  #> [2,] 0.165385
-#  
-#  # Now with two-way clustered standard-errors
-#  est_lfe_2way = felm(y ~ x | id + time | 0 | id + time, base)
-#  se_lfe_2way  = se(est_lfe_2way)
-#  se_feols_2way = se(est_feols, se = "twoway")
-#  rbind(se_lfe_2way, se_feols_2way)
-#  #>                       x
-#  #> se_lfe_2way   0.3268584
-#  #> se_feols_2way 0.3080378
-#  
-#  # To obtain the same SEs, use cluster.df = "conventional"
-#  sum_feols_2way_conv = summary(est_feols, se = "twoway", dof = dof(cluster.df = "conv"))
-#  rbind(se_lfe_2way, se(sum_feols_2way_conv))
-#  #>                     x
-#  #> se_lfe_2way 0.3268584
-#  #>             0.3268584
-#  
-#  # We also obtain the same p-values
-#  rbind(pvalue(est_lfe_2way), pvalue(sum_feols_2way_conv))
-#  #>              x
-#  #> [1,] 0.3347851
-#  #> [2,] 0.3347851
+se_feols_firm_plm = se(est_feols, ssc = ssc(fixef.K = "none", cluster.adj = FALSE))
+rbind(se_plm_firm, se_feols_firm_plm)
 
 ## -----------------------------------------------------------------------------
-setFixest_dof(dof(adj = FALSE))
+#
+# Newey-west
+#
+
+se_plm_NW   = se(vcovNW(est_plm))["capital"]
+se_feols_NW = se(est_feols, vcov = "NW")
+
+rbind(se_plm_NW, se_feols_NW)
+
+# we can replicate plm's by changing the type of SSC:
+rbind(se_plm_NW, 
+      se(est_feols, vcov = NW ~ ssc(adj = FALSE, cluster.adj = FALSE)))
+
+#
+# Driscoll-Kraay
+#
+
+se_plm_DK   = se(vcovSCC(est_plm))["capital"]
+se_feols_DK = se(est_feols, vcov = "DK")
+
+rbind(se_plm_DK, se_feols_DK)
+
+# Replicating plm's
+rbind(se_plm_DK, 
+      se(est_feols, vcov = DK ~ ssc(adj = FALSE, cluster.adj = FALSE)))
+
+
+## ---- eval = TRUE, echo = FALSE-----------------------------------------------
+is_lfe = requireNamespace("lfe", quietly = TRUE)
+if(!is_lfe){
+  cat("The evaluation of the next chunks of code require the package 'lfe' which is not available.")
+}
+
+## ---- eval = is_lfe, include = FALSE------------------------------------------
+# avoids ugly startup messages popping + does not require the us of the not very elegant suppressPackageStartupMessages
+library(lfe)
+
+## ---- eval = is_lfe && is_plm, warning = FALSE--------------------------------
+library(lfe)
+
+# lfe: clustered by firm
+est_lfe = felm(inv ~ capital | firm + year | 0 | firm, Grunfeld)
+se_lfe_firm = se(est_lfe)
+
+# The two are different, and it cannot be directly replicated by feols
+rbind(se_lfe_firm, se_feols_firm)
+
+# You have to provide a custom VCOV to replicate lfe's VCOV
+my_vcov = vcov(est_feols, ssc = ssc(adj = FALSE))
+se(est_feols, vcov = my_vcov * 199/198) # Note that there are 200 observations
+
+# Differently from feols, the SEs in lfe are different if year is not a FE:
+# => now SEs are identical.
+rbind(se(felm(inv ~ capital + factor(year) | firm | 0 | firm, Grunfeld))["capital"],
+      se(feols(inv ~ capital + factor(year) | firm, Grunfeld))["capital"])
+
+# Now with two-way clustered standard-errors
+est_lfe_2way  = felm(inv ~ capital | firm + year | 0 | firm + year, Grunfeld)
+se_lfe_2way   = se(est_lfe_2way)
+se_feols_2way = se(est_feols, vcov = "twoway")
+rbind(se_lfe_2way, se_feols_2way)
+
+# To obtain the same SEs, use cluster.df = "conventional"
+sum_feols_2way_conv = summary(est_feols, vcov = twoway ~ ssc(cluster.df = "conv"))
+rbind(se_lfe_2way, se(sum_feols_2way_conv))
+
+# We also obtain the same p-values
+rbind(pvalue(est_lfe_2way), pvalue(sum_feols_2way_conv))
 
 ## -----------------------------------------------------------------------------
-setFixest_se(no_FE = "standard", one_FE = "standard", two_FE = "standard")
+setFixest_ssc(ssc(adj = FALSE))
+
+## -----------------------------------------------------------------------------
+setFixest_vcov(no_FE = "iid", one_FE = "iid", 
+               two_FE = "hetero", panel = "driscoll_kraay")
 

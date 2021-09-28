@@ -6,18 +6,9 @@ knitr::opts_chunk$set(
 
 set.seed(0)
 
-if(requireNamespace("data.table", quietly = TRUE)) library(data.table)
+is_DT = requireNamespace("data.table", quietly = TRUE)
 
-require_DT_ON = function(){
-  if(!requireNamespace("data.table", quietly = TRUE)){
-    knitr::opts_chunk$set(eval = FALSE)
-    cat("Evaluation of the next chunks requires 'data.table', which is not present.")
-  }
-}
-
-require_DT_OFF = function(){
-  knitr::opts_chunk$set(eval = TRUE)
-}
+if(is_DT) library(data.table)
 
 library(fixest)
 setFixest_nthreads(1)
@@ -38,13 +29,12 @@ gravity_pois = fepois(Euros ~ log(dist_km) | Origin + Destination + Product + Ye
 print(gravity_pois)
 
 ## -----------------------------------------------------------------------------
-summary(gravity_pois, se = "twoway")
+summary(gravity_pois, vcov = "twoway")
 
 ## ---- eval = FALSE------------------------------------------------------------
-#  # Two ways to summon clustering on the Product variable
-#  # - by reference:
+#  # Three ways to summon clustering on the Product variable
+#  summary(gravity_pois, vcov = ~Product)
 #  summary(gravity_pois, cluster = "Product")
-#  # - with a formula:
 #  summary(gravity_pois, cluster = ~Product)
 
 ## ---- eval = TRUE-------------------------------------------------------------
@@ -54,10 +44,10 @@ summary(gravity_pois, cluster = ~Product)
 gravity_simple = fepois(Euros ~ log(dist_km), trade)
 # We use a formula to specify the variables used for two way clustering
 # (note that the values of the variables are fetched directly in the original database)
-summary(gravity_simple, cluster = ~Origin + Destination)
+summary(gravity_simple, ~Origin + Destination)
 
 ## -----------------------------------------------------------------------------
-fepois(Euros ~ log(dist_km), trade, cluster = ~Product)
+fepois(Euros ~ log(dist_km), trade, vcov = ~Product)
 
 ## -----------------------------------------------------------------------------
 gravity_ols = feols(log(Euros) ~ log(dist_km) | Origin + Destination + Product + Year, trade)
@@ -68,10 +58,10 @@ gravity_negbin = fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product 
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  etable(gravity_pois, gravity_negbin, gravity_ols,
-#           se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
+#           vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
 
 ## ---- echo=FALSE, results='asis'----------------------------------------------
-tab = etable(gravity_pois, gravity_negbin, gravity_ols, se = "twoway", subtitles = c("Poisson", "Negative Binomial", "Gaussian"))
+tab = etable(gravity_pois, gravity_negbin, gravity_ols, vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
 # problem to display the second empty line in markdown
 knitr::kable(tab[-2, ])
 
@@ -118,6 +108,73 @@ fixedEffects$Year
 
 ## ---- fig.width=7-------------------------------------------------------------
 plot(fixedEffects)
+
+## -----------------------------------------------------------------------------
+data(base_did)
+est = feols(y ~ x1, base_did)
+# Note that there is partial matching enabled (newey = newey_west)
+summary(est, newey ~ id + period)
+
+## ---- error=TRUE--------------------------------------------------------------
+summary(est, "newey_west")
+
+## -----------------------------------------------------------------------------
+est_panel = feols(y ~ x1, base_did, panel.id = ~id + period)
+summary(est_panel, "newey_west")
+
+## -----------------------------------------------------------------------------
+setFixest_estimation(panel.id = ~id + period)
+est_implicit = feols(y ~ x1, base_did)
+summary(est_implicit, "newey_west")
+
+## -----------------------------------------------------------------------------
+summary(est_implicit, "cluster")
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | period, base_did, "cluster")
+
+## -----------------------------------------------------------------------------
+# Removing the panel
+setFixest_estimation(reset = TRUE)
+feols(y ~ x1 | period, base_did, "cluster")
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | period, base_did, ~id + period)
+
+## -----------------------------------------------------------------------------
+data(quakes)
+feols(depth ~ mag, quakes, "conley")
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | period, base_did, NW(2) ~ id + period)
+
+feols(depth ~ mag, quakes, conley(200, distance = "spherical"))
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | period, base_did, vcov_NW("id", "period", lag = 2))
+
+feols(depth ~ mag, quakes, vcov_conley(lat = "lat", lon = "long", 
+                                       cutoff = 200, distance = "spherical"))
+
+## -----------------------------------------------------------------------------
+est = feols(y ~ x1 | id, base_did)
+est_up = feols(y ~ x1 | id, base_did, ssc = ssc(fixef.K = "full"))
+est_down = feols(y ~ x1 | id, base_did, ssc = ssc(adj = FALSE, cluster.adj = FALSE))
+etable(est, est_up, est_down)
+
+## -----------------------------------------------------------------------------
+etable(est, vcov = list(~id, ~id + ssc(fixef.K = "full"), 
+                        ~id + ssc(adj = FALSE, cluster.adj = FALSE)))
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | id, base_did, iid ~ ssc(adj = FALSE))
+feols(y ~ x1 | id, base_did, hetero ~ ssc(adj = FALSE))
+
+## -----------------------------------------------------------------------------
+summary(est, vcov = sandwich::vcovHC, type = "HC1")
+
+## -----------------------------------------------------------------------------
+feols(y ~ x1 | id, base_did, vcov = function(x) sandwich::vcovHC(x, type = "HC1"))
 
 ## -----------------------------------------------------------------------------
 base = iris
@@ -219,7 +276,7 @@ if(requireNamespace("ggplot2", quietly = TRUE)){
 # "Naive" TWFE DiD (note that the time to treatment for the never treated is -1000)
 # (by using ref = c(-1, -1000) we exclude the period just before the treatment and 
 # the never treated)
-res_twfe = feols(y ~ x1 + i(time_to_treatment, treated, ref = c(-1, -1000)) | id + year, base_stagg)
+res_twfe = feols(y ~ x1 + i(time_to_treatment, ref = c(-1, -1000)) | id + year, base_stagg)
 
 # To implement the Sun and Abraham (2020) method,
 # we use the sunab(cohort, period) function
@@ -269,6 +326,16 @@ xpd(Armed.Forces ~ Population + ..("GNP|ployed"), data = longley)
 feols(Armed.Forces ~ Population + ..("GNP|ployed"), longley)
 
 ## -----------------------------------------------------------------------------
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+i = 2:3
+z = "i(species)"
+feols(y ~ x.[i] + .[z], base)
+
+## -----------------------------------------------------------------------------
+i = 1:5
+xpd(y ~ ..x, ..x = "x.[i]_sq")
+
+## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)
 est2 = feols(f(y) ~ l(x1, -1:1), base_did, panel.id = ~id+period)
 est3 = feols(l(y) ~ l(x1, 0:3), base_did, panel.id = ~id+period)
@@ -284,10 +351,7 @@ est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 etable(est1, est2, est_sub, order = "f", drop = "Int")
 
-## ---- include = FALSE---------------------------------------------------------
-require_DT_ON()
-
-## -----------------------------------------------------------------------------
+## ---- eval = is_DT------------------------------------------------------------
 library(data.table)
 pdat_dt = panel(as.data.table(base_did), ~id+period)
 # we create a lagged value of the variable x1
@@ -296,26 +360,17 @@ pdat_dt[, x1_l1 := l(x1)]
 pdat_dt[, c("x1_l1_fill0", "y_f2") := .(l(x1, fill = 0), f(y, 2))]
 head(pdat_dt)
 
-## ---- include = FALSE---------------------------------------------------------
-require_DT_OFF()
-
 ## -----------------------------------------------------------------------------
 base_lag = base_did
 # we create a lagged value of the variable x1
 base_lag$x1.l1 = lag(x1 ~ id + period, 1, base_lag)
 head(base_lag)
 
-## ---- include = FALSE---------------------------------------------------------
-require_DT_ON()
-
-## -----------------------------------------------------------------------------
+## ---- eval = is_DT------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
 base_lag_dt[, x1.l1 := lag(x1 ~ id + period, 1)]
-
-## ---- include = FALSE---------------------------------------------------------
-require_DT_OFF()
 
 ## -----------------------------------------------------------------------------
 # Generating data:

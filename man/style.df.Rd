@@ -15,7 +15,10 @@ style.df(
   slopes.format = "__var__ (__slope__)",
   stats.title = "_",
   stats.line = "_",
-  yesNo = c("Yes", "No")
+  yesNo = c("Yes", "No"),
+  headers.sep = TRUE,
+  interaction.combine = " x ",
+  i.equal = " = "
 )
 }
 \arguments{
@@ -40,6 +43,12 @@ style.df(
 \item{stats.line}{Character scalar. Default is \code{"_"}. A character that will be used to create a line of separation for the statistics header. Used only if \code{stats.title} is not the empty string.}
 
 \item{yesNo}{Character vector of length 1 or 2. Default is \code{c("Yes", "No")}. Used to inform on the presence or absence of fixed-effects in the estimation. If of length 1, then automatically the second value is considered as the empty string.}
+
+\item{headers.sep}{Logical, default is \code{TRUE}. Whether to add a line of separation between the headers and the coefficients.}
+
+\item{interaction.combine}{Character scalar, defaults to \code{" x "}. When the estimation contains interactions, then the variables names (after aliasing) are combined with this argument. For example: if \code{dict = c(x1="Wind", x2="Rain")} and you have the following interaction \code{x1:x2}, then it will be renamed (by default) \code{Wind x Rain} -- using \code{interaction.combine = "*"} would lead to \code{Wind*Rain}.}
+
+\item{i.equal}{Character scalar, defaults to \code{" = "}. Only affects factor variables created with the function \code{\link[fixest]{i}}, tells how the variable should be linked to its value. For example if you have the Species factor from the iris data set, by default the display of the variable is \code{Species = Setosa}, etc. If \code{i.equal = ": "} the display becomes \code{Species: Setosa}.}
 }
 \value{
 It returns an object of class \code{fixest_style_df}.
@@ -63,7 +72,7 @@ est = feols(c(Ozone, Solar.R) ~
 etable(est)
 
 # Playing a bit with the styles
-etable(est, style_df = style.df(fixef.title = "", fixef.suffix = " FE",
+etable(est, style.df = style.df(fixef.title = "", fixef.suffix = " FE",
                                  stats.line = " ", yesNo = "yes"))
 
 

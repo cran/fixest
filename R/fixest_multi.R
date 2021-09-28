@@ -120,8 +120,8 @@ setup_multi = function(index, all_names, data, simplify = TRUE){
 #' summary(res, type = "se_compact")
 #'
 #'
-summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NULL, dof = NULL,
-                                .vcov, stage = 2, lean = FALSE, n = 1000, ...){
+summary.fixest_multi = function(object, type = "short", vcov = NULL, se = NULL, cluster = NULL, ssc = NULL,
+                                .vcov = NULL, stage = 2, lean = FALSE, n = 1000, ...){
     dots = list(...)
     data = attr(object, "data")
 
@@ -135,7 +135,7 @@ summary.fixest_multi = function(object, type = "short", se = NULL, cluster = NUL
     if(is.null(est_1$cov.scaled) || !isTRUE(dots$fromPrint)){
 
         for(i in 1:length(data)){
-            data[[i]] = summary(data[[i]], se = se, cluster = cluster, dof = dof,
+            data[[i]] = summary(data[[i]], vcov = vcov, se = se, cluster = cluster, ssc = ssc,
                                 .vcov = .vcov, stage = stage, lean = lean, n = n, ...)
         }
 
@@ -317,7 +317,7 @@ print.fixest_multi = function(x, ...){
             if(isTRUE(data[[i]]$onlyFixef)){
                 cat("No variable (only the fixed-effects).\n")
             } else {
-                myPrintCoefTable(coeftable = coeftable(data[[i]]), show_signif = FALSE)
+                print_coeftable(coeftable = coeftable(data[[i]]), show_signif = FALSE)
             }
             if(tree[i, depth] != index[[depth]]) cat("---\n")
         } else {
