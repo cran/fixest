@@ -100,9 +100,17 @@
 #'
 #' A note on performance. The feature of multiple estimations has been highly optimized for \code{feols}, in particular in the presence of fixed-effects. It is faster to estimate multiple models using the formula rather than with a loop. For non-\code{feols} models using the formula is roughly similar to using a loop performance-wise.
 #'
+#' @section Tricks to estimate multiple LHS:
+#'
+#' To use multiple dependent variables in \code{fixest} estimations, you need to include them in a vector: like in \code{c(y1, y2, y3)}.
+#'
+#' First, if names are stored in a vector, they can readily be inserted in a formula to perform multiple estimations using the dot square bracket operator. For instance if \code{my_lhs = c("y1", "y2")}, calling \code{fixest} with, say \code{feols(.[my_lhs] ~ x1, etc)} is equivalent to using \code{feols(c(y1, y2) ~ x1, etc)}. Beware that this is a special feature unique to the \emph{left-hand-side} of \code{fixest} estimations (the default behavior of the DSB operator is to aggregate with sums, see \code{\link[fixest]{xpd}}).
+#'
+#' Second, you can use a regular expression to grep the left-hand-sides on the fly. When the \code{..("regex")} feature is used naked on the LHS, the variables grepped are inserted into \code{c()}. For example \code{..("Pe") ~ Sepal.Length, iris} is equivalent to \code{c(Petal.Length, Petal.Width) ~ Sepal.Length, iris}. Beware that this is a special feature unique to the \emph{left-hand-side} of \code{fixest} estimations (the default behavior of \code{..("regex")} is to aggregate with sums, see \code{\link[fixest]{xpd}}).
+#'
 #' @section Argument sliding:
 #'
-#' When the data set has been set up globally using \code{\link[fixest]{setFixest_estimation}}(data = data_set), the argument \code{vcov} can be used implicitly. This means that calls such as \code{feols(y ~ x, "HC1")}, or \code{feols(y ~ x, ~id)}, are valid: i) the data is automatically deduced from the global settings, and ii) the \code{vcov} is deduced to be the second argument.
+#' When the data set has been set up globally using \code{\link[fixest]{setFixest_estimation}}\code{(data = data_set)}, the argument \code{vcov} can be used implicitly. This means that calls such as \code{feols(y ~ x, "HC1")}, or \code{feols(y ~ x, ~id)}, are valid: i) the data is automatically deduced from the global settings, and ii) the \code{vcov} is deduced to be the second argument.
 #'
 #' @section Piping:
 #'
@@ -319,6 +327,35 @@
 #' setFixest_estimation(data = NULL)
 #'
 #'
+#' #
+#' # Formula expansions
+#' #
+#'
+#' # By default, the features of the xpd function are enabled in
+#' # all fixest estimations
+#' # Here's a few examples
+#'
+#' base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+#'
+#' # dot square bracket operator
+#' feols(y ~ x.[1:3], base)
+#'
+#' # fetching variables via regular expressions: ..("regex")
+#' feols(y ~ ..("1|2"), base)
+#'
+#' # NOTA: it also works for multiple LHS
+#' mult1 = feols(x.[1:2] ~ y + species, base)
+#' mult2 = feols(..("y|3") ~ x.[1:2] + species, base)
+#' etable(mult1, mult2)
+#'
+#'
+#' # Use .[, stuff] to include variables in functions:
+#' feols(y ~ csw(x.[, 1:3]), base)
+#'
+#' # Same for ..(, "regex")
+#' feols(y ~ csw(..(,"x")), base)
+#'
+#'
 #'
 feols = function(fml, data, vcov, weights, offset, subset, split, fsplit, cluster, se,
                  ssc, panel.id, fixef, fixef.rm = "none", fixef.tol = 1e-6,
@@ -331,7 +368,7 @@ feols = function(fml, data, vcov, weights, offset, subset, split, fsplit, cluste
 	# 1st: is the call coming from feglm?
 	fromGLM = FALSE
 	skip_fixef = FALSE
-	if("X" %in% names(dots)){
+	if("fromGLM" %in% names(dots)){
 		fromGLM = TRUE
 		# env is provided by feglm
 		X = dots$X
@@ -1388,14 +1425,17 @@ feols = function(fml, data, vcov, weights, offset, subset, split, fsplit, cluste
 		    opt_fe = check_conv(y_demean, X_demean, fixef_id_list, slope_flag, slope_vars, weights)
 
 		    # This is a bit too rough a check but it should catch the most problematic cases
-		    if(any(opt_fe > 1e-4)){
+		    if(anyNA(opt_fe) || any(opt_fe > 1e-4)){
 		        msg = "There seems to be a convergence problem due to the presence of variables with varying slopes. The precision of the estimates may not be great."
 		        if(any(slope_flag < 0)){
 		            sugg = "This convergence problem mostly arises when there are varying slopes without their associated fixed-effect, as is the case in your estimation. Why not try to include the fixed-effect (i.e. use '[' instead of '[[')?"
 		        } else {
-		            sugg = "As a workaround, and if there are not too many slopes, you can use the variables with varying slopes as regular variables using the function interact (see ?interact)."
+		            sugg = "As a workaround, and if there are not too many slopes, you can use the variables with varying slopes as regular variables using the function i (see ?i)."
 		        }
-		        msg = paste(msg, sugg)
+
+		        sugg_tol = "Or use a lower 'fixef.tol' (sometimes it works)?"
+
+		        msg = paste(msg, sugg, sugg_tol)
 
 		        res$convStatus = FALSE
 
@@ -1735,9 +1775,7 @@ ols_fit = function(y, X, w, correct_0w = FALSE, collin.tol, nthreads, xwx = NULL
     res
 }
 
-
-
-check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
+check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights, full = FALSE, fixef_names = NULL){
     # VERY SLOW!!!!
     # IF THIS FUNCTION LASTS => TO BE PORTED TO C++
 
@@ -1748,29 +1786,45 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 
     Q = length(slope_flag)
 
-    nobs = length(y)
+    use_y = TRUE
     if(length(X) == 1){
         K = 1
+        nobs = length(y)
     } else {
-        K = NCOL(X) + 1
-    }
+        nobs = NROW(X)
 
-    res = list()
-
-    for(k in 1:K){
-        if(k == 1){
-            x = y
-        } else {
-            x = X[, k - 1]
+        if(length(y) <= 1){
+            use_y = FALSE
         }
 
-        res_tmp = c()
+        K = NCOL(X) + use_y
+    }
+
+    info_max = list()
+    info_full = vector("list", K)
+
+    for(k in 1:K){
+        if(k == 1 && use_y){
+            x = y
+        } else if(use_y){
+            x = X[, k - use_y]
+        } else {
+            x = X[, k]
+        }
+
+        info_max_tmp = c()
+        info_full_tmp = list()
         index_slope = 1
         for(q in 1:Q){
             fixef_id = fixef_id_list[[q]]
 
             if(slope_flag[q] >= 0){
-                res_tmp = c(res_tmp, max(abs(tapply(weights * x, fixef_id, mean))))
+                x_means = tapply(weights * x, fixef_id, mean)
+                info_max_tmp = c(info_max_tmp, max(abs(x_means)))
+
+                if(full){
+                    info_full_tmp[[length(info_full_tmp) + 1]] = x_means
+                }
             }
 
             n_slopes = abs(slope_flag[q])
@@ -1780,17 +1834,37 @@ check_conv = function(y, X, fixef_id_list, slope_flag, slope_vars, weights){
 
                     num = tapply(weights * x * var, fixef_id, sum)
                     denom = tapply(weights * var^2, fixef_id, sum)
-                    res_tmp = c(res_tmp, max(abs(num/denom)))
+
+                    x_means = num/denom
+                    info_max_tmp = c(info_max_tmp, max(abs(x_means)))
+
+                    if(full){
+                        info_full_tmp[[length(info_full_tmp) + 1]] = x_means
+                    }
 
                     index_slope = index_slope + 1
                 }
             }
         }
 
-        res[[k]] = res_tmp
+        if(!is.null(fixef_names)){
+            names(info_full_tmp) = fixef_names
+        }
+
+        info_max[[k]] = info_max_tmp
+
+        if(full){
+            info_full[[k]] = info_full_tmp
+        }
     }
 
-    res = do.call("rbind", res)
+    info_max = do.call("rbind", info_max)
+
+    if(full){
+        res = info_full
+    } else {
+        res = info_max
+    }
 
     res
 }
@@ -1860,6 +1934,7 @@ feols.fit = function(y, X, fixef_df, vcov, offset, split, fsplit, cluster, se, s
 #' @inheritSection feols Multiple estimations
 #' @inheritSection feols Argument sliding
 #' @inheritSection feols Piping
+#' @inheritSection feols Tricks to estimate multiple LHS
 #' @inheritSection xpd Dot square bracket operator in formulas
 #'
 #' @param family Family to be used for the estimation. Defaults to \code{gaussian()}. See \code{\link[stats]{family}} for details of family functions.
@@ -2326,7 +2401,7 @@ feglm.fit = function(y, X, fixef_df, family = "gaussian", vcov, offset, split,
             gc()
         }
 
-        wols = feols(y = z, X = X, weights = w, means = wols_means, correct_0w = any_0w, env = env, fixef.tol = fixef.tol * 10**(iter==1), fixef.iter = fixef.iter, collin.tol = collin.tol, nthreads = nthreads, mem.clean = mem.clean, verbose = verbose - 1)
+        wols = feols(y = z, X = X, weights = w, means = wols_means, correct_0w = any_0w, env = env, fixef.tol = fixef.tol * 10**(iter==1), fixef.iter = fixef.iter, collin.tol = collin.tol, nthreads = nthreads, mem.clean = mem.clean, verbose = verbose - 1, fromGLM = TRUE)
 
         if(isTRUE(wols$NA_model)){
             return(wols)
@@ -2705,6 +2780,7 @@ feglm.fit = function(y, X, fixef_df, family = "gaussian", vcov, offset, split,
 #' @inheritSection feols Multiple estimations
 #' @inheritSection feols Argument sliding
 #' @inheritSection feols Piping
+#' @inheritSection feols Tricks to estimate multiple LHS
 #' @inheritSection xpd Dot square bracket operator in formulas
 #'
 #' @param fml A formula representing the relation to be estimated. For example: \code{fml = z~x+y}. To include fixed-effects, insert them in this formula using a pipe: e.g. \code{fml = z~x+y|fixef_1+fixef_2}. Multiple estimations can be performed at once: for multiple dep. vars, wrap them in \code{c()}: ex \code{c(y1, y2)}. For multiple indep. vars, use the stepwise functions: ex \code{x1 + csw(x2, x3)}. The formula \code{fml = c(y1, y2) ~ x1 + cw0(x2, x3)} leads to 6 estimation, see details. Square brackets starting with a dot can be used to call global variables: \code{y.[i] ~ x.[1:2]} will lead to \code{y3 ~ x1 + x2} if \code{i} is equal to 3 in the current environment (see details in \code{\link[fixest]{xpd}}).
@@ -2935,6 +3011,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit,
 #' @inheritSection feols Multiple estimations
 #' @inheritSection feols Argument sliding
 #' @inheritSection feols Piping
+#' @inheritSection feols Tricks to estimate multiple LHS
 #' @inheritSection xpd Dot square bracket operator in formulas
 #'
 #' @param fml A formula. This formula gives the linear formula to be estimated (it is similar to a \code{lm} formula), for example: \code{fml = z~x+y}. To include fixed-effects variables, insert them in this formula using a pipe (e.g. \code{fml = z~x+y|fixef_1+fixef_2}). To include a non-linear in parameters element, you must use the argment \code{NL.fml}. Multiple estimations can be performed at once: for multiple dep. vars, wrap them in \code{c()}: ex \code{c(y1, y2)}. For multiple indep. vars, use the stepwise functions: ex \code{x1 + csw(x2, x3)}. This leads to 6 estimation \code{fml = c(y1, y2) ~ x1 + cw0(x2, x3)}. See details. Square brackets starting with a dot can be used to call global variables: \code{y.[i] ~ x.[1:2]} will lead to \code{y3 ~ x1 + x2} if \code{i} is equal to 3 in the current environment (see details in \code{\link[fixest]{xpd}}).

@@ -420,6 +420,46 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
         # We apply expand for macros => we return fml_no_xpd
         if(length(getFixest_fml()) > 0 || any(c("..", "[") %in% all.vars(fml, functions = TRUE))){
             fml_no_xpd = fml
+
+            # Special beavior .[y] for multiple LHSs
+            lhs_fml = fml[[2]]
+
+            if(length(lhs_fml) == 1){
+                # nothing
+            } else if(lhs_fml[[1]] == "[" && length(lhs_fml) == 3 && grepl("\\.$", lhs_fml[[2]])){
+                # works for both .[y] and y.[1:3]
+
+                new_lhs_fml = (~ c(x))[[2]]
+                my_dsb = (~ .[, x])[[2]]
+                my_dsb[[2]] = lhs_fml[[2]]
+                my_dsb[[4]] = lhs_fml[[3]]
+
+                new_lhs_fml[[2]] = my_dsb
+                fml[[2]] = new_lhs_fml
+
+            } else if(lhs_fml[[1]] == ".." && length(lhs_fml) == 2 && is.character(lhs_fml[[2]])){
+                # works for ..("x") ~ y
+                re = lhs_fml[[2]]
+                if(grepl(".[", re, fixed = TRUE)){
+                    re = dot_square_bracket(re, call_env, regex = TRUE)
+                }
+                vars = grep(re, dataNames, value = TRUE, perl = TRUE)
+                if(length(vars) == 0){
+
+                    msg = re
+                    if(!grepl(".[", lhs_fml[[2]], fixed = TRUE)){
+                        msg = paste0(lhs_fml[[2]],"', evaluated as '", re)
+                    }
+
+                    stop("In the LHS of the formula, the regular expression: '", msg, "' leads to no variable being selected. Estimation cannot be done.")
+                }
+
+                new_lhs_txt = paste0("c(", paste0(vars, collapse = ", "), ")")
+                new_lhs_fml = error_sender(str2lang(new_lhs_txt), "In the LHS, the expansion of the regex leads to the following invalid expression: '", new_lhs_txt, "'.")
+                fml[[2]] = new_lhs_fml
+            }
+
+            # Expansion
             fml = .xpd(fml, data = dataNames, macro = TRUE, frame = call_env, check = TRUE)
         }
 
@@ -689,6 +729,8 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
     vcov_vars = NULL
     if(!missnull(vcov)){
 
+        data_names = if(isFit) character(0) else names(data)
+
         vcov_varnames = error_sender(vcov.fixest(only_varnames = TRUE, vcov = vcov, data_names = names(data),
                                                  panel.id = panel.id, fixef_vars = all.vars(fml_fixef)),
                                      "Problem in the VCOV:\n")
@@ -841,6 +883,10 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
 
             if(is.logical(subset)){
                 subset = which(subset)
+            }
+
+            if(length(subset) == 0){
+                stop("The argument 'subset' leads to no observation being selected.")
             }
 
             if(isFit){
@@ -2806,6 +2852,8 @@ fixest_env = function(fml, data, family=c("poisson", "negbin", "logit", "gaussia
         } else {
             K = K + sum(fixef_sizes - 1) + 1
         }
+        res$fixef.tol = fixef.tol
+        res$fixef.iter = fixef.iter
     }
     res$nparams = K
 

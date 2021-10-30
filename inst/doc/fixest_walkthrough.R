@@ -290,7 +290,7 @@ iplot(list(res_twfe, res_sa20), sep = 0.5)
 att_true = tapply(base_stagg$treatment_effect_true, base_stagg$time_to_treatment, mean)[-1]
 points(-9:8, att_true, pch = 15, col = 4)
 
-legend("topleft", col = c(1, 4, 2), pch = c(20, 17, 15), 
+legend("topleft", col = c(1, 4, 2), pch = c(20, 15, 17), 
        legend = c("TWFE", "Truth", "Sun & Abraham (2020)"))
 
 ## -----------------------------------------------------------------------------

@@ -8,7 +8,7 @@
 
 # Some functions are not trivial to test properly though
 
-library(dreamerr) ; library(fixest)
+library(fixest)
 
 
 test = fixest:::test ; chunk = fixest:::chunk
@@ -41,7 +41,7 @@ base$y_int_null = base$y_int
 base$y_int_null[base$fe_3 %in% 1:5] = 0
 
 for(model in c("ols", "pois", "logit", "negbin", "Gamma")){
-    cat("Model: ", dreamerr::sfill(model, 6), sep = "")
+    cat("Model: ", format(model, width = 6), sep = "")
     for(use_weights in c(FALSE, TRUE)){
         my_weight = NULL
         if(use_weights) my_weight = base$w
@@ -225,6 +225,12 @@ res = feols(y ~ -1 + x1 + i(fe1) + i(fe2), base)
 test("(Intercept)" %in% names(res$coefficients), FALSE)
 test(is.null(res$collin.var), TRUE)
 
+
+# IV + interacted FEs
+res = feols(y ~ x1 | fe1^fe2 | x2 ~ x3, base)
+
+# IVs + lags
+res = feols(y ~ x1 | fe1^fe2 | l(x2, -1:1) ~ l(x3, -1:1), base, panel.id = ~ fe1 + period)
 
 
 ####
@@ -658,7 +664,7 @@ base$y_int = as.integer(base$y) + 1
 # OLS + GLM + FENMLM
 
 for(method in c("ols", "feglm", "femlm", "fenegbin")){
-    cat("Method: ", dreamerr::sfill(method, 8))
+    cat("Method: ", format(method, width = 8))
     for(do_weight in c(FALSE, TRUE)){
         cat(".")
 
@@ -937,6 +943,45 @@ test(length(coef(res_sunab)), 15)
 res_sunab = feols(y ~ x1 + sunab(year_treated, year, bin.rel = "bin::2"), base_stagg)
 iplot(res_sunab)
 test(length(coef(res_sunab)), 12)
+
+
+####
+#### bin ####
+####
+
+chunk("BIN")
+
+plen = iris$Petal.Length
+years = round(rnorm(1000, 2000, 5))
+
+my_cuts = c("cut::3", "cut::2]5]", "cut::q1]q2]q3]", "cut::p20]p50]p70]p90]", "cut::2[q2]p90]")
+
+for(type in 1:2){
+
+    x = switch(type, "1" = plen, "2" = years)
+
+    for(cut in my_cuts){
+
+        my_bin = bin(x, cut)
+        bin_char = as.character(my_bin)
+
+        if(grepl("[", bin_char[1], fixed = TRUE)){
+            all_min = as.numeric(gsub("(^\\[)|(;.+)", "", bin_char))
+            all_max = as.numeric(gsub(".+; |\\]", "", bin_char))
+        } else {
+            all_min = as.numeric(gsub("-.+", "", bin_char))
+            all_max = as.numeric(gsub(".+-", "", bin_char))
+        }
+
+        test(all(x >= all_min), TRUE)
+        test(all(x <= all_max), TRUE)
+    }
+}
+
+
+
+
+
 
 
 ####
@@ -1323,7 +1368,10 @@ quoi$species = as.character(quoi$species)
 quoi$species[1:3] = "zz"
 test(head(predict(res)), predict(res, quoi))
 
+#
 # prediction with lags
+#
+
 data(base_did)
 res = feols(y ~ x1 + l(x1), base_did, panel.id = ~ id + period)
 test(predict(res, sample = "original"), predict(res, base_did))
@@ -1332,7 +1380,10 @@ qui = sample(which(base_did$id %in% 1:5))
 base_bis = base_did[qui, ]
 test(predict(res, sample = "original")[qui], predict(res, base_bis))
 
+#
 # prediction with poly
+#
+
 res_poly = feols(y ~ poly(x1, 2), base)
 pred_all = predict(res_poly)
 pred_head = predict(res_poly, head(base, 20))
@@ -1361,6 +1412,18 @@ test(coef_vs[fe_names] * base$x2, obs_fe[, 2])
 # with coef only
 obs_fe_coef = predict(res, fixef = TRUE, vs.coef = TRUE)
 test(coef_vs[fe_names], obs_fe_coef[, 2])
+
+#
+# when new data contain single valued factors
+#
+
+est_singleF = feols(y ~ x1 + species, base)
+est_singleF_lm = lm(y ~ x1 + species, base)
+
+new_data = data.frame(x1 = 12:13, species = factor("setosa"))
+
+test(predict(est_singleF, newdata = new_data),
+     predict(est_singleF_lm, newdata = new_data))
 
 #
 # SE of prediction
@@ -1757,24 +1820,6 @@ other_est = feols(y ~ x1 + x2, head(base, 50))
 test(nobs(other_est), 50)
 
 setFixest_estimation(reset = TRUE)
-
-#
-# piping
-#
-
-if(getRversion() >= "4.1.0"){
-    # no vcov
-    p1 = feols(y ~ x1, base)
-    p2 = base |> feols(y ~ x1)
-    test(coef(p1), coef(p2))
-
-    # with vcov
-    p1_se = feols(y ~ x1, base, ~species)
-    p2_se = base |> feols(y ~ x1, ~species)
-    test(se(p1_se), se(p2_se))
-}
-
-
 
 ####
 #### Offset ####

@@ -1,4 +1,203 @@
 
+# fixest 0.10.1
+
+## Bug fixes
+
+ - remove new R native piping test `|>` which led to errors in R < 4.1.0 despite conditional testing.
+ 
+ - fix bug in `etable` `headers` when one wants to include several lines and the first line contains only one element repeated across columns.
+ 
+ - fix bugs in predict: a) when variables are created with functions of the data, and b) when the new data contains single level factors (relates to issues [#200](https://github.com/lrberge/fixest/issues/200) and [#180](https://github.com/lrberge/fixest/issues/180) by @steffengreup and @IsadoraBM).
+ 
+ - fix bug in `etable` non-clustered standard errors not displaying properly in footers.
+ 
+ - fix bug in `etable` regarding the escaping of `fixef_sizes` (reported by Apoorva Lal [#201](https://github.com/lrberge/fixest/issues/201)).
+ 
+ - fix bug introduced in 0.10.0 preventing the estimation of IV models with interacted fixed-effects (reported by @etiennebacher [#203](https://github.com/lrberge/fixest/issues/203)).
+ 
+ - fix bug in IV estimations when: a) no exogenous variables were present AND the IV part contained at lags; and b) the endogenous variables contained at least two lags. Reported by Robbie Minton.
+ 
+ - fix bug in the `.fit` methods when the argument `vcov` wasn't `NULL`.
+ 
+ - fix bug in `summary.fixest_multi`: when the variance was NA and internal bug could pop in some circumstances.
+ 
+ - fix bug `plot.fixef` not working for `fepois` (reported by @statzhero [#213](https://github.com/lrberge/fixest/issues/213)).
+ 
+ - fix error message when the (wrong) argument `X` is used in `feols`.
+ 
+## New features
+
+ - when computing Newey-West standard-errors for time series, the bandwidth is now selected thanks to the [bwNeweyWest](https://sandwich.r-forge.r-project.org/reference/NeweyWest.html) function from the [sandwich](https://sandwich.r-forge.r-project.org/index.html) package. This function implements the method described in Newey and West 1994.
+ 
+ - add `type = "se_long"` to `summary.fixest_multi` which yields all coefficients and SEs for all estimations in a "long" format.
+ 
+ - only in `fixest` estimations, using a "naked" dot square bracket variable in the left-hand-side includes them as multiple left hand sides. Regular expressions can also be used in the LHS.
+```R
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+y = c("y", "x1")
+feols(.[y] ~ x2, base)
+#> Standard-errors: IID 
+#> Dep. var.: y
+#>             Estimate Std. Error t value  Pr(>|t|)    
+#> (Intercept) 4.306603   0.078389 54.9389 < 2.2e-16 ***
+#> x2          0.408922   0.018891 21.6460 < 2.2e-16 ***
+#> ---
+#> Dep. var.: x1
+#>              Estimate Std. Error  t value   Pr(>|t|)    
+#> (Intercept)  3.454874   0.076095 45.40188  < 2.2e-16 ***
+#> x2          -0.105785   0.018339 -5.76845 4.5133e-08 ***
+
+
+etable(feols(..("x") ~ y + i(species), base))
+#>                                  model 1            model 2            model 3
+#> Dependent Var.:                       x1                 x2                 x3
+#>                                                                               
+#> (Intercept)            1.677*** (0.2354) -1.702*** (0.2301) -0.4794** (0.1557)
+#> y                     0.3499*** (0.0463) 0.6321*** (0.0453) 0.1449*** (0.0306)
+#> species = versicolor -0.9834*** (0.0721)  2.210*** (0.0705) 0.9452*** (0.0477)
+#> species = virginica   -1.008*** (0.0933)  3.090*** (0.0912)  1.551*** (0.0617)
+#> ____________________ ___________________ __________________ __________________
+#> S.E. type                            IID                IID                IID
+#> Observations                         150                150                150
+#> R2                               0.56925            0.97489            0.93833
+#> Adj. R2                          0.56040            0.97438            0.93706
+```
+ 
+## Dot square bracket operator
+
+ - add a comma first, like in `.[,stuff]`, to separate variables with commas (instead of separating them with additions):
+```R
+lhs_vars = c("var1", "var2")
+xpd(c(.[,lhs_vars]) ~ csw(x.[,1:3]))
+#> c(var1, var2) ~ csw(x1, x2, x3)
+```
+
+ - new function `dsb`: applies the dot square bracket operator to character strings.
+ 
+ - in the function `dsb`, you can add a string literal in first or last position in `.[]` to "collapse" the character string in question. The way the collapse is performed depends on the position:
+```R
+name = c("Juliet", "Romeo")
+
+# default behavior => vector
+dsb("hello .[name], what's up?")
+#> [1] "hello Juliet, what's up?" "hello Romeo, what's up?" 
+
+# string literal in first position
+dsb("hello .[' and ', name], what's up?")
+#> [1] "hello Juliet and Romeo, what's up?"
+
+# string literal in last position
+dsb("hello .[name, ' and '], what's up?")
+#> [1] "hello Juliet and hello Romeo, what's up?"
+
+```
+
+## bin
+
+ - `bin`: numeric vectors can be 'cut' with the new special value `'cut::q3]p90]'`, check it out!
+```R
+data(iris)
+plen = iris$Petal.Length
+
+# 3 parts of (roughly) equal size
+table(bin(plen, "cut::3"))
+#> 
+#> [1.0; 1.9] [3.0; 4.9] [5.0; 6.9] 
+#>         50         54         46 
+
+# Three custom bins
+table(bin(plen, "cut::2]5]"))
+#> 
+#> [1.0; 1.9] [3.0; 5.0] [5.1; 6.9] 
+#>         50         58         42 
+
+# .. same, excluding 5 in the 2nd bin
+table(bin(plen, "cut::2]5["))
+#> 
+#> [1.0; 1.9] [3.0; 4.9] [5.0; 6.9] 
+#>         50         54         46 
+
+# Using quartiles
+table(bin(plen, "cut::q1]q2]q3]"))
+#> 
+#> [1.0; 1.6] [1.7; 4.3] [4.4; 5.1] [5.2; 6.9] 
+#>         44         31         41         34 
+
+# Using percentiles
+table(bin(plen, "cut::p20]p50]p70]p90]"))
+#> 
+#> [1.0; 1.5] [1.6; 4.3] [4.4; 5.0] [5.1; 5.8] [5.9; 6.9] 
+#>         37         38         33         29         13 
+
+# Mixing all
+table(bin(plen, "cut::2[q2]p90]"))
+#> 
+#> [1.0; 1.9] [3.0; 4.3] [4.4; 5.8] [5.9; 6.9] 
+#>         50         25         62         13
+
+# Adding custom names
+table(bin(plen, c("cut::2[q2]p90]", "<2", "]2; Q2]", NA, ">90%")))
+#>         <2    ]2; Q2] [4.4; 5.8]       >90% 
+#>         50         25         62         13 
+```
+
+ - `bin` also accepts formulas, e.g. `bin = list("<2" = ~ x < 2)` (`x` must be the only variable).
+ 
+ - `bin` accepts the use of `.()` for `list()`.
+ 
+ - you can add the location of the element using `@d` in the name. Useful to rearrange factors:
+```R
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+table(base$species)
+#>     setosa versicolor  virginica 
+#>         50         50         50
+
+table(bin(base$species, .("@3" = "seto", "@1 VIRGIN" = "virg")))
+#>     VIRGIN versicolor     setosa 
+#>         50         50         50 
+```
+ 
+ 
+## etable
+
+ - the tex output is now "nicely" formatted.
+ 
+ - argument `extralines` replaces the argument `extraline` to increase coherence. Hence function `extraline_register` becomes `extralines_register` (the change is done without deprecation since I guess this function must be only rarely used).
+ 
+ - arguments `extralines` and `headers` accept `.()` for `list()`.
+```R
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+
+```
+ 
+## New function
+ 
+ - `check_conv_feols`: checks the convergence of the fixed-effects in `feols` models by looking at the first-order conditions.
+ 
+## New functions, unrelated but possibly useful
+
+Although a bit unrelated to the purpose of this package, these functions are so extensively used in the author's research that he decided to leverage his author privileges to include them in `fixest` to make them easier to share with co-authors.
+
+ - `osize`: simple function returning a formatted object size.
+ 
+ - `n_unik`: simple but flexible function returning the number of unique elements from variables in one or several data sets. Useful for checking keys.
+ 
+ - `sample_df`: simple function to extract random lines from a `data.frame`.
+ 
+## Other
+
+ - improve error messages when `subset` does not select any element.
+ 
+ - add inheritance of the default style in `iplot` when the style is set globally with `setFixest_coefplot`.
+ 
+ - improve error messages in general by prompting additional error calls.
+ 
+ - the dictionaries now ignore white spaces in coefficient names (thanks to Caleb Kwon).
+ 
+ - the package startup messages have been improved (they should pop up less often).
+ 
+ - to comply with CRAN policies, the startup message doesn't write on the .Renviron file any more.
+
 # fixest 0.10.0
 
 ## Bugs fixes

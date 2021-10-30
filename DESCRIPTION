@@ -1,7 +1,7 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.10.0
+Version: 0.10.1
 Authors@R: 
     c(person(given = "Laurent",
              family = "Berge",
@@ -15,8 +15,8 @@ Authors@R:
              role = "ctb",
              email = "grantmcd@uoregon.edu",
              comment = c(ORCID = "0000-0001-7883-8573")))
-Imports: stats, graphics, grDevices, utils, methods, numDeriv, nlme,
-        sandwich, Rcpp, dreamerr(>= 1.2.3)
+Imports: stats, graphics, grDevices, tools, utils, methods, numDeriv,
+        nlme, sandwich, Rcpp, dreamerr(>= 1.2.3)
 Suggests: knitr, rmarkdown, data.table, plm, MASS, pander, ggplot2, lfe
 LinkingTo: Rcpp
 Depends: R(>= 3.5.0)
@@ -30,13 +30,13 @@ URL: https://lrberge.github.io/fixest/,
 SystemRequirements: C++11
 VignetteBuilder: knitr
 LazyData: true
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2021-09-27 19:56:10 UTC; lrberge
+Packaged: 2021-10-30 21:18:53 UTC; berge028
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb],
   Grant McDermott [ctb] (<https://orcid.org/0000-0001-7883-8573>)
 Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2021-09-28 12:10:02 UTC
+Date/Publication: 2021-10-30 22:00:02 UTC

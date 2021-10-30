@@ -868,23 +868,23 @@ se = function(object, vcov, ssc, cluster, keep, drop, order, ...){
 
     if(is.matrix(object) && nrow(object) == ncol(object)){
         # special case => object is a VCOV matrix and NOT an estimation
-        return(sqrt(diag(object)))
-    }
+        res = sqrt(diag(object))
 
+    } else {
+        mc = match.call()
+        mc[[1]] = as.name("coeftable")
+        mc$object = as.name("object")
 
-    mc = match.call()
-    mc[[1]] = as.name("coeftable")
-    mc$object = as.name("object")
+        mat = eval(mc)
 
-    mat = eval(mc)
+        if(ncol(mat) != 4){
+            stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4). You can investigate the problem using function coeftable().")
+        }
 
-    if(ncol(mat) != 4){
-        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4). You can investigate the problem using function coeftable().")
-    }
-
-    res = mat[, 2]
-    if(is.null(names(res))) {
-        names(res) = rownames(mat)
+        res = mat[, 2]
+        if(is.null(names(res))) {
+            names(res) = rownames(mat)
+        }
     }
 
     if(!missnull(keep) || !missnull(drop) || !missnull(order)){
@@ -1060,7 +1060,9 @@ summary.fixest.fixef = function(object, n=5, ...){
 #' # Plotting them:
 #' plot(fe_trade)
 #'
-fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, ...){
+fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthreads = getFixest_nthreads(),
+                        fixef.tol = 1e-5, fixef.iter = 10000, ...){
+
 	# object is a fixest object
 	# This function retrieves the dummies
 
@@ -1069,9 +1071,8 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, ...){
     # Checking the arguments
     validate_dots(valid_args = "fixef.tol")
 
-    dots = list(...)
-    fixef.tol = dots$fixef.tol
-    check_value_plus(fixef.tol, "NULL{1e-5} numeric scalar GT{0} LT{1}")
+    check_value(fixef.tol, "numeric scalar GT{0} LT{1}")
+    check_value(fixef.iter, "strict integer scalar GT{0}")
 
     if(isTRUE(object$lean)){
         # LATER: recompute the FEs by extracting them from the data
@@ -1130,14 +1131,15 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, ...){
 	    # STEP 2: demeaning
 	    #
 
+	    nthreads = check_set_nthreads(nthreads)
 
 	    table_id_I = as.integer(unlist(lapply(fe_id_list, table), use.names = FALSE))
 
-	    S_demean = cpp_demean(y = S, X_raw = 0, r_weights = 0, iterMax = 1000L,
+	    S_demean = cpp_demean(y = S, X_raw = 0, r_weights = 0, iterMax = as.integer(fixef.iter),
 	                           diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
 	                           fe_id_list = fe_id_list, table_id_I = table_id_I,
 	                           slope_flag_Q = slope_flag, slope_vars_list = slope_variables,
-	                           r_init = 0, nthreads = 1L, save_fixef = TRUE)
+	                           r_init = 0, nthreads = nthreads, save_fixef = TRUE)
 
 	    fixef_coef = S_demean$fixef_coef
 
@@ -1306,9 +1308,9 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, ...){
 
 	# Family information
 	attr(all_clust, "exponential") = FALSE
-	if(object$method == "femlm" && object$family %in% c("poisson", "negbin")){
+	if(object$method_type == "feNmlm" && object$family %in% c("poisson", "negbin")){
 		attr(all_clust, "exponential") = TRUE
-	} else if(object$method == "feglm" && object$family$link == "log"){
+	} else if(object$method_type == "feglm" && object$family$link == "log"){
 		attr(all_clust, "exponential") = TRUE
 	}
 
@@ -1458,7 +1460,7 @@ collinearity = function(x, verbose){
 
     # stop("Sorry, it does not work. A new version will hopefully come soon.")
 
-	if(class(x) != "fixest"){
+	if(!inherits(x, "fixest")){
 		stop("Argument 'x' must be a fixest object.")
 	}
 
@@ -1506,23 +1508,7 @@ collinearity = function(x, verbose){
 	}
 
 	# Panel setup
-	if(check_lag(linear_fml)){
-	    if(!is.null(x$panel.info)){
-	        if(is.null(attr(data, "panel_info"))){
-	            # We try to recreate the panel
-	            if(any(!names(x$panel.info) %in% c("", "data", "panel.id"))){
-	                # This was NOT a standard panel creation
-	                stop("The original data set was a fixest_panel, now it isn't any more. Please restore the original data to a panel to perform the collinearity check. NOTA: the original call to panel was:\n", deparse_long(x$panel.info))
-	            } else {
-	                panel__meta__info = panel_setup(data, x$panel.id, from_fixest = TRUE)
-	            }
-	        } else {
-	            panel__meta__info = attr(data, "panel_info")
-	        }
-	    } else {
-	        panel__meta__info = panel_setup(data, x$panel.id, from_fixest = TRUE)
-	    }
-	}
+	panel__meta__info = set_panel_meta_info(x, data)
 
 	if(isLinear || isFixef || "(Intercept)" %in% names(coef)){
 		# linear.matrix = model.matrix(linear_fml, data)
@@ -2481,7 +2467,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 #' @param keep A vector of values to be kept from \code{factor_var} (all others are dropped). By default they should be values from \code{factor_var} and if \code{keep} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
 #' @param ref2 A vector of values to be dropped from \code{var}. By default they should be values from \code{var} and if \code{ref2} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
 #' @param keep2 A vector of values to be kept from \code{var} (all others are dropped). By default they should be values from \code{var} and if \code{keep2} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
-#' @param bin2 A list or vector defining the binning of the second variable. See help for the argument \code{bin} for details (or look at the help of the function \code{\link[fixest]{bin}}).
+#' @param bin2 A list or vector defining the binning of the second variable. See help for the argument \code{bin} for details (or look at the help of the function \code{\link[fixest]{bin}}). You can use \code{.()} for \code{list()}.
 #' @param ... Not currently used.
 #'
 #' @details
@@ -2519,6 +2505,13 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 #'
 #' # to force a numeric variable to be treated as a factor: use i.
 #' data.frame(x, y, i(x, i.y))
+#'
+#' # Binning
+#' data.frame(x, i(x, bin = list(ab = c("a", "b"))))
+#'
+#' # Same as before but using .() for list() and a regular expression
+#' # note that to trigger a regex, you need to use an @ first
+#' data.frame(x, i(x, bin = .(ab = "@a|b")))
 #'
 #' #
 #' # In fixest estimations
@@ -2679,12 +2672,20 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
         is_na_all = is.na(f)
     }
 
-    if(!MISSNULL(bin)){
-        f = bin_factor(bin, f, f_name)
+    if(!missing(bin)){
+        bin = error_sender(eval_dot(bin), arg_name = "bin")
+
+        if(!is.null(bin)){
+            f = bin_factor(bin, f, f_name)
+        }
     }
 
     if(IS_INTER_FACTOR && !MISSNULL(bin2)){
-        var = bin_factor(bin2, var, f_name)
+        bin2 = error_sender(eval_dot(bin2), arg_name = "bin2")
+
+        if(!is.null(bin2)){
+            var = bin_factor(bin2, var, f_name)
+        }
     }
 
     if(IS_INTER_FACTOR){
@@ -2869,7 +2870,29 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #' Tool to easily group the values of a given variable.
 #'
 #' @param x A vector whose values have to be grouped. Can be of any type but must be atomic.
-    #' @param bin A list of values to be grouped, a vector, or the special value \code{"bin::digit"}. To create a new value from old values, use \code{bin = list("new_value"=old_values)} with \code{old_values} a vector of existing values. It accepts regular expressions, but they must start with an \code{"@"}, like in \code{bin="@Aug|Dec"}. The names of the list are the new names. If the new name is missing, the first value matched becomes the new name. Feeding in a vector is like using a list without name and only a single element. If the vector is numeric, you can use the special value \code{"bin::digit"} to group every \code{digit} element. For example if \code{x} represent years, using \code{bin="bin::2"} create bins of two years. Using \code{"!bin::digit"} groups every digit consecutive values starting from the first value. Using \code{"!!bin::digit"} is the same bu starting from the last value. In both cases, \code{x} is not required to be numeric.
+#' @param bin A list of values to be grouped, a vector, a formula, or the special values \code{"bin::digit"} or \code{"cut::values"}. To create a new value from old values, use \code{bin = list("new_value"=old_values)} with \code{old_values} a vector of existing values. You can use \code{.()} for \code{list()}.
+#' It accepts regular expressions, but they must start with an \code{"@"}, like in \code{bin="@Aug|Dec"}. It accepts one-sided formulas which must contain the variable \code{x}, e.g. \code{bin=list("<2" = ~x < 2)}.
+#' The names of the list are the new names. If the new name is missing, the first value matched becomes the new name. In the name, adding \code{"@d"}, with \code{d} a digit, will relocate the value in position \code{d}: useful to change the position of factors. Use \code{"@"} as first item to make subsequent items be located first in the factor.
+#' Feeding in a vector is like using a list without name and only a single element. If the vector is numeric, you can use the special value \code{"bin::digit"} to group every \code{digit} element.
+#' For example if \code{x} represents years, using \code{bin="bin::2"} creates bins of two years.
+#' With any data, using \code{"!bin::digit"} groups every digit consecutive values starting from the first value.
+#' Using \code{"!!bin::digit"} is the same but starting from the last value.
+#' With numeric vectors you can: a) use \code{"cut::n"} to cut the vector into \code{n} equal parts, b) use \code{"cut::a]b["} to create the following bins: \code{[min, a]}, \code{]a, b[}, \code{[b, max]}.
+#' The latter syntax is a sequence of number/quartile (q0 to q4)/percentile (p0 to p100) followed by an open or closed square bracket. You can add custom bin names by adding them in the character vector after \code{'cut::values'}. See details and examples. Dot square bracket expansion (see \code{\link[fixest]{dsb}}) is enabled.
+#'
+#' @section "Cutting" a numeric vector:
+#'
+#' Numeric vectors can be cut easily into: a) equal parts, b) user-specified bins.
+#'
+#' Use \code{"cut::n"} to cut the vector into \code{n} (roughly) equal parts. Percentiles are used to partition the data, hence some data distributions can lead to create less than \code{n} parts (for example if P0 is the same as P50).
+#'
+#' The user can specify custom bins with the following syntax: \code{"cut::a]b]c]"etc}. Here the numbers \code{a}, \code{b}, \code{c}, etc, are a sequence of increasing numbers, each followed by an open or closed square bracket. The numbers can be specified as either plain numbers (e.g. \code{"cut::5]12[32["}), quartiles (e.g. \code{"cut::q1]q3["}), or percentiles (e.g. \code{"cut::p10]p15]p90]"}). Values of different types can be mixed: \code{"cut::5]q2[p80["} is valid provided the median (\code{q2}) is indeed greater than \code{5}, otherwise an error is thrown.
+#'
+#' The square bracket right of each number tells whether the numbers should be included or excluded from the current bin. For example, say \code{x} ranges from 0 to 100, then \code{"cut::5]"} will create two  bins: one from 0 to 5 and a second from 6 to 100. With \code{"cut::5["} the bins would have been 0-4 and 5-100.
+#'
+#' A factor is returned. The labels report the min and max values in each bin.
+#'
+#' To have user-specified bin labels, just add them in the character vector following \code{'cut::values'}. You don't need to provide all of them, and \code{NA} values fall back to the default label. For example, \code{bin = c("cut::4", "Q1", NA, "Q3")} will modify only the first and third label that will be displayed as \code{"Q1"} and \code{"Q3"}.
 #'
 #' @return
 #' It returns a vector of the same length as \code{x}
@@ -2898,6 +2921,9 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #' # ... idem starting from the last one
 #' table(bin(month_num, "!!bin::2"))
 #'
+#' # Using .() for list():
+#' table(bin(month_num, .("g1" = 5:6)))
+#'
 #'
 #' #
 #' # with non numeric data
@@ -2921,10 +2947,64 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #' # ...idem but starting from the last
 #' table(bin(month_fact, "!!bin::2"))
 #'
+#' # Relocating the months using "@d" in the name
+#' table(bin(month_fact, .("@5" = "may", "@1 summer" = "@aug|jul")))
+#'
+#' # Putting "@" as first item means subsequent items will be placed first
+#' table(bin(month_fact, .("@", "aug", "july")))
+#'
+#' #
+#' # "Cutting" numeric data
+#' #
+#'
+#' data(iris)
+#' plen = iris$Petal.Length
+#'
+#' # 3 parts of (roughly) equal size
+#' table(bin(plen, "cut::3"))
+#'
+#' # Three custom bins
+#' table(bin(plen, "cut::2]5]"))
+#'
+#' # .. same, excluding 5 in the 2nd bin
+#' table(bin(plen, "cut::2]5["))
+#'
+#' # Using quartiles
+#' table(bin(plen, "cut::q1]q2]q3]"))
+#'
+#' # Using percentiles
+#' table(bin(plen, "cut::p20]p50]p70]p90]"))
+#'
+#' # Mixing all
+#' table(bin(plen, "cut::2[q2]p90]"))
+#'
+#' # NOTA:
+#' # -> the labels always contain the min/max values in each bin
+#'
+#' # Custom labels can be provided, just give them in the char. vector
+#' # NA values lead to the default label
+#' table(bin(plen, c("cut::2[q2]p90]", "<2", "]2; Q2]", NA, ">90%")))
+#'
+#'
+#'
+#' #
+#' # With a formula
+#' #
+#'
+#' data(iris)
+#' plen = iris$Petal.Length
+#'
+#' # We need to use "x"
+#' table(bin(plen, list("< 2" = ~x < 2, ">= 2" = ~x >= 2)))
+#'
 #'
 bin = function(x, bin){
 
     check_arg(x, "vector mbt")
+
+
+    bin = error_sender(eval_dot(bin), arg_name = "bin")
+
     check_arg(bin, "list | vector mbt")
 
     varname = deparse(substitute(x))[1]
@@ -2959,15 +3039,19 @@ bin = function(x, bin){
 #'
 #' You can include a full variable from the environment in the same way: \code{for(y in c("a", "b")) xpd(.[y] ~ x)} will create the two formulas \code{a ~ x} and \code{b ~ x}.
 #'
-#' The DSB can even be used within variable names, but then the variable must be nested in character form. For example \code{y ~ .["x.[1:2]_sq"]} will create \code{y ~ x1_sq +  x2_sq}. Using the character form is important to avoid a formula parsing error.
+#' The DSB can even be used within variable names, but then the variable must be nested in character form. For example \code{y ~ .["x.[1:2]_sq"]} will create \code{y ~ x1_sq + x2_sq}. Using the character form is important to avoid a formula parsing error. Double quotes must be used. Note that the character string that is nested will be parsed with the function \code{\link[fixest]{dsb}}, and thus it will return a vector.
+#'
+#' By default, the DSB operator expands vectors into sums. You can add a comma, like in \code{.[, x]}, to expand with commas--the content can then be used within functions. For instance: \code{c(x.[, 1:2])} will create \code{c(x1, x2)} (and \emph{not} \code{c(x1 + x2)}).
 #'
 #' In all \code{fixest} estimations, this special parsing is enabled, so you don't need to use \code{xpd}.
 #'
-#' Limitations: the use of multiple square brackets within a single variable is not implemented. For example, the following will not work \code{xpd(y ~ ..x, ..x = x.[1:3]_.[1:3])}.
+#' You can even use multiple square brackets within a single variable, but then the use of nesting is required. For example, the following \code{xpd(y ~ .[".[letters[1:2]]_.[1:2]"])} will create \code{y ~ a_1 + b_2}. Remember that the nested character string is parsed with \code{\link[fixest]{dsb}}, which explains this behavior.
 #'
 #' @section Regular expressions:
 #'
 #' You can catch several variable names at once by using regular expressions. To use regular expressions, you need to enclose it in the dot-dot function: \code{..("regex")}. For example, \code{..("Sepal")} will catch both the variables \code{Sepal.Length} and \code{Sepal.Width} from the \code{iris} data set. In a \code{fixest} estimation, the variables names from which the regex will be applied come from the data set. If you use \code{xpd}, you need to provide either a data set or a vector of names in the argument \code{data}.
+#'
+#' By default the variables are aggregated with a sum. For example in a data set with the variables x1 to x10, \code{..("x(1|2)"} will yield \code{x1 + x2 + x10}. You can instead ask for "comma" aggregation by using a comma first, just before the regular expression: \code{y ~ sw(..(,"x(1|2)"))} would lead to \code{y ~ sw(x1, x2, x10)}.
 #'
 #' Note that the dot square bracket operator (DSB, see before) is applied before the regular expression is evaluated. This means that \code{..("x.[3:4]_sq")} will lead, after evaluation of the DSB, to \code{..("x3_sq|x4_sq")}. It is a handy way to insert range of numbers in a regular expression.
 #'
@@ -2975,9 +3059,12 @@ bin = function(x, bin){
 #' @return
 #' It returns a formula where all macros have been expanded.
 #'
+#' @author
+#' Laurent Berge
+#'
 #'
 #' @seealso
-#' \code{\link[fixest]{setFixest_fml}} to set formula macros.
+#' \code{\link[fixest]{setFixest_fml}} to set formula macros, and \code{\link[fixest]{dsb}} to modify character strings with the DSB operator.
 #'
 #' @examples
 #'
@@ -3102,6 +3189,11 @@ bin = function(x, bin){
 #'
 #' # => equivalent to ..("GNP|Pop")
 #'
+#' # Use .[,var] (NOTE THE COMMA!) to expand with commas
+#' # !! can break the formula if missused
+#' vars = c("wage", "unemp")
+#' xpd(c(y.[,1:3]) ~ csw(.[,vars]))
+#'
 #'
 xpd = function(fml, ..., lhs, rhs, data = NULL){
     .xpd(fml = fml, ..., lhs = lhs, rhs = rhs, data = data, check = TRUE, macro = TRUE, frame = parent.frame())
@@ -3156,8 +3248,10 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
 
     is_macro = length(macros) != 0
     is_data = !missnull(data)
-    is_brackets = "[" %in% all.vars(fml, functions = TRUE)
-    if(!(is_macro || is_data || is_brackets)) return(fml)
+    fml_funs = all.vars(fml, functions = TRUE)
+    is_brackets = "[" %in% fml_funs
+    is_dot_dot = ".." %in% fml_funs
+    if(!(is_macro || is_data || is_brackets || is_dot_dot)) return(fml)
 
     fml_dp = NULL
 
@@ -3173,39 +3267,63 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
         }
     }
 
-    if(is_data){
+    if(is_dot_dot){
         # We expand only if data is provided (it means the user wants us to check)
+        # if .[]: we expand inside the ..(".[1:3]") => ..("1|2|3")
+
         if(is.null(fml_dp)) fml_dp = deparse_long(fml)
+        is_brackets = grepl(".[", fml_dp, fixed = TRUE)
 
-        if(grepl('..("', fml_dp, fixed = TRUE)){
+        if(is_data || is_brackets){
 
-            check_arg(data, "character vector no na | matrix | data.frame")
+            if(is.null(fml_dp)) fml_dp = deparse_long(fml)
 
-            if(is.matrix(data)){
-                data = colnames(data)
-                if(is.null(data)){
-                    stop("The argument 'data' must contain variable names. It is currently a matrix without column names.")
+            if(is_data){
+                check_arg(data, "character vector no na | matrix | data.frame")
+
+                if(is.matrix(data)){
+                    data = colnames(data)
+                    if(is.null(data)){
+                        stop("The argument 'data' must contain variable names. It is currently a matrix without column names.")
+                    }
+                } else if(is.data.frame(data)){
+                    data = names(data)
                 }
-            } else if(is.data.frame(data)){
-                data = names(data)
             }
 
-            fml_dp_split = strsplit(fml_dp, '..("', fixed = TRUE)[[1]]
+            fml_dp_split = strsplit(fml_dp, '\\.\\.\\((?=[,"])', perl = TRUE)[[1]]
 
             res = fml_dp_split
             for(i in 2:length(res)){
                 re = gsub('"\\).*', "", res[i])
+
                 re_width = nchar(re)
+
+                is_comma = grepl("^,", re)
+                re = gsub("^,? ?\"", "", re)
+
                 re = dot_square_bracket(re, frame, regex = TRUE)
-                vars = grep(re, data, value = TRUE, perl = TRUE)
-                if(length(vars) == 0){
-                    vars = "1"
+
+                if(is_data){
+                    vars = grep(re, data, value = TRUE, perl = TRUE)
+                    if(length(vars) == 0){
+                        vars = "1"
+                    }
+
+                    coll = if(is_comma) ", " else " + "
+
+                    res[i] = paste0(paste(vars, collapse = coll), substr(res[i], re_width + 3, nchar(res[i])))
+                } else {
+                    res[i] = paste0("..(\"", re, "\")", substr(res[i], re_width + 3, nchar(res[i])))
                 }
 
-                res[i] = paste0(paste(vars, collapse = "+"), substr(res[i], re_width + 3, nchar(res[i])))
             }
 
-            fml = as.formula(paste(res, collapse = ""), frame)
+            fml_txt = paste(res, collapse = "")
+            fml = error_sender(as.formula(fml_txt, frame),
+                               "Expansion of variables in ..(\"regex\"): coercion of the following text to a formula led to an error.\n",
+                               fit_screen(paste0("     TEXT: ", fml_txt)),
+                               "\n  PROBLEM: see below", up = 1)
         }
     }
 
@@ -3219,12 +3337,97 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
                 fml_txt = dot_square_bracket(fml_txt, frame)
             }
 
-            fml = as.formula(fml_txt, frame)
+            fml = error_sender(as.formula(fml_txt, frame),
+                               "Dot square bracket operator: coercion of the following text to a formula led to an error.\n",
+                               fit_screen(paste0("     TEXT: ", fml_txt)),
+                               "\n  PROBLEM: see below", up = 1)
         }
 
     }
 
     fml
+}
+
+
+
+#' Extends strings with variables using the Dot Square Bracket operator
+#'
+#' Simple utility to insert variables into character strings using the "dot square bracket" operator. Typically \code{dsb("Hello I'm .[x]!")} is equivalent to \code{paste0("hello I'm ", x, "!")}.
+#'
+#' @param x A character string, must be of length 1. Every expression inside \code{.[]} is evaluated in the current frame and then coerced to character and inserted into the character string. For example: \code{dsb("hello .[name]")} is equivalent to \code{paste0("hello ", name)}. You can add a string literal as first or last element in the \code{.[]}. Doing so will collapse the expression. If first, as in \code{.['text', expr]}, the expression is first collapsed: \code{paste0(expr, collapse = "text")} is applied. If last, as in \code{"before.[expr, 'text']"}, the expression is collapsed to the previous adjacent text: \code{paste0("before", expr, collapse = "text")} is applied. The collapsing is always done with the previous text only. To collapse the whole string, use the argument `collapse`.
+#' @param collapse If the variables inserted into the string are of length greater than 1, you can merge into a single string with \code{collapse}.
+#'
+#' Every expression inside \code{.[]} is evaluated in the current frame and then coerced to character and inserted into the character string.
+#'
+#' @section Collapsing:
+#'
+#' If the expression inside \code{.[]} is a vector, a vector will be returned, except when we explicitly request the character string to be "collapsed". There are three main ways to do the collapsing that we detail below. Throughout, consider that the variable \code{name} is equal to \code{name = c("Romeo", "Juliet")} and the example \code{dsb("hello .[name], what's up?")}.
+#'
+#'
+#' \itemize{
+#'
+#' \item{full collapse:}{The argument \code{collapse} is used. All the string elements are attached. For example \code{dsb("hello .[name], what's up?", collapse = " And... ")} leads to \code{"hello Romeo, what's up? And... hello Juliet, what's up?"}.}
+#' \item{expression-collapse:}{There is a string literal in the first position of \code{.[]}. In that case the expression in brackets is first collapsed before being merged. For example in \code{dsb("hello .[' and ', name], what's up?")} leads to \code{"hello Romeo and Juliet, what's up?"}. If you add a comma but omit the string literal, the default is to collapse with a space: \code{.[,expr]} is equivalent to \code{.[" ", expr]}.}
+#' \item{text-expression-collapse:}{There is a string literal in the second position of \code{.[]}. In that case the expression in brackets is collapsed to the adjacent string on the left. For example in \code{dsb("hello .[name, ' and '], what's up?")} leads to \code{"hello Romeo and hello Juliet, what's up?"}. If you add a comma but omit the string literal, the default is to collapse with a space: \code{.[expr,]} is equivalent to \code{.[expr, " "]}.}
+#'
+#' }
+#'
+#' @return
+#' A character vector. It is of length > 1 only if the variables inserted are of length > 1.
+#'
+#' @author
+#' Laurent Berge
+#'
+#' @examples
+#'
+#' guy_all = c("Jenny", "Bryan")
+#' loc_all = c("kitchen", "bathroom")
+#'
+#' guy = sample(guy_all, 1)
+#' loc = sample(loc_all, 1)
+#'
+#' dsb("Where is .[guy]? .[guy] is in the .[loc].")
+#'
+#' # Since the stuff in brackets is evaluated in the current frame,
+#' # you can do things like:
+#'
+#' guy_gen = function() sample(guy_all, 1)
+#' loc_gen = function() sample(loc_all, 1)
+#'
+#' dsb("Where is .[g <- guy_gen()]? .[g] is in the .[loc_gen()].")
+#'
+#'
+#' #
+#' # Collapsing options
+#' #
+#'
+#' name = c("Romeo", "Juliet")
+#'
+#' # full collapse with argument collapse
+#' dsb("hello .[name], what's up?", collapse = " and ")
+#'
+#' # collapse the expression by adding a string literal
+#' # in the *first* position of .[]
+#' dsb("hello .[' and ', name], what's up?")
+#'
+#' # collapsing the epression with the previous string
+#' # using a string literal in the *second* position
+#' dsb("hello .[name, ' and '], what's up?")
+#'
+#' # The elements can also be empty, leading to collapse with a " "
+#' dsb("hello .[, name], what's up?")
+#' dsb("hello .[name, ], what's up?")
+#'
+dsb = function(x, collapse = NULL){
+    check_arg(x, "character scalar")
+    check_arg(collapse, "NULL character scalar")
+
+    res = dot_square_bracket(x, frame = parent.frame(), text = TRUE)
+    if(!is.null(collapse)){
+        res = paste0(res, collapse = collapse)
+    }
+
+    res
 }
 
 
@@ -3278,7 +3481,8 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
 #' # You can use multi.join to handle the join of the items:
 #' to_integer(x1, x2, add_items = TRUE, multi.join = "; ")
 #'
-to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE, multi.df = FALSE, multi.join = "_", internal = FALSE){
+to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE,
+                      multi.df = FALSE, multi.join = "_", internal = FALSE){
 
     if(!internal) check_arg(..., "vector mbt")
     check_arg(sorted, add_items, items.list, "logical scalar")
@@ -3456,7 +3660,7 @@ to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE
 #'
 #' @inheritSection feols Varying slopes
 #'
-#' @param X A matrix, vector, data.frame or a list OR a formula. If equal to a formula, then the argument \code{data} is required, and it must be of the type: \code{x1 + x2 ~ f1 + fe2} with on the LHS the variables to be centered, and on the RHS the factors used for centering. Note that you can use variables with varying slopes with the syntax \code{fe[v1, v2]} (see details in \code{\link[fixest]{feols}}). If not a formula, it must represent the data to be centered. Of course the dimension of that data must be the same as the factors used for centering (argument \code{f}).
+#' @param X A matrix, vector, data.frame or a list OR a formula OR a \code{\link[fixest]{feols}} estimation. If equal to a formula, then the argument \code{data} is required, and it must be of the type: \code{x1 + x2 ~ f1 + fe2} with on the LHS the variables to be centered, and on the RHS the factors used for centering. Note that you can use variables with varying slopes with the syntax \code{fe[v1, v2]} (see details in \code{\link[fixest]{feols}}). If a \code{feols} estimation, all variables (LHS+RHS) are demeaned and then returned (only if it was estimated with fixed-effects). Otherwise, it must represent the data to be centered. Of course the number of observations of that data must be the same as the factors used for centering (argument \code{f}).
 #' @param f A matrix, vector, data.frame or list. The factors used to center the variables in argument \code{X}. Matrices will be coerced using \code{as.data.frame}.
 #' @param slope.vars A vector, matrix or list representing the variables with varying slopes. Matrices will be coerced using \code{as.data.frame}. Note that if this argument is used it MUST be in conjunction with the argument \code{slope.flag} that maps the factors to which the varying slopes are attached. See examples.
 #' @param slope.flag An integer vector of the same length as the number of variables in \code{f} (the factors used for centering). It indicates for each factor the number of variables with varying slopes to which it is associated. Positive values mean that the raw factor should also be included in the centering, negative values that it should be excluded. Sorry it's complicated... but see the examples it may get clearer.
@@ -3469,6 +3673,8 @@ to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE
 #' @param na.rm Logical, default is \code{TRUE}. If \code{TRUE} and the input data contains any NA value, then any observation with NA will be discarded leading to an output with less observations than the input. If \code{FALSE}, if NAs are present the output will also be filled with NAs for each NA observation in input.
 #' @param as.matrix Logical, if \code{TRUE} a matrix is returned, if \code{FALSE} it will be a data.frame. The default depends on the input, if atomic then a matrix will be returned.
 #' @param im_confident Logical, default is \code{FALSE}. FOR EXPERT USERS ONLY! This argument allows to skip some of the preprocessing of the arguments given in input. If \code{TRUE}, then \code{X} MUST be a numeric vector/matrix/list (not a formula!), \code{f} MUST be a list, \code{slope.vars} MUST be a list, \code{slope.vars} MUST be consistent with \code{slope.flag}, and \code{weights}, if given, MUST be numeric (not integer!). Further there MUST be not any NA value, and the number of observations of each element MUST be consistent. Non compliance to these rules may simply lead your R session to break.
+#' @param fixef.reorder Logical, default is \code{TRUE}. Whether to reorder the fixed-effects by frequencies before feeding them into the algorithm. If \code{FALSE}, the original fixed-effects order provided by the user is maintained. In general, reordering leads to faster and more precise performance.
+#' @param ... Not currently used.
 #'
 #' @return
 #' It returns a data.frame of the same number of columns as the number of variables to be centered.
@@ -3558,9 +3764,9 @@ to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE
 #'
 demean = function(X, f, slope.vars, slope.flag, data, weights,
                   nthreads = getFixest_nthreads(), notes = getFixest_notes(),
-                  iter = 2000, tol = 1e-6, na.rm = TRUE,
+                  iter = 2000, tol = 1e-6, fixef.reorder = TRUE, na.rm = TRUE,
                   as.matrix = is.atomic(X),
-                  im_confident = FALSE) {
+                  im_confident = FALSE, ...) {
 
 
     ANY_NA = FALSE
@@ -3570,7 +3776,8 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
     # LB: next line is needed if input data is matrix and as.matrix is set to FALSE
     clx = NULL
-    if(lX <- is.list(X)) {
+    is_fixest = inherits(X, "fixest")
+    if(lX <- is.list(X) && !is_fixest) {
         clx <- oldClass(X)
         # SK: oldClass is faster and returns NULL when the list is plain. class returns the implicit class "list".
         # This is the key to fast R code -> all data.frame methods are super slow and should duly be avoided in internal code.
@@ -3581,13 +3788,65 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
     # LB: To avoid delayed evaluation problems (due to new default is.atomic(X))
     as_matrix = as.matrix
 
+    # internal argument
+    fe_info = FALSE
+
     # Step 1: formatting the input
     if(!im_confident){
 
-        check_arg(X, "numeric vmatrix | list | formula mbt")
+        check_arg(X, "numeric vmatrix | list | formula | class(fixest) mbt")
         check_arg(iter, "integer scalar GE{1}")
         check_arg(tol, "numeric scalar GT{0}")
         check_arg(notes, "logical scalar")
+
+        validate_dots(valid_args = "fe_info", stop = TRUE)
+        dots = list(...)
+        fe_info = isTRUE(dots$fe_info)
+
+        data_mbt = TRUE
+        if(inherits(X, "fixest")){
+            data_mbt = FALSE
+            if(!identical(X$method, "feols")){
+                stop("This function only works for 'feols' estimations (not for ", X$method, ").")
+            }
+
+            if(!fe_info && !is.null(X$y_demeaned)){
+                return(cbind(X$y_demeaned, X$X_demeaned))
+            }
+
+            if(!"fixef_vars" %in% names(X)){
+                stop("To apply demeaning, the estimation must contain fixed-effects, this is currently not the case.")
+            }
+
+            # Otherwise => we create data and X: formula
+            data = fetch_data(X)
+            fml_linear = X$fml_all$linear
+            fml_fixef = X$fml_all$fixef
+
+            fml_vars = .xpd(~ ..lhs + ..rhs,
+                            ..lhs = fml_linear[[2]],
+                            ..rhs = fml_linear[[3]])
+
+            if(!is.null(X$fml_all$iv)){
+                fml_iv = X$fml_all$iv
+                fml_vars = .xpd(~ ..vars + ..iv_lhs + ..iv_rhs,
+                                ..vars = fml_vars,
+                                ..iv_lhs = fml_iv[[2]],
+                                ..iv_rhs = fml_iv[[3]])
+            }
+
+            fml = .xpd(lhs = fml_vars, rhs = fml_fixef)
+
+            mc = match.call()
+            if(!"tol" %in% names(mc)) tol = X$fixef.tol
+            if(!"iter" %in% names(mc)) iter = X$fixef.iter
+
+            weights = X[["weights"]]
+
+            X = fml
+
+            as_matrix = TRUE
+        }
 
         #
         # X
@@ -3596,8 +3855,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
         fe_done = FALSE
         if(is.call(X)) {
 
-            # The above line is not needed anymore since model.matrix is no longer used.
-            check_arg(data, "data.frame mbt")
+            if(data_mbt) check_arg(data, "data.frame mbt")
             check_arg(X, "ts formula var(data)", .data = data)
 
             # Extracting the information
@@ -3610,11 +3868,21 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
             # FE
             fe_done = TRUE
-            f = unclass(error_sender(prepare_df(terms_fixef$fe_vars, data), "Error when evaluating the fixed-effects variables: "))
+            f = unclass(error_sender(prepare_df(terms_fixef$fe_vars, data),
+                                     "Error when evaluating the fixed-effects variables: "))
+
             isSlope = any(terms_fixef$slope_flag != 0)
 
             if(isSlope) {
-                slope.vars = unclass(error_sender(prepare_df(terms_fixef$slope_vars, data), "Error when evaluating the variable with varying slopes: "))
+
+                slope.vars = unclass(error_sender(prepare_df(terms_fixef$slope_vars, data),
+                                                  "Error when evaluating the variable with varying slopes: "))
+
+                if(anyDuplicated(terms_fixef$slope_vars)){
+                    # we need it!!!!
+                    slope.vars = slope.vars[terms_fixef$slope_vars]
+                }
+
                 slope.flag = terms_fixef$slope_flag
 
                 is_numeric = vapply(`attributes<-`(slope.vars, NULL), is.numeric, TRUE)
@@ -3829,6 +4097,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
     #
     # Unclassing fes
     #
+
     quf_info_all = cpppar_quf_table_sum(x = f, y = 0, do_sum_y = FALSE, rm_0 = FALSE,
                                         rm_1 = FALSE, rm_single = FALSE, do_refactor = FALSE,
                                         r_x_sizes = 0, obs2keep = 0, only_slope = slope.flag < 0L,
@@ -3837,6 +4106,60 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
     # table/sum_y/sizes
     fixef_table = quf_info_all$table
     fixef_sizes = lengths(fixef_table)
+
+    if(fixef.reorder){
+        new_order = order(fixef_sizes, decreasing = TRUE)
+        if(is.unsorted(new_order)){
+            fixef_table = fixef_table[new_order]
+            fixef_sizes = fixef_sizes[new_order]
+            quf_info_all$quf = quf_info_all$quf[new_order]
+
+            # We reorder slope.vars only if needed (because it is a pain)
+            if(sum(slope.flag != 0) >= 2){
+
+                # here slope.vars have 2 or more variables:
+                # either matrix or data.frame/list
+                if(!is.list(slope.vars)){
+                    slope.vars = as.data.frame(slope.vars)
+                }
+                # we ensure it's a plain list
+                slope.vars = unclass(slope.vars)
+
+                n_fixef = length(slope.flag)
+                slope_vars_list = vector("list", n_fixef)
+                id_current = 0
+                for(i in 1:n_fixef){
+                    n_slopes = abs(slope.flag[i])
+
+                    if(n_slopes == 0){
+                        slope_vars_list[[i]] = 0
+                    } else {
+                        slope_vars_list[[i]] = slope.vars[1:n_slopes + id_current]
+                        id_current = id_current + n_slopes
+                    }
+                }
+
+                # Reordering => currently it's quite clumsy (but I HATE VSs!)
+                slope.vars = vector("list", sum(abs(slope.flag)))
+                slope_vars_list_reordered = slope_vars_list[new_order]
+                id_current = 0
+                for(i in 1:n_fixef){
+                    vs = slope_vars_list_reordered[[i]]
+                    if(is.list(vs)){
+                        n_vs = length(vs)
+                        for(j in 1:n_vs){
+                            slope.vars[[id_current + j]] = vs[[j]]
+                        }
+                        id_current = id_current + n_vs
+                    }
+                }
+
+                # slope.flag must be reordered afterwards
+                slope.flag = slope.flag[new_order]
+            }
+        }
+    }
+
     fixef_table_vector = unlist(fixef_table)
     if(!is.integer(slope.flag)) slope.flag = as.integer(slope.flag)
 
@@ -3851,7 +4174,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
         # Quirk => y returns a list only if NCOL(y) > 1 or is.list(y)
         y = if(lX) X else list(X)
         # SK: This does the same, a bit more frugal
-        # LB: I tend to prefer late evaluations instead of lX which requires bookeeping
+        # LB: I tend to prefer late evaluations instead of lX which requires bookkeeping
         X = 0
     }
 
@@ -3860,6 +4183,17 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
                               fe_id_list = quf_info_all$quf, table_id_I = fixef_table_vector,
                               slope_flag_Q = slope.flag, slope_vars_list = slope.vars,
                               r_init = 0, nthreads = nthreads)
+
+    # Internal call
+    if(fe_info){
+
+        res = list(y = vars_demean$y_demean, X = vars_demean$X_demean,
+                   weights = weights, fixef_id_list = quf_info_all$quf,
+                   slope_vars = slope.vars, slope_flag = slope.flag, varnames = colnames(X))
+
+        return(res)
+
+    }
 
 
     if(as_matrix) {
@@ -3938,10 +4272,1106 @@ obs = function(x){
     return(id)
 }
 
+
+
+
+#' Check the fixed-effects convergence of a \code{feols} estimation
+#'
+#' Checks the convergence of a \code{feols} estimation by computing the first-order conditions of all fixed-effects (all should be close to 0)
+#'
+#' @param x A \code{\link[fixest]{feols}} estimation that should contain fixed-effects.
+#' @param object An object returned by \code{check_conv_feols}.
+#' @param type Either "short" (default) or "detail". If "short", only the maximum absolute FOC are displayed, otherwise the 2 smallest and the 2 largest FOC are reported for each fixed-effect and each variable.
+#' @param ... Not currently used.
+#'
+#' Note that this function first re-demeans the variables, thus possibly incurring some extra computation time.
+#'
+#' @return
+#' It returns a list of \code{N} elements, \code{N} being the number of variables in the estimation (dependent variable + explanatory variables +, if IV, endogenous variables and instruments). For each variable, all the first-order conditions for each fixed-effect are returned.
+#'
+#' @examples
+#'
+#' base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+#' base$FE = rep(1:30, 5)
+#'
+#' # one estimation with fixed-effects + varying slopes
+#' est = feols(y ~ x1 | species[x2] + FE[x3], base)
+#'
+#' # Checking the convergence
+#' conv = check_conv_feols(est)
+#'
+#' # We can check that al values are close to 0
+#' summary(conv)
+#'
+#' summary(conv, "detail")
+#'
+#'
+#'
+check_conv_feols = function(x){
+
+    check_arg(x, "class(fixest) mbt")
+    if(!identical(x$method, "feols")){
+        stop("This function only works for 'feols' estimations (not for ", x$method, ").")
+    }
+
+    if(!"fixef_vars" %in% names(x)){
+        message("This function only works with fixed-effects (which are currently not present).")
+        return(NULL)
+    }
+
+    # fixef names for information
+    new_order = x$fe.reorder
+    fixef_vars = x$fixef_vars[new_order]
+    if(!is.null(x$fixef_terms)){
+
+        slope_variables = x$slope_variables_reordered
+        slope_flag = x$slope_flag_reordered
+
+        # We reconstruct the terms
+        fixef_names = c()
+        start = c(0, cumsum(abs(slope_flag)))
+        for(i in seq_along(slope_flag)){
+            sf = slope_flag[i]
+            if(sf >= 0){
+                fixef_names = c(fixef_names, fixef_vars[i])
+            }
+
+            if(abs(sf) > 0){
+                fixef_names = c(fixef_names, paste0(fixef_vars[i], "[[", names(slope_variables)[start[i] + 1:abs(sf)], "]]"))
+            }
+        }
+    } else {
+        fixef_names = fixef_vars
+    }
+
+
+    info = demean(x, fe_info = TRUE)
+
+    res = check_conv(y = info$y, X = info$X, fixef_id_list = info$fixef_id_list,
+                     slope_flag = info$slope_flag, slope_vars = info$slope_vars,
+                     weights = info$weights, full = TRUE, fixef_names = fixef_names)
+
+    names(res) = info$varnames
+
+    class(res) = "fixest_check_conv"
+
+    res
+}
+
+#' @rdname check_conv_feols
+summary.fixest_check_conv = function(object, type = "short", ...){
+
+    check_arg_plus(type, "match(short, detail)")
+    validate_dots(suggest_args = "type")
+
+    if(type == "short"){
+        info_max_abs = lapply(object, function(x) sapply(x, function(y) max(abs(y))))
+
+        info_max_abs = do.call("rbind", info_max_abs)
+
+        cat("Maximum absolute value of the first-order conditions:\n\n")
+        print(info_max_abs)
+
+    } else {
+
+        extract_and_format = function(x){
+            # x: list
+
+            x_sorted = lapply(x, sort)
+
+            is_short = sapply(x, function(y) length(y) <= 4)
+
+            x_small = list()
+            for(i in seq_along(x)){
+                xi = x_sorted[[i]]
+                if(is_short[i]){
+                    x_small[[i]] = c(xi, rep(NA, 4 - length(xi)))
+                } else {
+                    x_small[[i]] = c(head(xi, 2), tail(xi, 2))
+                }
+            }
+
+            x_mat = format(do.call("rbind", x_small), digits = 3)
+
+            x_fmt = c()
+            for(i in seq_along(x)){
+                xi = x_mat[i, ]
+                if(is_short[i]){
+                    x_fmt[[i]] = gsub(", +NA", "", paste0(xi, collapse = ", "))
+                } else {
+                    x_fmt[[i]] = paste0(xi[1], ", ", xi[2], ", ..., ", xi[3], ", ", xi[4])
+                }
+            }
+
+            x_names = sfill(names(x))
+
+            res = paste0(x_names, ": ", x_fmt)
+
+            res
+        }
+
+        info = lapply(object, extract_and_format)
+
+        cat("Smallest and largest values of the first-order conditions:\n\n")
+        var_names = sfill(names(object), right = TRUE)
+        intro = sfill("|", n = nchar(var_names[1]) + 1)
+        n_var = length(object)
+        for(i in 1:n_var){
+            cat(var_names[i], "\n")
+            value = paste0(intro, info[[i]])
+            cat(value, sep = "\n")
+            cat(gsub(" ", "_", intro), "\n")
+
+            if(i < n_var) cat("\n")
+        }
+    }
+}
+
+
+
+
+#' Prints the number of unique elements in a data set
+#'
+#' This utility tool displays the number of unique elements in one or multiple data.frames as well as their number of NA values.
+#'
+#' @param x A formula, with data set names on the LHS and variables on the RHS, like \code{data1 + data2 ~ var1 + var2}. The following special variables are admitted: \code{"."} to get default values, \code{".N"} for the number of observations, \code{".U"} for the number of unique rows, \code{".NA"} for the number of rows with at least one NA. Variables can be combined with \code{"^"}, e.g. \code{df~id^period}; use \code{id\%^\%period} to also include the terms on both sides. Note that using \code{:} and \code{*} is equivalent to \code{^} and \code{\%^\%}. Sub select with \code{id[cond]}, when doing so \code{id} is automatically included. Conditions can be chained, as in \code{id[cond1, cond2]}. Use \code{NA(x, y)} in conditions instead of \code{is.na(x) | is.na(y)}. Use the \code{!!} operator to have both a condition and its opposite. To compare the keys in two data sets, use \code{data1:data2}. If not a formula, \code{x} can be: a vector (displays the # of unique values); a \code{data.frame} (default values are displayed), or a "sum" of data sets like in \code{x = data1 + data2}, in that case it is equivalent to \code{data1 + data2 ~ .}.
+#' @param ... Not currently used.
+#'
+#' @section Special values and functions:
+#'
+#' In the formula, you can use the following special values: \code{"."}, \code{".N"}, \code{".U"}, and \code{".NA"}.
+#'
+#' \itemize{
+#'
+#' \item{\code{"."}}{Accesses the default values. If there is only one data set and the data set is \emph{not} a \code{data.table}, then the default is to display the number of observations and the number of unique rows. If the data is a \code{data.table}, the number of unique items in the key(s) is displayed instead of the number of unique rows (if the table has keys of course). If there are two or more data sets, then the default is to display the unique items for: a) the variables common across all data sets, if there's less than 4, and b) if no variable is shown in a), the number of variables common across at least two data sets, provided there are less than 5. If the data sets are data tables, the keys are also displayed on top of the common variables. In any case, the number of observations is always displayed.}
+#'
+#' \item{\code{".N"}}{Displays the number of observations.}
+#'
+#' \item{\code{".U"}}{Displays the number of unique rows.}
+#'
+#' \item{\code{".NA"}}{Displays the number of rows with at least one NA.}
+#'
+#' }
+#'
+#' @section The \code{NA} function:
+#'
+#' The special function \code{NA} is an equivalent to \code{is.na} but can handle several variables. For instance, \code{NA(x, y)} is equivalent to \code{is.na(x) | is.na(y)}. You can add as many variables as you want as arguments. If no argument is provided, as in \code{NA()}, it is identical to having all the variables of the data set as argument.
+#'
+#' @section Combining variables:
+#'
+#' Use the "hat", \code{"^"}, operator to combine several variables. For example \code{id^period} will display the number of unique values of id x period combinations.
+#'
+#' Use the "super hat", \code{"\%^\%"}, operator to also include the terms on both sides. For example, instead of writing \code{id + period + id^period}, you can simply write \code{id\%^\%period}.
+#'
+#' Alternatively, you can use \code{:} for \code{^} and \code{*} for \code{\%^\%}.
+#'
+#' @section Sub-selections:
+#'
+#' To show the number of unique values for sub samples, simply use \code{[]}. For example, \code{id[x > 10]} will display the number of unique \code{id} for which \code{x > 10}.
+#'
+#' Simple square brackets lead to the inclusion of both the variable and its subset. For example \code{id[x > 10]} is equivalent to \code{id + id[x > 10]}. To include only the sub selection, use double square brackets, as in \code{id[[x > 10]]}.
+#'
+#' You can add multiple sub selections at once, only separate them with a comma. For example \code{id[x > 10, NA(y)]} is equivalent to \code{id[x > 10] + id[NA(y)]}.
+#'
+#' Use the double negative operator, i.e. \code{!!}, to include both a condition and its opposite at once. For example \code{id[!!x > 10]} is equivalent to \code{id[x > 10, !x > 10]}. Double negative operators can be chained, like in \code{id[!!cond1 & !!cond2]}, then the cardinal product of all double negatived conditions is returned.
+#'
+#' @return
+#' It returns a vector containing the number of unique values per element. If several data sets were provided, a list is returned, as long as the number of data sets, each element being a vector of unique values.
+#'
+#' @examples
+#'
+#' data = base_did
+#' data$x1.L1 = round(lag(x1~id+period, 1, data))
+#'
+#' # By default, just the formatted number of observations
+#' n_unik(data)
+#'
+#' # Or the nber of unique elements of a vector
+#' n_unik(data$id)
+#'
+#' # number of unique id values and id x period pairs
+#' n_unik(data ~.N + id + id^period)
+#'
+#' # use the %^% operator to include the terms on the two sides at once
+#' # => same as id*period
+#' n_unik(data ~.N + id %^% period)
+#'
+#' # using sub selection with []
+#' n_unik(data ~.N + period[!NA(x1.L1)])
+#'
+#' # to show only the sub selection: [[]]
+#' n_unik(data ~.N + period[[!NA(x1.L1)]])
+#'
+#' # you can have multiple values in [],
+#' # just separate them with a comma
+#' n_unik(data ~.N + period[!NA(x1.L1), x1 > 7])
+#'
+#' # to have both a condition and its opposite,
+#' # use the !! operator
+#' n_unik(data ~.N[!!NA(x1.L1)])
+#'
+#' # the !! operator works within condition chains
+#' n_unik(data ~.N[!!NA(x1.L1) & !!x1 > 7])
+#'
+#' # Conditions can be distributed
+#' n_unik(data ~ (id + period)[x1 > 7])
+#'
+#' #
+#' # Several data sets
+#' #
+#'
+#' # Typical use case: merging
+#' # Let's create two data sets and merge them
+#'
+#' data(base_did)
+#' base_main = base_did
+#' base_extra = sample_df(base_main[, c("id", "period")], 100)
+#' base_extra$id[1:10] = 111:120
+#' base_extra$period[11:20] = 11:20
+#' base_extra$z = rnorm(100)
+#'
+#' # You can use db1:db2 to compare the common keys in two data sets
+#'  n_unik(base_main:base_extra)
+#'
+#' tmp = merge(base_main, base_extra, all.x = TRUE, by = c("id", "period"))
+#'
+#' # You can show unique values for any variable, as before
+#' n_unik(tmp + base_main + base_extra ~ id[!!NA(z)] + id^period)
+#'
+#'
+#'
+n_unik = function(x){
+    # returns a vector with the nber of unique values
+    # attr("na.info") => nber of NA values, vector
+
+    if(missing(x)){
+        stop("Argument 'x' must be provided. Problem: it is missing.")
+    }
+
+    # Non standard-evaluation
+    x_dp = deparse_long(substitute(x))
+    if(!grepl("~", x_dp, fixed = TRUE)){
+        if(grepl("[+:*]", x_dp)){
+            # Non standard-evaluation
+            x = as.formula(paste0(x_dp, "~ ."))
+        } else {
+            check_arg(x, "data.frame | vector l0 | ts formula")
+        }
+    } else {
+        check_arg(x, "ts formula")
+    }
+
+    nthreads = getFixest_nthreads()
+
+    # If vector
+    comp_pairs = list()
+    if(is.vector(x)){
+
+        x_name = gsub("^[[:alpha:]\\.][[:alnum:]\\._]*\\$", "", x_dp)
+
+        na.info = 0
+        if(anyNA(x)){
+            who_NA = is.na(x)
+            na.info = sum(who_NA)
+            x = x[!who_NA]
+        }
+
+        res = len_unique(x, nthreads)
+        names(res) = x_name
+
+        attr(res, "na.info") = na.info
+
+        class(res) = "vec_n_unik"
+        return(res)
+
+    } else if(is.data.frame(x)){
+
+        n_x = 1
+        x_all = list(x)
+        fml = ~.
+
+    } else if(inherits(x, "formula")){
+
+        x_terms = terms(x[1:2])
+
+        fact_mat = attr(x_terms, "factors")
+
+        x_all_names = rownames(fact_mat)
+
+        # We get the comparison pairs
+        vars = colnames(fact_mat)
+        for(pair in grep(":", vars, fixed = TRUE, value = TRUE)){
+            dict = setNames(1:length(x_all_names), x_all_names)
+            pair_split = strsplit(pair, ":", fixed = TRUE)[[1]]
+            comb = combn(pair_split, 2)
+            for(i in 1:ncol(comb)){
+                comp_pairs[[length(comp_pairs) + 1]] = unname(dict[comb[, i]])
+            }
+        }
+
+        if(length(comp_pairs) > 0){
+            comp_pairs = unique(comp_pairs)
+        }
+
+        # Construction of the list  + sanity check
+        n_x = length(x_all_names)
+        x_all = vector("list", n_x)
+        for(i in 1:n_x){
+            x_all[[i]] = error_sender(eval(str2lang(x_all_names[i]), parent.frame()),
+                                      "The left-hand-side of the formula must contain valid data.frames. Problem in the evaluation of '", x_all_names[i], "':")
+            check_value(x_all[[i]], "data.frame",
+                        .message = paste0("The value '", x_all_names[i], "' (in the LHS of the formula) must be a data.frame."))
+        }
+
+        fml = x[c(1, 3)]
+
+    }
+
+    # If DF + formula
+    # ex: fml = ~ id^year + author_id[sw0(is.na(author_name), is.na(affil_name), year == min_year)]
+    # fml = ~ id^sw0(fe)
+
+    # check variable names
+    naked_vars = origin_vars = all.vars(fml)
+    valid_vars = c(".N", ".U", ".NA", ".", unique(unlist(lapply(x_all, names))))
+
+    check_value_plus(naked_vars, "multi match", .choices = valid_vars,
+                     .message = paste0("The formula must only use variables in the data set", plural_len(x_all), "."))
+
+    if("." %in% naked_vars){
+        # The default values
+
+        IS_DT = requireNamespace("data.table", quietly = TRUE)
+
+        dot_default = ".N"
+        x_keys = c()
+        x_common_vars = c()
+
+        # keys
+        if(IS_DT){
+            for(I in 1:n_x){
+                if(inherits(x_all[[I]], "data.table")){
+                    x_keys = c(x_keys, data.table::key(x_all[[I]]))
+                }
+            }
+        }
+
+        # common variables
+        if(n_x > 1){
+
+            # Common to all
+            x_names_current = names(x_all[[1]])
+            for(i in 2:n_x){
+                x_names_current = intersect(x_names_current, names(x_all[[i]]))
+                if(length(x_names_current) == 0) break
+            }
+
+            if(length(x_names_current) %in% 1:4){
+                # No more than 4 common variables by default
+                x_common_vars = x_names_current
+
+                if(length(comp_pairs) > 0 && length(x_names_current) <= 3){
+                    x_common_vars = paste0(x_names_current, collapse = "*")
+                }
+
+            } else if(n_x > 2){
+                # Common to at least 2 data sets
+                for(i in 1:(n_x - 1)){
+                    x_names_current = names(x_all[[i]])
+                    for(j in (i + 1):n_x){
+                        qui_common = x_names_current %in% names(x_all[[j]])
+                        if(any(qui_common)){
+                            x_common_vars = c(x_common_vars, x_names_current[qui_common])
+                        }
+                    }
+                }
+
+                x_common_vars = unique(x_common_vars)
+
+                if(length(x_common_vars) > 5){
+                    #  we keep max 5
+                    x_common_vars = c()
+                }
+            }
+        }
+
+        if(length(x_keys) > 0 || length(x_common_vars) > 0){
+            dot_default = unique(c(dot_default, x_keys, x_common_vars))
+        }
+
+        if(length(dot_default) == 1){
+            dot_default = c(".N", ".U")
+        }
+
+        rhs_txt = as.character(fml)[[2]]
+        rhs_txt = gsub("(^| )\\.( |$)", dsb(".[dot_default]", "+"), rhs_txt)
+        fml = .xpd(rhs = rhs_txt)
+    }
+
+    if(any(naked_vars != origin_vars)){
+        # we complete the partial matching
+        fml_txt = deparse_long(fml)
+
+        var_diff = which(naked_vars != origin_vars)
+
+        for(i in seq_along(var_diff)){
+            re = paste0("(?!<[[:alnum:]._])", origin_vars[i], "(?!=[[:alnum:]._])")
+            fml_txt = gsub(re, naked_vars[i], fml_txt, perl = TRUE)
+        }
+
+        fml = as.formula(fml_txt)
+    }
+
+    tm = terms_hat(fml, n_unik = TRUE)
+    all_vars = attr(tm, "term.labels")
+    var_final = c()
+
+    # stepwise function
+    for(var in all_vars){
+        # var = all_vars[1]
+
+        if(grepl("combine_clusters(_fast)?", var)){
+            var = gsub("combine_clusters(_fast)?", "to_integer", var)
+        }
+
+        IS_HAT_SW = grepl("sw0?\\)\\(", var)
+        if(IS_HAT_SW){
+            var = paste0(gsub("(sw0?)\\)\\(", "\\1(", var), ")")
+        }
+
+        if(grepl("^[[:alpha:].][[:alnum:]._]*\\[", var, perl = TRUE) && !grepl("sw0?\\(", var)){
+            # We use sw to make id[cond1, cond2] work
+            # That's what's called path dependency!
+
+            var_new = gsub("^([[:alpha:].][[:alnum:]._]*)\\[", "\\1[sw0(", var)
+            if(grepl("sw0([", var_new, fixed = TRUE)){
+                var_new = sub("sw0([", "sw(", str_trim(var_new, 1), fixed = TRUE)
+            }
+            var_new = sub("\\]$", ")]", var_new)
+
+            var = var_new
+        }
+
+        if(is_fun_in_char(var, "sw0?")){
+
+            info = extract_fun(var, "sw0?", err_msg = "The stepwise function can be used only once per variable.")
+
+            sw_value = eval(str2lang(info$fun))
+
+            qui_double = grepl("!!", trimws(sw_value))
+            while(any(qui_double)){
+                i = which(qui_double)[1]
+
+                value = sw_value[i]
+                value_split = strsplit(value, "!!")[[1]]
+
+                n_split = length(value_split)
+                n_s = 2 ** (n_split - 1)
+                new_values = rep(value_split[1], n_s)
+
+                prefixes = do.call(expand.grid, rep(list(c("", "!")), n_split - 1))
+
+                for(j in 1:ncol(prefixes)){
+                    new_values = paste0(new_values, prefixes[, j], value_split[j + 1])
+                }
+
+                sw_value = insert(sw_value[-i], new_values, i)
+                qui_double = grepl("!!", sw_value)
+            }
+
+            var_char_new = paste0(info$before, sw_value, info$after)
+
+            if(IS_HAT_SW){
+                var_char_new[1] = gsub(", (,|\\))", "\\1", var_char_new[1])
+
+                qui_nested = grepl("^(to_integer\\(.+){2,}", var_char_new)
+                if(any(qui_nested)){
+                    # later => add check problem if another function is used
+                    var_char_new[qui_nested] = paste0("to_integer(", gsub("to_integer\\(|\\)", "", var_char_new[qui_nested]), ")")
+                }
+            }
+
+            if(grepl("[]", var_char_new[1], fixed = TRUE)){
+                var_char_new[1] = gsub("[]", "", var_char_new[1], fixed = TRUE)
+            }
+
+            var_final = c(var_final, var_char_new)
+        } else {
+            var_final = c(var_final, var)
+        }
+    }
+
+    var_final = unique(var_final)
+
+    var_final_names = var_final
+    # we take care of id^year cases
+    if(any(who_combine <- is_fun_in_char(var_final, "to_integer"))){
+
+        for(i in which(who_combine)){
+            info = extract_fun(var_final[i], "to_integer")
+
+            # we use sw() to get the vars
+            sw_char = gsub("^[^\\(]+\\(", "sw(", info$fun)
+            sw_value = eval(str2lang(sw_char))
+
+            hat_value = paste(sw_value, collapse = "^")
+
+            var_final_names[i] = paste0(info$before, hat_value, info$after)
+        }
+    }
+
+    # NA counting + unique counting
+
+    res_all = list()
+    for(I in 1:n_x){
+
+        x = x_all[[I]]
+        x_list = unclass(x)
+        x_list[["NA_fun"]] = function(...) NA_fun(..., df = x)
+
+        vars_legit = c(".N", ".U", ".NA", names(x))
+
+        res = c()
+        na.info = c()
+
+        for(i in seq_along(var_final)){
+
+            vf = var_final[i]
+            vf_name = var_final_names[i]
+            na_i = 0
+
+            vf = gsub("((?<=[^[:alnum:]_\\.])|^)NA\\(", "NA_fun(", vf, perl = TRUE)
+
+            vf_call = str2lang(vf)
+
+            if(!all(all.vars(vf_call) %in% vars_legit)){
+                res_i = NA_real_
+                vf_name = ""
+
+            } else if(grepl("^\\.(N|U)($|\\[)", vf)){
+
+
+                if(vf %in% c(".N", ".N[]")){
+                    res_i = nrow(x)
+                    vf_name = "# Observations"
+
+                } else if(vf %in% c(".U", ".U[]")){
+                    res_i = nrow(unique(x))
+                    vf_name = "# Unique rows"
+
+                } else {
+                    # Other methods are faster but are less general
+
+                    vf_new = gsub("(^\\.(N|U)\\[)|(\\]$)", "", vf)
+                    do_unik = grepl("^\\.U", vf)
+
+                    val = eval(str2lang(vf_new), x_list)
+
+                    # we want to drop the NAs for indices
+                    if(anyNA(val)){
+                        val = val[!is.na(val)]
+                    }
+
+                    if(length(val) == 0){
+                        res_i = 0
+
+                    } else if(do_unik){
+                        res_i = NROW(unique(x[val, ]))
+
+                    } else {
+                        res_i = if(is.logical(val)) sum(val) else length(val)
+                    }
+
+                    msg = if(do_unik) "# Unique rows" else "# Obs."
+                    vf_new = gsub("NA_fun", "NA", vf_new, fixed = TRUE)
+                    vf_name = paste0(msg, " with ", vf_new)
+                }
+
+            } else if(grepl("^(\\.NA|NA_fun\\(\\))", vf)) {
+
+                if(vf %in% c(".NA", ".NA[]", "NA_fun()", "NA_fun()[]")){
+                    res_i = sum(!complete.cases(x))
+                    vf_name = "# Rows with NAs"
+
+                } else {
+
+                    subselect = NULL
+                    sub_text = ""
+                    if(grepl("\\]$", vf)){
+                        sub_text_split = strsplit(vf, "[", fixed = TRUE)[[1]]
+                        sub_text = paste0(sub_text_split[-1], collapse = "[")
+                        sub_text = gsub("\\]$", "", sub_text)
+
+                        subselect = eval(str2lang(sub_text), x_list)
+                    }
+
+                    if(length(subselect) == 0){
+                        res_i = 0
+                    } else {
+                        res_i = sum(!complete.cases(x[subselect, ]))
+                    }
+
+                    vf_name = dsb("# Rows with NAs, with .[sub_text]")
+                }
+            } else {
+                val = eval(vf_call, x_list)
+
+                if(anyNA(val)){
+                    who_NA = is.na(val)
+                    na_i = sum(who_NA)
+                    val = val[!who_NA]
+                }
+
+                if(grepl("^NA_fun\\(", vf)){
+                    res_i = sum(val)
+
+                    # now the message
+                    leftover = sub("^[^\\)]+\\)", "", vf)
+                    begin = substr(vf, 1, nchar(vf) - nchar(leftover))
+
+                    my_fun = list("NA_fun" = function(x) enumerate_items(sapply(sys.call()[-1], deparse_long)))
+                    na_vars = eval(str2lang(begin), my_fun)
+                    msg_start = paste0("# NAs in ", na_vars)
+
+                    msg_end = ""
+                    if(grepl("[", vf, fixed = TRUE)){
+                        msg_end = paste0(" with ", gsub("^\\[|\\]$", "", leftover))
+                    }
+
+                    vf_name = paste0(msg_start, msg_end)
+
+                } else {
+                    res_i = len_unique(val, nthreads)
+                }
+
+            }
+
+            res[vf_name] = res_i
+            na.info[i] = na_i
+        }
+
+        attr(res, "na.info") = na.info
+        class(res) = "vec_n_unik"
+
+        if(n_x == 1){
+            return(res)
+        }
+
+        res_all[[x_all_names[I]]] = res
+    }
+
+
+    # Specific data set comparisons
+    info_pairs = list()
+    for(pair in comp_pairs){
+
+        i_x = pair[1]
+        i_y = pair[2]
+
+        x = x_all[[i_x]]
+        x_list = unclass(x)
+        x_list[["NA_fun"]] = function(...) NA_fun(..., df = x)
+
+        y = x_all[[i_y]]
+        y_list = unclass(y)
+        y_list[["NA_fun"]] = function(...) NA_fun(..., df = y)
+
+        vars_legit = intersect(names(x), names(y))
+
+        # two last elements: id and common
+        all_rows_id_common = c()
+        row_temp = rep(NA_real_, n_x + 2)
+
+        for(i in seq_along(var_final)){
+
+            vf = var_final[i]
+            vf = gsub("((?<=[^[:alnum:]_\\.])|^)NA\\(", "NA_fun(", vf, perl = TRUE)
+            vf_call = str2lang(vf)
+
+            if(!all(all.vars(vf_call) %in% vars_legit) || grepl("^NA_fun", vf)){
+                next
+
+            } else {
+
+                if(grepl("to_integer", vf, fixed = TRUE)){
+                    # specific scheme for combinations
+
+                    if(grepl("NA_fun()", vf, fixed = TRUE)){
+                        # we don't allow that
+                        next
+                    }
+
+                    vars_keep = all.vars(vf_call)
+
+                    xy_list = list()
+                    for(v in vars_keep){
+                        xy_list[[v]] = c(x_list[[v]], y_list[[v]])
+                    }
+
+                    xy_list[["NA_fun"]] = function(...) NA_fun(..., df = stop("Internal error."))
+
+
+                    val_xy = eval(vf_call, xy_list)
+
+                    nrow_x = length(x_list[[1]])
+                    nrow_y = length(y_list[[1]])
+                    val_x = val_xy[1:nrow_x]
+                    val_y = val_xy[(nrow_x + 1):(nrow_x + nrow_y)]
+
+                } else {
+                    val_x = eval(vf_call, x_list)
+                    val_y = eval(vf_call, y_list)
+                }
+
+
+                if(anyNA(val_x)){
+                    val_x = val_x[!is.na(val_x)]
+                }
+
+                if(anyNA(val_y)){
+                    val_y = val_y[!is.na(val_y)]
+                }
+
+                # first col is ID
+                val_x_unik = unique(val_x)
+                val_y_unik = unique(val_y)
+
+                n_x_not_in_y = sum(!val_x_unik %in% val_y_unik)
+                n_y_not_in_x = sum(!val_y_unik %in% val_x_unik)
+                n_common = sum(val_x_unik %in% val_y_unik)
+
+                row = row_temp
+                row[i_x] = n_x_not_in_y
+                row[i_y] = n_y_not_in_x
+
+                row[n_x + 1] = i
+                row[n_x + 2] = n_common
+
+                all_rows_id_common = rbind(all_rows_id_common, row)
+
+            }
+        }
+
+        if(length(all_rows_id_common) > 0){
+            attr(all_rows_id_common, "data_id") = c(i_x, i_y)
+            info_pairs[[length(info_pairs) + 1]] = all_rows_id_common
+        }
+    }
+
+    if(length(info_pairs) > 0){
+        attr(res_all, "info_pairs") = info_pairs
+    }
+
+    class(res_all) = "list_n_unik"
+
+    return(res_all)
+}
+
+#' @rdname n_unik
+print.vec_n_unik = function(x, ...){
+
+    hash = "## "
+
+    x_names = sfill(names(x))
+    na.info = attr(x, "na.info")
+    na.info_format = sfill(fsignif(na.info))
+    x_value = sfill(fsignif(x))
+
+    n = length(x)
+    na_col = paste0("(# NAs: ", na.info_format, ")")
+    na_col[na.info == 0] = ""
+
+    res = paste0(hash, x_names, ": ", x_value, " ", na_col)
+    cat(res, sep = "\n")
+}
+
+#' @rdname n_unik
+print.list_n_unik = function(x, ...){
+
+
+    # I can't use #> anymore!!! The auto complete by the new version
+    # of Rstudio drives me nuts!!!
+    hash = "## "
+
+    x_all = x
+    n_x = length(x_all)
+
+    if(n_x == 1) return(x_all[[1]])
+
+    info_pairs = attr(x, "info_pairs")
+    IS_PAIR = !is.null(info_pairs)
+
+    # First, the variable names
+
+    all_names = names(x_all[[1]])
+    qui_0 = nchar(all_names) == 0
+    i = 2
+    while(any(qui_0) && i <= n_x){
+        names_i = names(x_all[[i]])
+        all_names[qui_0] = names_i[qui_0]
+        qui_0 = nchar(all_names) == 0
+        i = i + 1
+    }
+
+    # id_vars: used in info_pairs
+    id_vars = seq_along(all_names)
+
+    if(all(qui_0)){
+        stop("Not any valid information to display: please check that all your variables exist in all data sets.")
+
+    } else if(any(qui_0)){
+        warning("Some variables could not be evaluated in any data set: please check that all your variables exist in all data sets.")
+
+        all_names = all_names[!qui_0]
+        id_vars = id_vars[!qui_0]
+
+        for(i in 1:n_x){
+            x = x_all[[i]]
+            na.info = attr(x, "na.info")
+
+            x = x[!qui_0]
+            na.info = na.info[!qui_0]
+            attr(x, "na.info") = na.info
+
+            x_all[[i]] = x
+        }
+    }
+
+
+    x_names = sfill(all_names)
+
+    # If ambiguous pairs: we add data set suffixes
+    if(n_x > 2 && IS_PAIR){
+        add_suffix = function(x, i) paste0(x, " (", letters[i], ")")
+        var_width = max(nchar("Exclusive "), nchar(x_names[1]))
+    } else {
+        add_suffix = function(x, i) x
+        var_width = nchar(x_names[1])
+    }
+
+    var_col = paste0(hash, x_names, ":")
+    na_intro = paste0(hash, sfill(" ", var_width), "|NAs:")
+    var_col = insert_in_between(var_col, na_intro)
+    # we add the first row of the data sets names + format
+    var_col = sfill(c(hash, var_col), right = TRUE)
+
+    print_mat = var_col
+
+    KEEP_NA_ROW = rep(FALSE, length(x_names))
+
+    for(i in 1:n_x){
+
+        data_name = add_suffix(names(x_all)[i], i)
+
+        x = x_all[[i]]
+
+        na.info = attr(x, "na.info")
+        KEEP_NA_ROW = KEEP_NA_ROW | na.info > 0
+        na.info_format = fsignif(na.info)
+        x_value = fsignif(x)
+        x_value[is.na(x)] = "--"
+        na.info_format[is.na(x)] = "--"
+
+
+        width = max(nchar(na.info_format), nchar(x_value))
+
+        na.info_format = sfill(na.info_format, width)
+        x_value = sfill(x_value, width)
+
+        x_col = insert_in_between(x_value, na.info_format)
+        x_col = sfill(c(data_name, x_col))
+
+        print_mat = cbind(print_mat, x_col)
+    }
+
+    if(!any(KEEP_NA_ROW)){
+        print_mat[, 1] = substr(print_mat[, 1], 1, nchar(print_mat[1, 1]) - 4)
+    }
+
+    keep = c(TRUE, insert_in_between(TRUE, KEEP_NA_ROW))
+
+    print_mat = print_mat[keep, ]
+
+    # PAIR information
+    if(IS_PAIR){
+
+        # identifiers used for insertion
+        id_vars_all = c(0, insert_in_between(id_vars, 0))
+        id_vars_all = id_vars_all[keep]
+
+        # we add two columns: id and common
+        print_mat = cbind(print_mat, id_vars_all, "")
+
+        insert_row_after_id = function(mat, row, col_id){
+
+            for(i in 1:nrow(row)){
+                i_id_mat = max(which(mat[, col_id] == row[i, col_id]))
+                tmp_before = mat[1:i_id_mat, ]
+
+                if(i_id_mat < nrow(mat)){
+                    tmp_after = mat[(i_id_mat + 1):nrow(mat), ]
+                } else {
+                    tmp_after = NULL
+                }
+
+                mat = rbind(tmp_before, row[i, ], tmp_after)
+            }
+
+            mat
+        }
+
+        for(pair in info_pairs){
+            data_id = attr(pair, "data_id")
+
+            if(n_x == 2){
+                # data_col = paste0(hash, sfill(" ", var_width, right = TRUE), "|Excl:")
+                data_col = paste0(hash, sfill("# Exclusive ", var_width, right = TRUE), "|")
+            } else {
+                data_col = paste0(hash, sfill("# Exclusive ", var_width, right = TRUE),
+                                  "|", paste0(letters[data_id], collapse = ":"))
+            }
+
+            # formatting the NAs
+            pair[is.na(pair)] = " "
+
+            # adding the data col
+            pair = cbind(data_col, pair)
+
+            print_mat = insert_row_after_id(print_mat, pair, n_x + 2)
+
+        }
+
+        # Formatting
+        print_mat = print_mat[, -(n_x + 2)]
+        print_mat[, 1] = sfill(print_mat[, 1], right = TRUE)
+        for(j in 2:(n_x + 1)){
+            print_mat[, j] = sfill(print_mat[, j])
+        }
+
+        # Last column
+        common = print_mat[, n_x + 2]
+        is_num = grepl("\\d", common)
+        common[is_num] = sfill(fsignif(as.numeric(common[is_num])))
+        common[is_num] = paste0("# Common: ", common[is_num])
+        print_mat[, n_x + 2] = common
+    }
+
+    vec2print = apply(print_mat, 1, paste, collapse = " ")
+
+    cat(vec2print, sep = "\n")
+
+}
+
+
+#' Formatted object size
+#'
+#' Tools that returns a formatted object size, where the appropriate unit is automatically chosen.
+#'
+#' @param x Any R object.
+#' @param ... Not currently used.
+#'
+#' @return
+#' Returns a character scalar.
+#'
+#' @examples
+#'
+#' osize(iris)
+#'
+#' data(trade)
+#' osize(trade)
+#'
+#'
+osize = function(x){
+
+    size = as.numeric(utils::object.size(x))
+    n = log10(size)
+
+    if (n < 3) {
+        res = paste0(size, " Octets.")
+    } else if (n < 6) {
+        res = paste0(fsignif(size/1000), " Ko.")
+    } else {
+        res = paste0(fsignif(size/1e+06), " Mo.")
+    }
+
+    class(res) = "osize"
+    res
+}
+
+#' @rdname osize
+print.osize = function(x, ...){
+    cat(x, "\n")
+}
+
+
+#' Randomly draws observations from a data set
+#'
+#' This function is useful to check a data set. It gives a random number of rows of the input data set.
+#'
+#' @param x A data set: either a vector, a matrix or a data frame.
+#' @param n The number of random rows/elements to sample randomly.
+#'
+#' @return
+#' A data base (resp vector) with n rows (resp elements).
+#'
+#' @examples
+#'
+#' sample_df(iris)
+#'
+sample_df = function(x, n = 10){
+
+    check_arg(n, "integer scalar")
+
+    if(MISSNULL(x)){
+        if(missing(x)) stop("The argument 'x' cannot be missing, please provide it.")
+        if(is.null(x)) stop("The argument 'x' must be a vector, matrix or data.frame. Currently it is NULL.")
+    }
+
+    if(is.null(dim(x)) || inherits(x, "table")){
+        n = min(n, length(x))
+        return(x[sample(length(x), n)])
+    }
+
+    n = min(n, nrow(x))
+    # complicated var name to avoid issue with data.table variables
+    XXXselectedXXX = sample(nrow(x), n)
+    x[XXXselectedXXX, ]
+}
+
+len_unique = function(x, nthreads = getFixest_nthreads()){
+
+    if(!is.vector(x)){
+        return(length(unique(x)))
+    }
+
+    ANY_NA = FALSE
+    if(is.numeric(x)){
+        info_na = cpp_which_na_inf(x, nthreads)
+        if(info_na$any_na_inf){
+            ANY_NA = TRUE
+            x = x[!info_na$is_na_inf]
+        }
+    } else {
+        if(anyNA(x)){
+            ANY_NA = TRUE
+            x = x[!is.na(x)]
+        }
+    }
+
+    if(length(x) == 0){
+        return(0)
+    }
+
+    x_quf = quickUnclassFactor(x, addItem = TRUE, sorted = FALSE)
+
+    length(x_quf$items) + ANY_NA
+}
+
 #### ................. ####
 #### Internal Funs     ####
 ####
 
+as.character.formula = function(x, ...) as.character.default(x, ...)
 
 parse_macros = function(..., reset = FALSE, from_xpd = FALSE, check = TRUE, frame = NULL){
     set_up(1)
@@ -4029,20 +5459,37 @@ value2stringCall = function(value_raw, call = FALSE, check = FALSE, frame = NULL
     res
 }
 
-dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE){
+dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE, up = 0){
     # transforms "x.[i]" into x1 if i==1
     # z = "XX" ; x = ".[z] + x.[1:5] + y.[1:2]_t"
     # x = "x.[a] | fe[b] + m.[o]"
+    # .[,stuff] => means aggregation is comma based
+    # if text, we allow:
+    # - before.["text", stuff]after AND .[stuff, "text"]
+    #   * .["text", stuff] => collapses stuff with "text"
+    #     ie paste0(before, paste0(stuff, collapse = "text"), after)
+    #   * .["text", stuff] => collapses stuff WITH the previous string with "text",
+    #     ie paste0(paste0(before, stuff, collapse = "text), after)
+    # regex = FALSE ; frame = .GlobalEnv ; text = FALSE
+    # x = 'c(.[,y]) ~ sw(x.[,1:3])'
+    # name = c("Jon", "Juliet") ; x = "bonjour .[' and ', name]" ; text = TRUE
+    # name = c("Jon", "Juliet") ; x = "bonjour .[name, ' and ']" ; text = TRUE
 
     if(!grepl(".[", x, fixed = TRUE)) return(x)
 
     x_split_open = strsplit(x, ".[", fixed = TRUE)[[1]]
 
-    # nesting: a ~ .["x.[1:2]_sq"] + b
-    is_nested = any(grepl("^\"", x_split_open))
-    if(is_nested){
+    # comma aggregation
+    is_comma = grepl("^,", x_split_open[-1])
+    if(any(is_comma) && !text){
+        x_split_open[-1] = gsub("^, *", "", x_split_open[-1])
+    }
 
-        i_open_quote = which(grepl("^\"", x_split_open))
+    # nesting: a ~ .["x.[1:2]_sq"] + b
+    any_nested = any(grepl("^\"", x_split_open[-1]))
+    if(any_nested){
+
+        i_open_quote = setdiff(which(grepl("^\"", x_split_open)), 1)
         i_close_quote = which(grepl("\"\\]", x_split_open))
 
         x_split_new = x_split_open[1]
@@ -4068,27 +5515,88 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE){
         x_split_open = x_split_new
     }
 
-    x_split_close_left = gsub("^([^\\[]+)\\].*", "\\1", x_split_open[-1])
-    x_split_close_right = substr(x_split_open[-1], nchar(x_split_close_left) + 2, nchar(x_split_open[-1]))
+    # Finding the elements left/right of the closing bracket
+    # we take care of indexing within brackets (e.g. x1 + .[m[1]])
+    b_open = gregexpr("[", x_split_open[-1], fixed = TRUE)
+    b_close = gregexpr("]", x_split_open[-1], fixed = TRUE)
 
     x_split = character(length(x_split_open) * 2 - 1)
     n = length(x_split)
     x_split[1] = x_split_open[1]
 
-    for(i in 2:n){
-        x_split[[i]] = if(i %% 2 == 0) x_split_close_left[i %/% 2] else x_split_close_right[i %/% 2]
+    for(i in seq_along(b_open)){
+
+        if(b_open[[i]][1] != -1){
+            # means there was an open [
+            n_extend = length(b_close[[i]]) - length(b_open[[i]])
+            index_closing = b_close[[i]][which.max(b_close[[i]] < c(b_open[[i]], rep(Inf, n_extend)))]
+        } else {
+            index_closing = b_close[[i]][1]
+        }
+
+        x_SO = x_split_open[i + 1]
+        x_split_close_left = substr(x_SO, 1, index_closing - 1)
+        x_split_close_right = substr(x_SO, index_closing + 1, nchar(x_SO))
+
+        j = 2 * i
+        x_split[[j]] = x_split_close_left
+        x_split[[j + 1]] = x_split_close_right
     }
 
-    if(is_nested){
+    if(any_nested){
         x_split = gsub("__open__", ".[", x_split)
         x_split = gsub("__close__", "]", x_split)
     }
 
+    if(text){
+        # NA means no aggregation
+        agg = rep(NA_character_, n)
+        agg_full = rep(FALSE, n)
+    }
+
     res = as.list(x_split)
     for(i in (1:n)[(1:n) %% 2 == 0]){
-        # I don't send informative error messages here => OK
-        value = eval(str2lang(x_split[i]), frame)
+
+        # catching the aggregator
+        if(text && grepl(",", x_split[i], fixed = TRUE)){
+            # taking care of the empty commas
+            x_txt = sub("(^(?=,)|(?<=,)$)", "' '", trimws(x_split[i]), perl = TRUE)
+            x_txt = paste0("dsb_check_set_agg(", x_txt, ")")
+            my_list = list(dsb_check_set_agg = dsb_check_set_agg)
+            info_agg = error_sender(eval(str2lang(x_txt), my_list, frame),
+                                    "Dot square bracket operator: Evaluation of '.[",
+                                    x_split[i], "]' led to an error:",
+                                    up = up + 1)
+            agg[i] = info_agg$agg
+            agg_full[i] = isTRUE(attr(info_agg$agg, "full"))
+            my_call = info_agg$call
+        } else {
+            my_call = error_sender(str2lang(x_split[i]),
+                                   "Dot square bracket operator: Evaluation of '.[",
+                                   x_split[i], "]' led to an error:",
+                                   up = up + 1)
+        }
+
+        if(is.character(my_call) && grepl(".[", my_call, fixed = TRUE)){
+            # Nested call
+            value = dot_square_bracket(my_call, frame = frame, text = TRUE, up = up + 1)
+
+        } else {
+            # Informative error message
+            value = error_sender(as.character(eval(my_call, frame)),
+                                 "Dot square bracket operator: Evaluation of '.[",
+                                 x_split[i], "]' led to an error:",
+                                 up = up + 1)
+        }
+
+
         res[[i]] = value
+    }
+
+    if(any(is_comma)){
+        is_comma = insert_in_between(FALSE, is_comma)
+    } else if(!text){
+        is_comma = rep(FALSE, length(res))
     }
 
     if(max(lengths(res)) == 1) {
@@ -4104,6 +5612,19 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE){
                 res_txt = paste0(res_txt, res[[i]])
                 i = i + 1
 
+            } else if(text){
+                if(is.na(agg[i])){
+                    res_txt = paste0(res_txt, res[[i]])
+                } else {
+                    if(agg_full[i]){
+                        res_txt = paste0(res_txt, res[[i]], collapse = agg[i])
+                    } else {
+                        res_txt = paste0(res_txt, paste0(res[[i]], collapse = agg[i]))
+                    }
+                }
+
+                i = i + 1
+
             } else if(regex) {
                 after = if(i != n) res[[i + 1]] else ""
                 res_txt = paste0(res_txt, res[[i]], after, collapse = "|")
@@ -4113,15 +5634,17 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE){
                 before_no_var = gsub("[[:alnum:]_\\.]+$", "", res_txt)
                 var_before = substr(res_txt, nchar(before_no_var) + 1, nchar(res_txt))
 
+                coll = if(is_comma[i]) ", " else " + "
+
                 if(i != n && grepl("[[:alnum:]_\\.]", substr(res[[i + 1]], 1, 1))){
                     after = res[[i + 1]]
                     after_no_var = gsub("^[[:alnum:]_\\.]+", "", after)
                     var_after = substr(after, 1, nchar(after) - nchar(after_no_var))
 
-                    res_txt = paste0(before_no_var, paste0(var_before, res[[i]], var_after, collapse = " + "), after_no_var)
+                    res_txt = paste0(before_no_var, paste0(var_before, res[[i]], var_after, collapse = coll), after_no_var)
                     i = i + 2
                 } else {
-                    res_txt = paste0(before_no_var, paste0(var_before, res[[i]], collapse = " + "))
+                    res_txt = paste0(before_no_var, paste0(var_before, res[[i]], collapse = coll))
                     i = i + 1
                 }
             }
@@ -4130,13 +5653,39 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE){
         res = res_txt
     }
 
-    if(grepl(".[", res, fixed = TRUE)){
+
+    # Recursivity prevention: no recursivity if text = TRUE
+    DSB_RECURSIVE = TRUE
+    is_rec = exists("DSB_RECURSIVE", parent.frame(), inherits = FALSE)
+
+    if(!text && !is_rec && grepl(".[", res, fixed = TRUE)){
         res = dot_square_bracket(res, frame, regex)
     }
 
     res
 }
 
+
+dsb_check_set_agg = function(...){
+    if(...length() > 2){
+        stop("You cannot have more than two elements in between .[]. Currently there are ", ...length(), ".")
+    }
+
+    mc = match.call()
+    if(...length() == 1){
+        res = list(agg = NA_character_, call = mc[[2]])
+    } else if(is.character(mc[[2]])){
+        res = list(agg = mc[[2]], call = mc[[3]])
+    } else if(is.character(mc[[3]])){
+        agg = mc[[3]]
+        attr(agg, "full") = TRUE
+        res = list(agg = agg, call = mc[[2]])
+    } else {
+        stop("The operator .[] accepts only up to two elements, one of the MUST be a string literal (eg: .['text', y]). Problem: none of the two elements is a string literal.")
+    }
+
+    return(res)
+}
 
 
 # style_name = "fixef"
@@ -4292,7 +5841,8 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
     # This function is way faster than model.matrix but does not accept factors
     # The argument fml **MUST** not have factors!
 
-    rhs = fml[c(1,3)]
+    rhs = if(length(fml) == 3) fml[c(1, 3)] else fml
+
     t = terms(rhs, data = base)
 
     all_var_names = attr(t, "term.labels")
@@ -4315,8 +5865,8 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
     # Handling the multi columns case (ex: bs(x1), splines)
     # NOTA: I need to add a check for i() because of 1 value interactions
     #       not caught by the != nber of obs
-    qui_inter = grepl("\\bi\\(", all_var_names)
-    if(any(lengths(data_list) != nrow(base)) || any(qui_inter)){
+    qui_i = grepl("\\bi\\(", all_var_names)
+    if(any(lengths(data_list) != nrow(base)) || any(qui_i)){
 
         all_n = as.vector(lengths(data_list) / nrow(base))
 
@@ -4331,7 +5881,7 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
         all_n_vector = rep(all_n, all_n)
 
         new_names = as.list(all_var_names)
-        for(i in which(all_n > 1 | qui_inter)){
+        for(i in which(all_n > 1 | qui_i)){
             my_names = colnames(data_list[[i]])
             if(is.null(my_names)){
                 my_names = 1:all_n[i]
@@ -4350,7 +5900,7 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
 }
 
 
-fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALSE){
+fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALSE, mf = NULL){
     # This functions takes in the formula of the linear part and the
     # data
     # It reformulates the formula (ie with lags and interactions)
@@ -4362,9 +5912,10 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
 
     # fml = ~a*b+c+i(x1)+Temp:i(x2)+i(x3)/Wind
 
-    # Modify the formula to add interactions
-    rhs_txt = deparse_long(fml[[3]])
+    if(length(fml) == 3) fml = fml[c(1, 3)]
 
+    # We need to check a^b otherwise error is thrown in terms()
+    rhs_txt = deparse_long(fml[[2]])
     if(grepl("\\^[[:alpha:]]", rhs_txt)){
         stop("The special operator '^' can only be used in the fixed-effects part of the formula. Please use ':' instead.")
     }
@@ -4387,60 +5938,65 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
     }
 
     # We check for calls to i()
-    qui_inter = grepl("(^|[^[:alnum:]_\\.])i\\(", tl)
-    IS_INTER = any(qui_inter)
-    if(IS_INTER){
+    qui_i = grepl("(^|[^[:alnum:]_\\.])i\\(", tl)
+    IS_I = any(qui_i)
+    if(IS_I){
         # OMG... why do I always have to reinvent the wheel???
         is_intercept = fake_intercept || (attr(t_fml,"intercept") == 1)
-        i_naked = which(is_naked_fun(tl[qui_inter], "i"))
+        i_naked = which(is_naked_fun(tl[qui_i], "i"))
 
         if(i_noref){
             for(i in seq_along(i_naked)){
                 j = i_naked[i]
-                txt = gsub("(^|(?<=[^[:alnum:]\\._]))i\\(", "i_noref(", tl[qui_inter][j], perl = TRUE)
-                tl[qui_inter][j] = eval(str2lang(txt))
+                txt = gsub("(^|(?<=[^[:alnum:]\\._]))i\\(", "i_noref(", tl[qui_i][j], perl = TRUE)
+                tl[qui_i][j] = eval(str2lang(txt))
             }
         } else {
             for(i in seq_along(i_naked)){
                 if(!is_intercept && i == 1) next
 
                 j = i_naked[i]
-                txt = gsub("(^|(?<=[^[:alnum:]\\._]))i\\(", "i_ref(", tl[qui_inter][j], perl = TRUE)
-                tl[qui_inter][j] = eval(str2lang(txt))
+                txt = gsub("(^|(?<=[^[:alnum:]\\._]))i\\(", "i_ref(", tl[qui_i][j], perl = TRUE)
+                tl[qui_i][j] = eval(str2lang(txt))
             }
         }
 
-        fml_no_inter = .xpd(lhs = "y", rhs = tl[!qui_inter])
+        fml_no_inter = .xpd(rhs = tl[!qui_i])
 
         if(!is_intercept) tl = c("-1", tl)
-        fml = .xpd(lhs = "y", rhs = tl)
+        fml = .xpd(rhs = tl)
 
     }
 
     # Are there factors NOT in i()? If so => model.matrix is used
     dataNames = names(data)
 
-    if(IS_INTER){
-        linear.varnames = all.vars(fml_no_inter[[3]])
-        is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
-        if(length(is_num) > 0 && (any(!is_num) || grepl("factor", deparse_long(fml_no_inter)))){
-            useModel.matrix = TRUE
-        } else {
-            useModel.matrix = FALSE
-        }
+    if(!is.null(mf)){
+        useModel.matrix = TRUE
     } else {
-        linear.varnames = all.vars(fml[[3]])
-        is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
-        if(length(is_num) == 0 || any(!is_num) || grepl("factor", deparse_long(fml))){
-            useModel.matrix = TRUE
+        useModel.matrix = FALSE
+        if(IS_I){
+            linear.varnames = all.vars(fml_no_inter[[2]])
+            is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
+            if(length(is_num) > 0 && (any(!is_num) || grepl("factor", deparse_long(fml_no_inter)))){
+                useModel.matrix = TRUE
+            }
         } else {
-            useModel.matrix = FALSE
+            linear.varnames = all.vars(fml[[2]])
+            is_num = sapply(data[, dataNames %in% linear.varnames, FALSE], is.numeric)
+            if(length(is_num) == 0 || any(!is_num) || grepl("factor", deparse_long(fml))){
+                useModel.matrix = TRUE
+            }
         }
     }
 
     if(useModel.matrix){
         # to catch the NAs, model.frame needs to be used....
-        linear.mat = stats::model.matrix(fml[c(1, 3)], stats::model.frame(fml[c(1, 3)], data, na.action = na.pass))
+        if(is.null(mf)){
+            mf = stats::model.frame(fml, data, na.action = na.pass)
+        }
+
+        linear.mat = stats::model.matrix(fml, mf)
 
         if(fake_intercept){
             who_int = which("(Intercept)" %in% colnames(linear.mat))
@@ -4525,123 +6081,51 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
                 stop("Due to the use of the argument 'subset', not a single variable is left.")
             }
 
-            fml = .xpd(lhs = "y", rhs = terms_all[!terms_drop])
+            fml = .xpd(rhs = terms_all[!terms_drop])
         }
     }
 
-    fml_dp = deparse_long(fml)
-
     #
-    # poly
+    # Extra functions that need raw data-evaluation + single valued factors
     #
 
-    # We check for the presence of poly only in the case of new data
-    # if it's the original data set, that's OK
+    mf = NULL
+    if(!original_data){
 
-    is_poly = FALSE
-    if(!original_data && grepl("(?<![\\.[:alnum:]_])poly\\(", fml_dp, perl = TRUE)){
-        # checking the regex: 87us on a small vector
+        # What I don't like here is:
+        # to take care of only two particular cases, namely
+        #  + functions using the original data
+        #  + single value factors
+        # we incur a lot of computing time to EVERYONE
+        # That's really not good.
+        # The problem is that it's not so easy to catch those cases 100% without error.
+        # I shall find a solution at some point.
 
-        poly_parts = strsplit(fml_dp, "(?<![\\.[:alnum:]_])poly\\(", perl = TRUE)[[1]]
+        # if lean = TRUE, we should be avoiding that
+        # => I don't know of a solution yet...
 
-        split_by_poly = function(r){
+        if(length(fml) == 3) fml = fml[c(1, 3)]
 
-            if(!grepl("(", r, fixed = TRUE) && grepl("\\)$", r)){
-                return(c(paste0("poly(", r), ""))
-            }
-
-            letter_vec = strsplit(r, "")[[1]]
-            open = 1 + cumsum(letter_vec == "(")
-            close = cumsum(letter_vec == ")")
-            index = which.max(close - open == 0)
-
-            c(paste0("poly(", substr(r, 1, index)), substr(r, index + 1, nchar(r)))
-        }
-
-        poly_parts_full = lapply(poly_parts[-1], split_by_poly)
-
-        poly_variables_all = sapply(poly_parts_full, function(x) x[1])
-        rest_all = sapply(poly_parts_full, function(x) x[2])
-
-        poly_variables_unik = unique(poly_variables_all)
-
-        # We now evaluate these in the old data => we get the nber of variables and the coefs
+        # We apply model.frame to the original data
         data = fetch_data(object, "To apply 'model.matrix.fixest', ")
 
-        poly_call = function(x, ..., degree = 1, coefs = NULL, raw = FALSE, simple = FALSE, data, i){
-            mc = match.call()
-            if(raw == TRUE || !is.null(coefs)){
-                return(list(is_OK = TRUE))
-            }
+        panel__meta__info = set_panel_meta_info(object, data)
 
-            # We write evaluate the data to get the coefs
-            # We will return:
-            # - degree
-            # - deparsed call to evaluate
+        mf = model.frame(fml, data, na.action = na.pass)
 
-            mc_new = mc
-            mc_new$simple = FALSE
-            mc_new$data = NULL
-            mc_new[[1]] = as.name("poly")
+        rm(panel__meta__info) # needed, so that when the data is recreated for real
 
-            tmp = eval(mc_new, data)
+        t_mf = terms(mf)
+        xlev = .getXlevels(t_mf, mf)
 
-            mc_new$coefs = attr(tmp, "coefs")
-            res = list(degree = attr(tmp, "degree"), new_call = deparse_long(mc_new))
-
-            res
-        }
-
-        poly_variables_all_new = poly_variables_all
-        old_varname_all = new_varname_all = list()
-        poly_dict_full = c()
-        for(i in seq_along(poly_variables_unik)){
-
-            polyvar = poly_variables_unik[i]
-            my_call_txt = gsub("poly(", "poly_call(", polyvar, fixed = TRUE)
-            my_call_txt = gsub("\\)$", ", data = data)", my_call_txt)
-            info = eval(str2lang(my_call_txt))
-
-            if(isTRUE(info$is_OK)){
-                next
-            }
-
-            old_var_name = paste0(polyvar, info$degree)
-            new_var_name = paste0("POLY__VAR", i, "__", info$degree)
-            poly_dict_full[polyvar] = paste0("(", paste(new_var_name, collapse = " + "), ")")
-
-            poly_variables_all_new[i] = poly_dict_full[polyvar]
-
-            old_varname_all[[length(old_varname_all) + 1]] = old_var_name
-            new_varname_all[[length(new_varname_all) + 1]] = new_var_name
-
-            # Evaluation in the new data
-            tmp = eval(str2lang(info$new_call), newdata)
-            for(j in 1:ncol(tmp)){
-                newdata[[new_var_name[j]]] = tmp[, j]
-            }
-        }
-
-        old_varname_all = unlist(old_varname_all)
-        new_varname_all = unlist(new_varname_all)
-
-        # Now => recreation of the fml
-        if(length(old_varname_all) > 0){
-            is_poly = TRUE
-            fml = as.formula(paste0("y ~ ", poly_parts[1], paste0(poly_variables_all_new, rest_all, collapse = "")))
+        if(!identical(attr(t_mf,"variables"), attr(t_mf,"predvars")) || length(xlev) > 0){
+            mf = model.frame(t_mf, newdata, xlev = xlev)
+        } else {
+            mf = NULL
         }
     }
 
-    new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref)
-
-    # Renaming if poly
-    if(is_poly){
-        mat_names = colnames(new_matrix)
-        for(i in seq_along(new_varname_all)){
-            mat_names = gsub(new_varname_all[i], old_varname_all[i], mat_names, fixed = TRUE)
-        }
-        colnames(new_matrix) = mat_names
-    }
+    new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref, mf = mf)
 
     new_matrix
 }
@@ -5369,7 +6853,40 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname, keep_first = 
         x = as.character(x)
     }
 
-    if(is.character(x)){
+
+    if(inherits(x, "formula")){
+
+        if(!identical(all.vars(x), "x")){
+            stop_up("In argument '", argname, "', the formula must contain a single variable name: 'x'. So far '", deparse_long(x), "' is not valid.")
+        }
+
+        if(length(x) > 2){
+            stop_up("In argument '", argname, "', if a formula, it must be one-sided. Problem: '", deparse_long(x), "' is two-sided.")
+        }
+
+        is_here = error_sender(eval(x[[2]], list(x = items)),
+                               "In argument '", argname, "', the evaluation of the formula led to an error:")
+        if(length(is_here) != length(items)){
+            stop_up("In argument '", argname, "', the evaluation of the formula must return a logical vector of the same length as 'x'. Problem: '", deparse_long(x), "' returns a vector of length ", length(is_here), " (expected: ", length(items), ").")
+        }
+
+        if(!is.logical(is_here)){
+            stop_up("In argument '", argname, "', the evaluation of the formula must return a logical vector. Problem: '", deparse_long(x), "' is not logical (instead it is of class ", enumerate_items(class(is_here)), ").")
+        }
+
+        is_here = !is.na(is_here) & is_here
+
+        if(!no_error && !any(is_here)){
+            stop_up("In argument '", argname, "', the evaluation of the formula must match at least one value. Problem: '", deparse_long(x), "' does not match any.")
+        }
+
+        if(keep){
+            id_drop = which(!is_here)
+        } else {
+            id_drop = which(is_here)
+        }
+
+    } else if(is.character(x)){
         all_x = c()
         for(i in seq_along(x)){
 
@@ -5464,7 +6981,54 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
     set_up(1)
 
     argname = deparse(substitute(bin))
-    check_arg(bin, "list | vector")
+    check_arg(bin, "list | vector | os formula")
+
+    #
+    # DSB expansion
+    #
+
+    bin_dp = deparse_long(bin)
+    if(grepl(".[", bin_dp, fixed = TRUE)){
+        bin_dsb = dot_square_bracket(bin_dp, frame = parent.frame(2), text = TRUE, up = 1)
+        if(length(bin_dsb) > 1){
+            bin_dsb = paste0(bin_dsb, collapse = "")
+        }
+
+        bin_dsb_call = error_sender(str2lang(bin_dsb),
+                                    "Error when binning: the values expanded with '.[]' led to an error:")
+        bin = eval(bin)
+    }
+
+    #
+    # cut:: => special treatment, we short circuit
+    #
+
+    if(!is.list(bin) && (is.character(bin) && any(grepl("^cut::", bin)))){
+
+        if(!grepl("^cut::", bin[1])){
+            stop_up("To use the special binning 'cut::values', it must be in the first position of the vector, possibly followed by custom names. Currently 'cut::values' is in position ", which(grepl("^cut::", bin))[1], ".")
+        }
+
+        n_names = length(bin) - 1
+        if(n_names > 1){
+            my_cut = trimws(sub("^cut::", "", bin[1]))
+            if(grepl("^[[:digit:]]+$", my_cut)){
+                n_cuts = as.numeric(my_cut)
+            } else {
+                n_cuts = length(strsplit(my_cut, "\\[|\\]")[[1]]) + 1
+            }
+
+            if(n_names > n_cuts){
+                stop_up("In the special binning 'cut::values', the number of custom names is greater than the number of bins (", n_names, " vs ", n_cuts, ").")
+            }
+        }
+
+        if(!is.numeric(x)){
+            stop_up("To use the special binning 'cut::values', the variable '", varname, "' must be numeric. Currently this is not the case (it is of class ", enumerate_items(class(x)), " instead).")
+        }
+
+        return(cut_vector(x, bin))
+    }
 
     x_int = to_integer(x, add_items = TRUE, items.list = TRUE, sorted = TRUE)
     x_items = x_int$items
@@ -5476,7 +7040,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
     }
 
     if(!is.list(bin)){
-        if(any(grepl("^!?!?bin::", bin))){
+        if(is.character(bin) && any(grepl("^!?!?bin::", bin))){
 
             if(length(bin) > 1){
                 stop_up("To use the special binning 'bin::digit', the argument '", argname, "' must be of length 1. Currently it is of length ", length(bin), ".")
@@ -5515,6 +7079,20 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
         } else {
             bin = list(bin)
         }
+    }
+
+    # we catch "@" as first item
+    if(identical(bin[[1]], "@") && length(bin) > 1){
+        # this means that the user wants to specify
+        # the binned values as first elements of the new factor
+        bin[[1]] = NULL
+        if(is.null(names(bin))){
+            names(bin) = paste0("@", seq_along(bin), names(bin))
+        } else {
+            qui_ok = !grepl("^@\\d+", names(bin))
+            names(bin)[qui_ok] = paste0("@", seq(sum(qui_ok)), names(bin)[qui_ok])
+        }
+
     }
 
     x_map = x_range = seq_along(x_int$items)
@@ -5562,18 +7140,32 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
     }
 
     # changing the item values
+    x_items_new = x_items
+
     bin_names = names(bin)
+    custom_loc = FALSE # custom location
     if(is.null(bin_names)){
         bin_names = character(length(bin))
-    }
 
-    x_items_new = x_items
+    } else if(any(grepl("^@\\d", bin_names))){
+        custom_loc = TRUE
+        do_factor = TRUE
+        x_items_new = as.character(x_items_new)
+
+        qui = grepl("^@\\d", bin_names)
+        bin_location = sub("^@(\\d+).*", "\\1", bin_names)
+        bin_location[!qui] = NA
+        bin_location = as.numeric(bin_location)
+
+        bin_names = sub("^@\\d+ *", "", bin_names)
+    }
 
     for(i in seq_along(bin)){
 
         b_name = bin_names[[i]]
         if(nchar(b_name) == 0){
             b_name = as.character(x_items_new[id_bin[[i]][1]])
+            bin_names[[i]] = b_name # useful for new_loc
         }
 
         if(is.numeric(x_items_new)){
@@ -5593,6 +7185,59 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
 
     x_items_new = x_items_new[!id_not_core]
 
+    if(custom_loc){
+        n_bins = length(bin_names)
+        new_loc = rep(NA_real_, length(x_items_new))
+        for(i in 1:n_bins){
+            b_name = bin_names[i]
+            new_loc[x_items_new == b_name] = bin_location[i]
+        }
+
+        loc_no_na = new_loc[!is.na(new_loc)]
+        while(anyDuplicated(loc_no_na)){
+            # regularization
+            is_dup = duplicated(loc_no_na)
+            value = min(loc_no_na[is_dup])
+            i_first = which.max(loc_no_na == value)
+            loc_no_na[loc_no_na >= value] = loc_no_na[loc_no_na >= value] + 1
+            loc_no_na[i_first] = value
+        }
+
+        n_max = length(x_items_new)
+        if(any(loc_no_na > n_max)){
+            # regularization
+
+            n_lnona = length(loc_no_na)
+            if(n_lnona == 1){
+                loc_no_na = n_max
+            } else {
+                order_loc_no_na = order(loc_no_na)
+
+                loc_sorted = loc_no_na[order_loc_no_na]
+                loc_sorted[n_lnona] = n_max
+                for(i in n_lnona:2) {
+                    if(loc_sorted[i] <= loc_sorted[i - 1]){
+                        loc_sorted[i - 1] = loc_sorted[i] - 1
+                    }
+                }
+
+                loc_no_na = loc_sorted[order(order_loc_no_na)]
+            }
+        }
+
+        new_loc[!is.na(new_loc)] = loc_no_na
+
+        for(i in seq_along(new_loc)){
+            if(!i %in% new_loc){
+                j = which(is.na(new_loc))[1]
+                new_loc[j] = i
+            }
+        }
+
+        x_map = new_loc[x_map]
+        x_items_new = x_items_new[order(new_loc)]
+    }
+
     if(do_factor){
         x_items_new = factor(x_items_new, levels = x_items_new)
     }
@@ -5600,6 +7245,205 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
     x_new = x_items_new[x_map[x_int$x]]
 
     return(x_new)
+}
+
+
+cut_vector = function(x, bin){
+    # We cut a vector into pieces
+    # **only numeric vectors**
+    # cut::a]b[c] cuts the vectors into four slices: [-Inf, a]; ]a, b[; [b, c]; ]c, Inf]
+    # a, b, c should be numeric values
+    # they can be replaced with: pXX or qX, percentiles and quartiles
+    # cut::n splits the data into n equal sizes
+
+    set_up(2)
+
+    bin_names_usr = bin[-1]
+    bin = bin[1]
+
+    # checking bin
+    if(!is.character(bin) || !grepl("^cut::", bin)){
+        stop("Internal bug: Argument 'bin' should be equal to 'cut::stg' over here -- this is not the case.")
+    }
+
+    # cleaning x
+    n = length(x)
+    ANY_NA = anyNA(x)
+    IS_NA = FALSE
+    if(ANY_NA){
+        IS_NA = is.na(x)
+
+        if(all(IS_NA)){
+            return(x)
+        }
+
+        x = x[!IS_NA]
+    }
+
+    # we sort x (needed later)
+    x_order = order(x)
+    x_sorted = x[x_order]
+
+    my_cut = dsb(gsub("^cut::", "", bin))
+
+    if(is_numeric_in_char(my_cut)){
+        my_cut = as.numeric(my_cut)
+        pct = cumsum(rep(1/my_cut, max(my_cut - 1, 1)))
+        cut_points = quantile(x_sorted, pct)
+
+        bounds = rep("]", length(cut_points))
+
+    } else {
+        bounds = regmatches(my_cut, gregexpr("\\[|\\]", my_cut))[[1]]
+        values = strsplit(my_cut, "\\[|\\]")[[1]]
+
+        n_cuts = length(values)
+
+        if(n_cuts != length(bounds)){
+            stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles/percentiles. Problem: each number must be followed by an open (or closed) square bracket, this is currentlly not the case.")
+        }
+
+        cut_points = numeric(n_cuts)
+        for(i in seq_along(values)){
+
+            v = values[i]
+
+            if(is_numeric_in_char(v)){
+                cut_points[i] = as.numeric(v)
+
+            } else if(grepl("^p|P|q|Q", v)){
+                p = gsub("^.", "", v)
+                if(!is_numeric_in_char(p)){
+                    stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect.")
+                }
+
+                p = as.numeric(p)
+
+
+                if(grepl("^q|Q", v)){
+                    # we transform the quartile into a percentile
+                    if(!p %in% c(0:4)){
+                        stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. \n  The quartile must be an integer between 0 and 4.")
+                    }
+
+                    p = c(0, 25, 50, 75, 100)[p + 1]
+                }
+
+                if(!p %in% 0:100){
+                    stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. \n  The percentile must be an integer between 0 and 100.")
+                }
+
+                cut_points[i] = quantile(x, p/100)
+
+            } else {
+                stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. This is not a percentile nor a number.")
+            }
+        }
+
+        if(n_cuts > 1 && any(cut_points[1:(n_cuts-1)] > cut_points[1 + 1:(n_cuts-1)])){
+            i_pblm = which(cut_points[1:(n_cuts-1)] > cut_points[1 + 1:(n_cuts-1)])[1]
+            stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The values 'a', 'b', etc should be increasing, but the ", n_th(i_pblm), " value (", cut_points[i_pblm], ") is larger than the ", n_th(i_pblm + 1), " (", cut_points[i_pblm + 1], ").")
+        }
+
+    }
+
+    bin_names = character(length(cut_points) + 1)
+    for(i in seq_along(bin_names_usr)){
+        bi = bin_names_usr[i]
+        if(!is.na(bi)){
+            bin_names[i] = bi
+        }
+    }
+
+    is_included = 1 * (bounds == "]")
+    x_cut = cpp_cut(x_sorted, cut_points, is_included)
+
+    x_int = x_cut$x_int
+    isnt_empty = x_cut$isnt_empty
+    value_min = x_cut$value_min
+    value_max = x_cut$value_max
+    is_int = x_cut$is_int
+
+    n_bins = sum(isnt_empty)
+
+    if(any(isnt_empty == 0)){
+        i_empty = which(isnt_empty == 0)
+        if(getFixest_notes()){
+            message("When binning: in '", bin, "', the ", enumerate_items(n_th(i_empty)), " bin", plural_len(i_empty, "s.is"), " empty.")
+        }
+
+        x_int = cumsum(isnt_empty)[x_int]
+        value_min = value_min[-i_empty]
+        value_max = value_max[-i_empty]
+        bin_names = bin_names[-i_empty]
+    }
+
+    # creating the labels
+    labels = character(n_bins)
+    if(is_int){
+        # format A-B
+
+        # we don't want to add a comma to the years! But to large numbers: yes
+        fmt_fun = if(value_max[n_bins] > 9999) dreamerr::fsignif else function(x) as.character(x)
+
+        for(i in 1:n_bins){
+            if(value_min[i] == value_max[i]){
+                labels[i] = fmt_fun(value_min[i])
+            } else {
+                labels[i] = paste0(fmt_fun(value_min[i]), "-", fmt_fun(value_max[i]))
+            }
+        }
+
+    } else {
+        # format [A, B]
+        # we always write in inclusion, too hard to do the exclusion mentally
+        d_min = NULL
+        for(i in 1:n_bins){
+            vmin = value_min[i]
+            vmax = value_max[i]
+
+            l10_diff = if(vmax == vmin) 0 else log10(vmax - vmin)
+            # d: nber of digits
+            d = if(l10_diff >= 0) 1 else ceiling(abs(l10_diff))
+            if(!is.null(d_min) && d < d_min) d = d_min
+
+            # we check consistency problems
+            d_min = NULL
+            vmax_fmt = sprintf("%.*f", d, vmax)
+            if(i != n_bins){
+                vmin_next_fmt = sprintf("%.*f", d, value_min[i + 1])
+                if(vmax_fmt == vmin_next_fmt){
+                    l10_diff = log10(value_min[i + 1] - vmax)
+                    d = ceiling(abs(l10_diff))
+                    d_min = d
+                }
+                vmax_fmt = cpp_add_commas(vmax, d, FALSE)
+            }
+            vmin_fmt = cpp_add_commas(vmin, d, FALSE)
+
+            labels[i] = paste0("[", vmin_fmt, "; ", vmax_fmt, "]")
+        }
+    }
+
+    for(i in seq_along(bin_names)){
+        bi = bin_names[i]
+        if(nchar(bi) > 0){
+            labels[i] = bi
+        }
+    }
+
+
+    # Te result
+    if(ANY_NA){
+        res = rep(NA_real_, n)
+        res[!IS_NA] = x_int[order(x_order)]
+    } else {
+        res = x_int[order(x_order)]
+    }
+
+    res = factor(res, labels = labels)
+
+    return(res)
 }
 
 
@@ -5611,14 +7455,14 @@ fixest_pvalue = function(x, zvalue, vcov){
         if(missing(vcov)) {
             stop("Internal error (=bug): the argument 'vcov' should not be missing in fixest_pvalue().")
 
-        } else if(is.null(attr(vcov,"dof.K"))){
+        } else if(is.null(attr(vcov, "dof.K"))){
             stop("Internal error (=bug): the attribute 'dof.K' from 'vcov' should not be NULL.")
         }
 
         # df.t is always an attribute of the vcov
         df.t = attr(vcov, "df.t")
         if(is.null(df.t)){
-            df.t = max(nobs(x) - attr(vcov,"dof.K"), 1)
+            df.t = max(nobs(x) - attr(vcov, "dof.K"), 1)
         }
 
         pvalue = 2*pt(-abs(zvalue), df.t)
@@ -5639,6 +7483,9 @@ fixest_CI_factor = function(x, level, vcov){
 
         if(missing(vcov)) {
             stop("Internal error (=bug): the argument 'vcov' should not be missing in fixest_CI_factor().")
+
+        } else if(is.null(attr(vcov, "dof.K"))){
+            stop("Internal error (=bug): the attribute 'dof.K' from 'vcov' should not be NULL.")
         }
 
         # df.t is always an attribute of the vcov
@@ -5879,6 +7726,20 @@ dict_apply = function(x, dict = NULL){
 
     if(missing(dict) || length(dict) == 0){
         return(x)
+    }
+
+    # We make the dictionary names space agnostic, adds a handful of us only
+    if(any(grepl(" ", x, fixed = TRUE))){
+        x = gsub(" ", "", x, fixed = TRUE)
+    }
+
+    if(any(grepl(" ", names(dict), fixed = TRUE))){
+        names(dict) = gsub(" ", "", names(dict), fixed = TRUE)
+        if(anyDuplicated(names(dict))){
+            dup = duplicated(names(dict))
+            stop("The dictionary 'dict' contains several items with the same names, it concerns ",
+                 enumerate_items(names(dict)[dup]), " (note that spaces are ignored).")
+        }
     }
 
     who = x %in% names(dict)
@@ -6425,33 +8286,47 @@ fml_split = function(fml, i, split.lhs = FALSE, text = FALSE, raw = FALSE){
 }
 
 error_sender = function(expr, ..., clean, up = 0, arg_name){
-    res = tryCatch(expr, error = function(e) structure(conditionMessage(e), class = "try-error"))
+    res = tryCatch(expr, error = function(e) structure(list(conditionCall(e), conditionMessage(e)), class = "try-error"))
 
     if("try-error" %in% class(res)){
         set_up(1 + up)
-        msg = paste(..., collapse = "")
+        msg = paste0(..., collapse = "")
 
         if(nchar(msg) == 0){
             if(missing(arg_name)){
                 arg_name = deparse(substitute(expr))
             }
             msg = paste0("Argument '", arg_name, "' could not be evaluated: ")
-            stop_up(msg, res)
+            stop_up(msg, res[[2]])
 
-        } else if(!missing(clean)){
+        } else {
 
-            if(grepl(" => ", clean)){
-                clean_split = strsplit(clean, " => ")[[1]]
-                from = clean_split[1]
-                to = clean_split[2]
+            # The expression that is evaluated is absolutely non informative for the user
+            call_non_informative = deparse(substitute(expr), 100)[1]
+            call_error = deparse(res[[1]], 100)[1]
+
+            if(call_error == call_non_informative){
+                call_error = ""
+
             } else {
-                from = clean
-                to = ""
+                call_error = paste0("In ", call_error, ": ")
             }
 
-            stop_up(msg, gsub(from, to, res))
-        } else {
-            stop_up(msg, res)
+            if(!missing(clean)){
+
+                if(grepl(" => ", clean)){
+                    clean_split = strsplit(clean, " => ")[[1]]
+                    from = clean_split[1]
+                    to = clean_split[2]
+                } else {
+                    from = clean
+                    to = ""
+                }
+
+                stop_up(msg, "\n  ", call_error, gsub(from, to, res[[2]]))
+            } else {
+                stop_up(msg, "\n  ", call_error, res[[2]])
+            }
         }
     }
 
@@ -6500,10 +8375,10 @@ merge_fml = function(fml_linear, fml_fixef = NULL, fml_iv = NULL){
 fixest_fml_rewriter = function(fml){
     # Currently performs the following
     # - expands lags
-    # - expands interactions with :: (note that this will be deprecated)
     # - protects powers: x^3 => I(x^3)
     #
     # fml = sw(f(y, 1:2)) ~ x1 + l(x2, 1:2) + x2^2 | fe1 | y ~ z::e + g^3
+    # fml = y ~ 1 | id + period | l(x_endo, -1:1) ~ l(x_exo, -1:1)
 
     fml_text = deparse_long(fml)
 
@@ -6565,14 +8440,18 @@ fixest_fml_rewriter = function(fml){
 
         rhs_terms = get_vars(fml_rhs)
 
-        rhs_terms = error_sender(expand_lags_internal(rhs_terms),
-                                 "Problem in the formula regarding lag/leads: ", clean = "__expand")
+        if(length(rhs_terms) == 0){
+            rhs_text = "1"
+        } else {
+            rhs_terms = error_sender(expand_lags_internal(rhs_terms),
+                                     "Problem in the formula regarding lag/leads: ", clean = "__expand")
 
-        if(attr(terms(fml_rhs), "intercept") == 0){
-            rhs_terms = c("-1", rhs_terms)
+            if(attr(terms(fml_rhs), "intercept") == 0){
+                rhs_terms = c("-1", rhs_terms)
+            }
+
+            rhs_text = paste(rhs_terms, collapse = "+")
         }
-
-        rhs_text = paste(rhs_terms, collapse = "+")
 
         fml_linear = as.formula(paste0(lhs_text, "~", rhs_text))
 
@@ -6632,7 +8511,13 @@ fixest_fml_rewriter = function(fml){
             if(n_parts == 3 || !is_fe){
                 fml_iv = fml_maker(fml_parts[[n_parts]])
 
-                fml_iv = fixest_fml_rewriter(fml_iv)$fml
+                fml_endo = .xpd(lhs = ~y, rhs = fml_iv[[2]])
+                fml_inst = .xpd(lhs = ~y, rhs = fml_iv[[3]])
+
+                endo_lag_expand = fixest_fml_rewriter(fml_endo)$fml
+                inst_lag_expand = fixest_fml_rewriter(fml_inst)$fml
+
+                fml_iv = .xpd(lhs = endo_lag_expand[[3]], rhs = inst_lag_expand[[3]])
             }
         }
 
@@ -6643,7 +8528,7 @@ fixest_fml_rewriter = function(fml){
         # I think I should do that at the C level, this will be much faster I guess
 
         # We only take care of the RHS (we don't care about the LHS)
-        no_lhs_text = gsub("[^~]+~", "", fml_text)
+        no_lhs_text = gsub("^[^~]+~", "", fml_text)
         no_lhs_text = gsub("(?<!I\\()(\\b(\\.[[:alpha:]]|[[:alpha:]])[[:alnum:]\\._]*\\^[[:digit:]]+)", "I(\\1)", no_lhs_text, perl = TRUE)
 
         if(grepl("\\^[[:alpha:]]", no_lhs_text)){
@@ -6946,6 +8831,147 @@ use_t_distr = function(x){
     # x: fixest estimation
     x$method %in% "feols" || (x$method %in% "feglm" && !x$family$family %in% c("poisson", "binomial"))
 }
+
+
+is_fun_in_char = function(fml_char, fun){
+    extract_fun(fml_char, fun, bool = TRUE)
+}
+
+extract_fun = function(fml_char, fun, err_msg = NULL, bool = FALSE, drop = TRUE){
+    # A formula, in character form // can be a vector
+    # fun: a function name in regex form
+    #
+    # returns a list:
+    # before
+    # fun
+    # after
+    #
+    # fml_char = "to_integer(id, sw0(fe))" ;  fun = "sw0?"
+
+    only_one = TRUE
+
+    regex = paste0(c("(?<=^)", "(?<=[^[:alnum:]\\._])"),
+                   fun, "\\(", collapse = "|")
+
+    is_there = grepl(regex, fml_char, perl = TRUE)
+
+    if(bool) return(is_there)
+
+    res = list()
+
+    n = length(fml_char)
+    for(i in 1:n){
+        # fml_i = fml_char[1]
+
+        fml_i = fml_char[i]
+        if(is_there[i]){
+
+            fml_split = strsplit(fml_i, regex, perl = TRUE)[[1]]
+
+            if(only_one && length(fml_split) > 2){
+                if(is.null(err_msg)){
+                    stop_up("Only one function '", fun, "' can be used at a time.")
+                } else {
+                    stop_up(err_msg)
+                }
+            }
+
+            # we need to add a last character otherwise => problems
+            fml_value = paste0(fml_split[2], " ")
+            fml_right_split = strsplit(fml_value, ")", fixed = TRUE)[[1]]
+            n_open = pmax(lengths(strsplit(fml_right_split, "(", fixed = TRUE)) - 1, 0)
+
+            n_parts = length(fml_right_split)
+            fun_closed = which((1 + cumsum(n_open) - 1:n_parts) == 0)
+
+            fun_name = substr(fml_i, nchar(fml_split[1]) + 1, nchar(fml_i))
+            fun_name = gsub("\\(.+", "", fun_name)
+
+            fun_char = paste0(fun_name, "(", paste(fml_right_split[1:fun_closed], collapse = ")"), ")")
+
+            fml_right_rest = trimws(paste0(fml_right_split[-(1:fun_closed)], collapse = ")"))
+
+            res[[i]] = list(before = fml_split[1],
+                            fun = fun_char,
+                            after = fml_right_rest)
+
+
+        } else {
+            res[[i]] = list(before = fml_i,
+                            fun = "",
+                            after = "")
+        }
+    }
+
+    if(n == 1 && drop) res = res[[1]]
+
+    return(res)
+}
+
+is_numeric_in_char = function(x){
+    res = tryCatch(as.numeric(x), warning = function(x) "not numeric")
+    !identical(res, "not numeric")
+}
+
+insert_in_between = function(x, y){
+    n_x = length(x)
+    n_y = length(y)
+
+    if(n_y == 1) y = rep(y, n_x)
+    if(n_x == 1) x = rep(x, n_y)
+    n_x = length(x)
+
+    res = rep(x, each = 2)
+    res[2 * 1:n_x] = y
+
+    res
+}
+
+str_trim = function(x, n, first = FALSE){
+    if(first){
+        substr(x, 1 + n, nchar(x))
+    } else {
+        substr(x, 1, nchar(x) - n)
+    }
+}
+
+NA_fun = function(..., df){
+    dots = list(...)
+    n_dots = length(dots)
+
+    if(n_dots == 0){
+        res = !complete.cases(df)
+        return(res)
+    }
+
+    res = is.na(dots[[1]])
+
+    if(n_dots == 1){
+        return(res)
+    }
+
+    for(i in 2:n_dots){
+        res = res | is.na(dots[[i]])
+    }
+    res
+}
+
+
+eval_dot = function(x, up = 1){
+    # Note that the right use of up is ESSENTIAL
+    # if must refer to the parent frame from which the main call has been made
+    # Otherwise an error will be thrown of "." not existing
+
+    x_dp = deparse(substitute(x), 300)
+
+    sysOrigin = sys.parent(up)
+    mc = match.call(sys.function(sysOrigin), sys.call(sysOrigin))
+
+    my_list = list("." = list)
+
+    eval(mc[[x_dp]], my_list, parent.frame(up + 1))
+}
+
 
 
 #### ................. ####
@@ -7639,25 +9665,8 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 
 	# STEP 0: panel setup
 
-	fml_full = formula(object, type = "full")
 	fml = object$fml
-	if(check_lag(fml_full)){
-	    if(!is.null(object$panel.info)){
-	        if(is.null(attr(newdata, "panel_info"))){
-                # We try to recreate the panel
-	            if(any(!names(object$panel.info) %in% c("", "data", "panel.id"))){
-	                # This was NOT a standard panel creation
-	                stop("The estimation contained lags/leads and the original data was a 'fixest_panel' while the new data is not. Please set the new data as a panel first with the function panel(). NOTA: the original call to panel was:\n", deparse_long(object$panel.info))
-	            } else {
-	                panel__meta__info = panel_setup(newdata, object$panel.id, from_fixest = TRUE)
-	            }
-	        } else {
-	            panel__meta__info = attr(newdata, "panel_info")
-	        }
-	    } else {
-	        panel__meta__info = panel_setup(newdata, object$panel.id, from_fixest = TRUE)
-	    }
-	}
+	panel__meta__info = set_panel_meta_info(object, newdata)
 
 	#
 	# 1) Fixed-effects
@@ -8474,23 +10483,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
 	data = as.data.frame(data)
 
 	# Panel setup
-	if(check_lag(fml_full)){
-	    if(!is.null(object$panel.info)){
-	        if(is.null(attr(data, "panel_info"))){
-	            # We try to recreate the panel
-	            if(any(!names(object$panel.info) %in% c("", "data", "panel.id"))){
-	                # This was NOT a standard panel creation
-	                stop("The original data set was a fixest_panel, now it isn't any more. Please restore the original data to a panel to perform model.matrix. NOTA: the original call to panel was:\n", deparse_long(object$panel.info))
-	            } else {
-	                panel__meta__info = panel_setup(data, object$panel.id, from_fixest = TRUE)
-	            }
-	        } else {
-	            panel__meta__info = attr(data, "panel_info")
-	        }
-	    } else {
-	        panel__meta__info = panel_setup(data, object$panel.id, from_fixest = TRUE)
-	    }
-	}
+	panel__meta__info = set_panel_meta_info(object, data)
 
 	res = list()
 
@@ -9035,22 +11028,19 @@ rep.fixest_list = function(x, times = 1, each = 1, cluster, ...){
 #'
 #' # Change default with
 #' setFixest_notes(FALSE)
+#' feols(Ozone ~ Solar.R, airquality)
 #'
 #' # Back to default which is TRUE
-#' getFixest_notes()
+#' setFixest_notes(TRUE)
+#' feols(Ozone ~ Solar.R, airquality)
 #'
 setFixest_notes = function(x){
-
-	if(missing(x) || length(x) != 1 || !is.logical(x) || is.na(x)){
-		stop("Argument 'x' must be equal to TRUE or FALSE.")
-	}
+    check_arg(x, "mbt logical scalar")
 
 	options("fixest_notes" = x)
 }
 
 #' @rdname setFixest_notes
-"getFixest_notes"
-
 getFixest_notes = function(){
 
     x = getOption("fixest_notes")
@@ -9068,7 +11058,7 @@ getFixest_notes = function(){
 #'
 #'
 #' @param nthreads The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. If missing, the default is to use 50\% of all threads.
-#' @param save Either a logical or equal to \code{"reset"}. Default is \code{FALSE}. If \code{TRUE} then the value is set permanently at the project level, this means that if you restart R, you will still obtain the previously saved defaults. This is done by writing in the \code{".Renviron"} file, located in the project's working directory, hence we must have write permission there for this to work. If equal to "reset", the default at the project level is erased.
+#' @param save Either a logical or equal to \code{"reset"}. Default is \code{FALSE}. If \code{TRUE} then the value is set permanently at the project level, this means that if you restart R, you will still obtain the previously saved defaults. This is done by writing in the \code{".Renviron"} file, located in the project's working directory, hence we must have write permission there for this to work, and only works with Rstudio. If equal to "reset", the default at the project level is erased. Since there is writing in a file involved, permission is asked to the user.
 #'
 #' @author
 #' Laurent Berge
@@ -9135,8 +11125,6 @@ setFixest_nthreads = function(nthreads, save = FALSE){
 }
 
 #' @rdname setFixest_nthreads
-"getFixest_nthreads"
-
 getFixest_nthreads = function(){
 
     x = getOption("fixest_nthreads")
@@ -9206,8 +11194,6 @@ setFixest_dict = function(dict){
 }
 
 #' @rdname setFixest_dict
-"getFixest_dict"
-
 getFixest_dict = function(){
 
     x = getOption("fixest_dict")
@@ -9410,15 +11396,15 @@ getFixest_estimation = function(){
 #' @param x Logical, no default. If \code{FALSE}, the package startup message is removed.
 #'
 #' @details
-#' Note that this function is introduced to cope with the first \code{fixest} startup message (in version 0.9.0). In the future, all startup messages may be removed, but the function will still exist.
+#' Note that this function is introduced to cope with the first \code{fixest} startup message (in version 0.9.0).
 #'
-#' This function works by adding a variable in the \code{.Renviron} file, so it is very lightweight and project-specific.
+#' This function works only with R >= 4.0.0. There are no startup messages for R < 4.0.0.
 #'
 fixest_startup_msg = function(x){
 
     check_arg(x, "logical scalar mbt")
 
-    renvir_update("fixest_startup_msg", x)
+    config_update("fixest_startup_msg", x)
 
 }
 
@@ -9447,17 +11433,34 @@ initialize_startup_msg = function(startup_msg){
     # Note that we must return the value of 'fixest_startup_msg' since these are
     # updated only at session restart (and hence are not directly accessible)
 
-    # We make sure we're not in R CMD check => we don't want to write to Renviron in that case
-    if(any(grepl("R_CHECK", names(Sys.getenv()), fixed = TRUE))){
+    # message("fixest_startup_msg")
+
+    if(getRversion() < "4.0.0"){
+        # No startup message for version < 4.0
+        # because there's no way to monitor the messages
         return(FALSE)
     }
 
-    previous_version = renvir_get("fixest_version")
+    # message("getting version")
+
+    previous_version = config_get("fixest_version")
+
+    # message("version is ", previous_version)
+
+    if(is.null(previous_version)){
+        # compatibility with previous versions
+        # message("trying to get version from renviron")
+        previous_version = renvir_get("fixest_version")
+    }
+
     current_version = fixest_version()
 
     if(is.null(previous_version)){
         # We first update the version
-        renvir_update("fixest_version", current_version)
+        # message("updating the version")
+        config_update("fixest_version", current_version)
+
+        # message("Is fixest used? ", is_fixest_used())
 
         # Is it a new project? Or was fixest simply never used before?
         if(is_fixest_used()){
@@ -9465,52 +11468,65 @@ initialize_startup_msg = function(startup_msg){
             # Since I register versions since 0.9.0, this means that the
             # version of fixest used was anterior => all msgs should pop
 
-            renvir_update("fixest_startup_msg", TRUE)
+            config_update("fixest_startup_msg", TRUE)
             return(TRUE)
         } else {
             # fixest was never used
             # => we don't show any message since it will not break any existing code
-            renvir_update("fixest_startup_msg", FALSE)
+            config_update("fixest_startup_msg", FALSE)
             return(FALSE)
         }
 
+        # message("updating done ")
+
     } else if(!identical(previous_version, current_version)){
-        # A) we update the version
-        renvir_update("fixest_version", current_version)
 
-        # B) we reset the value of fixest_startup_msg
-        #    only if the previous_version is anterior to the version that introduced the
-        #    message (means the message SHOULD pop since it would be the first time)
+        if(version2num(current_version) < version2num(previous_version)){
+            # Can happen in projects shared in the cloud
+            # In that case, we don't touch the startup message
 
-        max_version_msg = names(startup_msg)[1]
-
-        if(version2num(previous_version) < version2num(max_version_msg)){
-            # You force a startup message even if it was turned off in a previous version
-
-            # use case:
-            # - v0.9.0: startup message, user uses fixest_startup_msg(FALSE)
-            # - v0.10.0: new breaking changes, you want to inform the user even if he had set
-            # fixest_startup_msg(FALSE) in v0.9.0
-            #
-
-            renvir_update("fixest_startup_msg", previous_version)
-            return(previous_version)
+            msg = paste0("The current project used 'fixest' version ", previous_version, ", but the current version is only ", current_version, ". Maybe update the package?")
+            packageStartupMessage(fit_screen(msg, 1))
 
         } else {
-            # The previous version is already posterior to the last message
-            # => no startup message any more
 
-            renvir_update("fixest_startup_msg", FALSE)
-            return(FALSE)
+            # A) we update the version
+            config_update("fixest_version", current_version)
+
+            # B) we reset the value of fixest_startup_msg
+            #    only if the previous_version is anterior to the version that introduced the
+            #    message (means the message SHOULD pop since it would be the first time)
+
+            max_version_msg = names(startup_msg)[1]
+
+            if(version2num(previous_version) < version2num(max_version_msg)){
+                # You force a startup message even if it was turned off in a previous version
+
+                # use case:
+                # - v0.9.0: startup message, user uses fixest_startup_msg(FALSE)
+                # - v0.10.0: new breaking changes, you want to inform the user even if he had set
+                # fixest_startup_msg(FALSE) in v0.9.0
+                #
+
+                config_update("fixest_startup_msg", previous_version)
+                return(previous_version)
+
+            } else {
+                # The previous version is already posterior to the last message
+                # => no startup message any more
+
+                config_update("fixest_startup_msg", FALSE)
+                return(FALSE)
+            }
         }
     }
 
     # If null, we'll get the value thanks to renvir_get("fixest_startup_msg")
     # but in some instances, it may be corrupt, so we fix it
-    res = renvir_get("fixest_startup_msg")
+    res = config_get("fixest_startup_msg")
     if(is.null(res)){
         # corrupt situation (can occur in dev)
-        renvir_update("fixest_startup_msg", FALSE)
+        config_update("fixest_startup_msg", FALSE)
         return(FALSE)
     }
 
@@ -9526,7 +11542,11 @@ fixest_version = function(){
 }
 
 is_fixest_used = function(){
-    # It takes quite some time though....
+    # To return TRUE:
+    # - fixest in the files
+    # - + file saved > 7 days
+    #
+    # - if fixest but file saved > 7 days, very likely a new project
 
     # Only level 1 recursivity
     files = list.files(pattern = "\\.(r|R)$")
@@ -9540,7 +11560,23 @@ is_fixest_used = function(){
 
     big_text = lapply(files, readLines, warn = FALSE)
 
-    return(any(grepl("fixest", big_text)))
+    # we get the files that have fixest in them
+    id_fixest = which(sapply(big_text, function(x) any(grepl("fixest", x, fixed = TRUE))))
+
+    fixest_files = files[id_fixest]
+    if(length(fixest_files) == 0) return(FALSE)
+
+    now = Sys.time()
+
+    for(f in fixest_files){
+        f_created = file.mtime(f)
+        d = as.numeric(difftime(now, f_created, units = "days"))
+        if(d > 7){
+            return(TRUE)
+        }
+    }
+
+    return(TRUE)
 }
 
 renvir_get = function(key){
@@ -9563,14 +11599,91 @@ renvir_get = function(key){
     return(value)
 }
 
+find_project_path = function(force = FALSE){
+    # finds the root directory
+    # we just look up the search path to find the root
+    # Only works for Rstudio projects!
+
+    past_path = "init"
+    path = normalizePath(".", "/")
+
+    is_found = FALSE
+    i = 1
+    nmax = 10
+    while(past_path != path && i <= nmax){
+        i = i + 1
+        if(length(list.files(path, pattern = "Rproj$")) > 0){
+            is_found = TRUE
+            break
+        } else {
+            past_path = path
+            path = dirname(path)
+        }
+    }
+
+    proj_path = NULL
+    if(is_found){
+        proj_path = path
+    }
+
+    if(force && is.null(proj_path)){
+        proj_path = normalizePath(".", "/")
+    }
+
+    proj_path
+}
+
+find_renviron = function(path = NULL){
+    # Simply attaches .Renviron to the project path
+
+    if(is.null(path)){
+        proj_path = find_project_path()
+        if(is.null(proj_path)) return(NULL)
+    } else {
+        if(!dir.exists(path)){
+            if(file.exists(path)){
+                path = dirname(path)
+            } else {
+                stop_up("The path provided in 'save' does not exist.", .up = 2)
+            }
+        }
+
+        proj_path = path
+    }
+
+    file.path(proj_path, ".Renviron")
+}
+
 renvir_update = function(key, value){
     # Updates the .Renviron file
+    # asks permission to the user => avoids messing up their workspace!
+    # I was thinking to add an argument path, given by the user... but in fact no
+    # the .Renviron works only at the Rstudio project level so making the user think
+    # that giving a path for saving would help is misleading, since the .Renviron from
+    # that path very likely wouldn't be loaded
 
     check_arg(key, "character scalar mbt")
     check_arg(value, "NULL mbt")
 
-    if(file.exists(".Renviron")){
-        file = file(".Renviron", "r", encoding = "UTF-8")
+    renv_path = find_renviron()
+
+    if(is.null(renv_path)){
+        message("The 'save' feature only works with Rstudio projects. The root directory of the Rstudio project could not be found: settings cannot be saved at the project level, sorry.")
+        return(NULL)
+    }
+
+    message("To save the settings at the project level 'fixest' needs to update the '.Renviron' file, currently located at:\n\n ", renv_path, "\n\n If the path indeed leads to your current project, do you give persmission? ")
+
+    consent = readline("ok/y/yes to consent:")
+    consent = tolower(trimws(consent))
+
+    if(!consent %in% c("ok", "y", "ye", "yes")){
+        message("aborting save")
+        return(NULL)
+    }
+
+    if(file.exists(renv_path)){
+        file = file(renv_path, "r", encoding = "UTF-8")
 
         renvir_raw = readLines(file)
 
@@ -9604,7 +11717,7 @@ renvir_update = function(key, value){
     }
 
     if(do_write){
-        file = file(".Renviron", "w", encoding = "UTF-8")
+        file = file(renv_path, "w", encoding = "UTF-8")
 
         renvir_raw = writeLines(renvir_raw, file)
 
@@ -9613,6 +11726,84 @@ renvir_update = function(key, value){
 
 
 }
+
+find_config_path = function(){
+    dir = tools::R_user_dir("fixest", "config")
+
+    # We create the directory if needed
+    if(!dir.exists(dir)){
+        dir.create(dir, recursive = TRUE)
+    }
+
+    dir = normalizePath(dir, "/")
+
+    file.path(dir, "fixest_config.csv")
+}
+
+
+config_update = function(key, value){
+
+    if(getRversion() < "4.0.0"){
+        return(NULL)
+    }
+
+    path = find_config_path()
+    proj = find_project_path(force = TRUE)
+
+    if(file.exists(path)){
+        data = read.csv(path)
+    } else {
+        data = data.frame(proj = proj, fixest_version = fixest_version(), stringsAsFactors = FALSE)
+    }
+
+    if(!key %in% names(data)){
+        data[[key]] = NA_character_
+    }
+
+    if(!proj %in% data$proj){
+        row = data[1, , drop = FALSE]
+        for(i in 1:ncol(row)) row[1, i] = NA
+        row[1, 1] = proj
+        data = rbind(data, row)
+    }
+
+    i = which(data$proj %in% proj)
+
+    data[["fixest_version"]][i] = fixest_version()
+
+    if(is.null(value)) value = "NULL"
+    data[[key]][i] = as.character(value)
+
+    write.csv(data, path, row.names = FALSE)
+}
+
+config_get = function(key){
+
+    path = find_config_path()
+
+    if(!file.exists(path)){
+        return(NULL)
+    }
+
+    data = read.csv(path)
+
+    proj = find_project_path(force = TRUE)
+
+    if(!proj %in% data$proj){
+        return(NULL)
+    }
+
+    i = which(data$proj %in% proj)
+
+    value = data[[key]][i]
+
+    if(is.character(value) && value %in% c("NULL", "TRUE", "FALSE")){
+        value = str2lang(value)
+    }
+
+    value
+}
+
 
 #### .................. ####
 #### DOCUMENTATION DATA ####
