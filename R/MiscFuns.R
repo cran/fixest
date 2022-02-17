@@ -224,7 +224,7 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 		}
 	}
 
-	if(isTRUE(x$NA_mode)){
+	if(isTRUE(x$NA_model)){
 	    return(invisible())
 	}
 
@@ -287,7 +287,7 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 #' @param cluster Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as fixed-effects in the estimation, you can leave it blank with \code{vcov = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] fixed-effect). You can interact two variables using \code{^} with the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"}.
 #' @param stage Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1} and there are multiple endogenous regressors or if \code{stage} is of length 2, then an object of class \code{fixest_multi} is returned.
 #' @param object A \code{fixest} object. Obtained using the functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#' @param ssc An object of class \code{ssc.type} obtained with the function \code{\link[fixest]{ssc}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{ssc}} for this argument. The arguments and defaults of the function \code{\link[fixest]{ssc}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "conventional"}, \code{t.df = "conventional"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{ssc}} for details.
+#' @param ssc An object of class \code{ssc.type} obtained with the function \code{\link[fixest]{ssc}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{ssc}} for this argument. The arguments and defaults of the function \code{\link[fixest]{ssc}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"}, \code{t.df = "min"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{ssc}} for details.
 #' @param .vcov A user provided covariance matrix or a function computing this matrix. If a matrix, it must be a square matrix of the same number of rows as the number of variables estimated. If a function, it must return the previously mentioned matrix.
 #' @param lean Logical, default is \code{FALSE}. Used to reduce the (memory) size of the summary object. If \code{TRUE}, then all objects of length N (the number of observations) are removed from the result. Note that some \code{fixest} methods may consequently not work when applied to the summary.
 #' @param forceCovariance (Advanced users.) Logical, default is \code{FALSE}. In the peculiar case where the obtained Hessian is not invertible (usually because of collinearity of some variables), use this option to force the covariance matrix, by using a generalized inverse of the Hessian. This can be useful to spot where possible problems come from.
@@ -589,7 +589,10 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
 	object$se = se
 
 	if(lean){
-	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE", "slope_variables_reordered", "y", "weights", "irls_weights", "obs_selection", "iv_residuals", "fitted.values_demean")
+	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE",
+	                  "slope_variables_reordered", "y", "weights", "irls_weights",
+	                  "obs_selection", "iv_residuals", "fitted.values_demean",
+	                  "working_residuals", "linear.predictors")
 
 	    object[var2clean] = NULL
 
@@ -724,7 +727,7 @@ summary.fixest_list = function(object, se, cluster, ssc = getFixest_ssc(), .vcov
 #'
 #'
 #'
-coeftable = function(object, vcov = NULL, ssc = NULL, cluster, keep, drop, order, ...){
+coeftable = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
     # We don't explicitly refer to the other arguments
 
     check_arg(keep, drop, order, "NULL character vector no na")
@@ -790,18 +793,14 @@ coeftable = function(object, vcov = NULL, ssc = NULL, cluster, keep, drop, order
 }
 
 #' @describeIn coeftable Extracts the p-value of an estimation
-pvalue = function(object, vcov, ssc, cluster, keep, drop, order, ...){
+pvalue = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
 
     check_arg(keep, drop, order, "NULL character vector no na")
 
-    mc = match.call()
-    mc[[1]] = as.name("coeftable")
-    mc$object = as.name("object")
-
-    mat = eval(mc)
+    mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
 
     if(ncol(mat) != 4){
-        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4). You can investigate the problem using function ctable().")
+        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
     }
 
     res = mat[, 4]
@@ -826,18 +825,14 @@ pvalue = function(object, vcov, ssc, cluster, keep, drop, order, ...){
 }
 
 #' @describeIn coeftable Extracts the t-statistics of an estimation
-tstat = function(object, vcov, ssc, cluster, keep, drop, order, ...){
+tstat = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
 
     check_arg(keep, drop, order, "NULL character vector no na")
 
-    mc = match.call()
-    mc[[1]] = as.name("coeftable")
-    mc$object = as.name("object")
-
-    mat = eval(mc)
+    mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
 
     if(ncol(mat) != 4){
-        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4). You can investigate the problem using function coeftable().")
+        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
     }
 
     res = mat[, 3]
@@ -862,7 +857,7 @@ tstat = function(object, vcov, ssc, cluster, keep, drop, order, ...){
 }
 
 #' @describeIn coeftable Extracts the standard-error of an estimation
-se = function(object, vcov, ssc, cluster, keep, drop, order, ...){
+se = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
 
     check_arg(keep, drop, order, "NULL character vector no na")
 
@@ -871,14 +866,11 @@ se = function(object, vcov, ssc, cluster, keep, drop, order, ...){
         res = sqrt(diag(object))
 
     } else {
-        mc = match.call()
-        mc[[1]] = as.name("coeftable")
-        mc$object = as.name("object")
 
-        mat = eval(mc)
+        mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
 
         if(ncol(mat) != 4){
-            stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4). You can investigate the problem using function coeftable().")
+            stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
         }
 
         res = mat[, 2]
@@ -2361,7 +2353,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
         # Changing the names of the variables
         if(!missnull(dict)){
             qui = which(res$vars %in% names(dict))
-            for(i in qui) res$vars[i] = escape_latex(dict[res$vars[i]], up = 1)
+            for(i in qui) res$vars[i] = escape_latex(dict[res$vars[i]])
         }
 
         # The data
@@ -2571,8 +2563,9 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
     # gt = function(x) cat(sfill(x, 20), ": ", -(t0 - (t0<<-proc.time()))[3], "s\n", sep = "")
     # t0 = proc.time()
 
-    validate_dots(valid_args = c("f2", "f_name", "ref_special"))
+    validate_dots(valid_args = c("f2", "f_name", "ref_special", "sparse"))
     dots = list(...)
+    is_sparse = isTRUE(dots$sparse)
 
     mc = match.call()
 
@@ -2789,6 +2782,27 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
         col_names = items_name
     }
 
+    if(is_sparse){
+        # Internal call: we return the row ids + the values + the indexes + the names
+
+        if(length(who_is_dropped) > 0){
+            valid_row = !is_na_all & !fe_num %in% who_is_dropped
+        } else {
+            valid_row = !is_na_all
+        }
+
+        # we need to ensure the IDs go from 1 to # Unique
+        fe_colid = to_integer(fe_num[valid_row], sorted = TRUE)
+
+        values = if(length(var) == 1) rep(1, length(valid_row)) else var
+        res = list(rowid = which(valid_row), values = values,
+                   colid = fe_colid, col_names = col_names)
+
+        class(res) = "i_sparse"
+
+        return(res)
+    }
+
     res = cpp_factor_matrix(fe_num, is_na_all, who_is_dropped, var, col_names)
     # res => matrix with...
     #  - NAs where appropriate
@@ -2894,8 +2908,24 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #'
 #' To have user-specified bin labels, just add them in the character vector following \code{'cut::values'}. You don't need to provide all of them, and \code{NA} values fall back to the default label. For example, \code{bin = c("cut::4", "Q1", NA, "Q3")} will modify only the first and third label that will be displayed as \code{"Q1"} and \code{"Q3"}.
 #'
+#' @section \code{bin} vs \code{ref}:
+#'
+#' The functions \code{\link[fixest]{bin}} and \code{\link[fixest]{ref}} are able to do the same thing, then why use one instead of the other? Here are the differences:
+#'
+#' \itemize{
+#' \item{}{\code{ref} always returns a factor. This is in contrast with \code{bin} which returns, when possible, a vector of the same type as the vector in input.}
+#' \item{}{\code{ref} always places the values modified in the first place of the factor levels. On the other hand, \code{bin} tries to not modify the ordering of the levels. It is possible to make \code{bin} mimic the behavior of \code{ref} by adding an \code{"@"} as the first element of the list in the argument \code{bin}.}
+#'  \item{}{when a vector (and not a list) is given in input, \code{ref} will place each element of the vector in the first place of the factor levels. The behavior of \code{bin} is totally different, \code{bin} will transform all the values in the vector into a single value in \code{x} (i.e. it's binning).}
+#' }
+#'
 #' @return
-#' It returns a vector of the same length as \code{x}
+#' It returns a vector of the same length as \code{x}.
+#'
+#' @author
+#' Laurent Berge
+#'
+#' @seealso
+#' To re-factor variables: \code{\link[fixest]{ref}}.
 #'
 #' @examples
 #'
@@ -2999,9 +3029,7 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #'
 #'
 bin = function(x, bin){
-
     check_arg(x, "vector mbt")
-
 
     bin = error_sender(eval_dot(bin), arg_name = "bin")
 
@@ -3009,6 +3037,136 @@ bin = function(x, bin){
 
     varname = deparse(substitute(x))[1]
     bin_factor(bin, x, varname)
+}
+
+#' Refactors a variable
+#'
+#' Takes a variables of any types, transforms it into a factors, and modifies the values of the factors. Useful in estimations when you want to set some value of a vector as a reference.
+#'
+#' @inheritSection bin \code{bin} vs \code{ref}
+#'
+#' @param x A vector of any type (must be atomic though).
+#' @param ref A vector or a list, or special binning values (explained later). If a vector, it must correspond to (partially matched) values of the vector \code{x}. The vector \code{x} which will be transformed into a factor and these values will be placed first in the levels. That's the main usage of this function. You can also bin on-the-fly the values of \code{x}, using the same syntax as the function \code{\link[fixest]{bin}}. Here's a description of what bin does: To create a new value from old values, use \code{bin = list("new_value"=old_values)} with \code{old_values} a vector of existing values. You can use \code{.()} for \code{list()}.
+#' It accepts regular expressions, but they must start with an \code{"@"}, like in \code{bin="@Aug|Dec"}. It accepts one-sided formulas which must contain the variable \code{x}, e.g. \code{bin=list("<2" = ~x < 2)}.
+#' The names of the list are the new names. If the new name is missing, the first value matched becomes the new name. In the name, adding \code{"@d"}, with \code{d} a digit, will relocate the value in position \code{d}: useful to change the position of factors.
+#' If the vector \code{x} is numeric, you can use the special value \code{"bin::digit"} to group every \code{digit} element.
+#' For example if \code{x} represents years, using \code{bin="bin::2"} creates bins of two years.
+#' With any data, using \code{"!bin::digit"} groups every digit consecutive values starting from the first value.
+#' Using \code{"!!bin::digit"} is the same but starting from the last value.
+#' With numeric vectors you can: a) use \code{"cut::n"} to cut the vector into \code{n} equal parts, b) use \code{"cut::a]b["} to create the following bins: \code{[min, a]}, \code{]a, b[}, \code{[b, max]}.
+#' The latter syntax is a sequence of number/quartile (q0 to q4)/percentile (p0 to p100) followed by an open or closed square bracket. You can add custom bin names by adding them in the character vector after \code{'cut::values'}. See details and examples. Dot square bracket expansion (see \code{\link[fixest]{dsb}}) is enabled.
+#'
+#' @return
+#' It returns a factor of the same length as \code{x}, where levels have been modified according to the argument \code{ref}.
+#'
+#' @author
+#' Laurent Berge
+#'
+#' @seealso
+#' To bin the values of a vectors: \code{\link[fixest]{bin}}.
+#'
+#' @examples
+#'
+#' data(airquality)
+#'
+#' # A vector of months
+#' month_num = airquality$Month
+#' month_lab = c("may", "june", "july", "august", "september")
+#' month_fact = factor(month_num, labels = month_lab)
+#' table(month_num)
+#' table(month_fact)
+#'
+#' #
+#' # Main use
+#' #
+#'
+#' # Without argument: equivalent to as.factor
+#' ref(month_num)
+#'
+#' # Main usage: to set a level first:
+#' # (Note that partial matching is enabled.)
+#' table(ref(month_fact, "aug"))
+#'
+#' # You can rename the level on-the-fly
+#' # (Northern hemisphere specific!)
+#' table(ref(month_fact, .("Hot month"="aug",
+#'                         "Late summer" = "sept")))
+#'
+#'
+#' # Main use is in estimations:
+#' a = feols(Petal.Width ~ Petal.Length + Species, iris)
+#'
+#' # We change the reference
+#' b = feols(Petal.Width ~ Petal.Length + ref(Species, "vers"), iris)
+#'
+#' etable(a, b)
+#'
+#'
+#' #
+#' # Binning
+#' #
+#'
+#' # You can also bin factor values on the fly
+#' # Using @ first means a regular expression will be used to match the values.
+#' # Note that the value created is placed first.
+#' # To avoid that behavior => use the function "bin"
+#' table(ref(month_fact, .(summer = "@jul|aug|sep")))
+#'
+#' # Please refer to the example in the bin help page for more example.
+#' # The syntax is the same.
+#'
+#'
+#' #
+#' # Precise relocation
+#' #
+#'
+#' # You can place a factor at the location you want
+#' #  by adding "@digit" in the name first:
+#' table(ref(month_num, .("@5"=5)))
+#'
+#' # Same with renaming
+#' table(ref(month_num, .("@5 five"=5)))
+#'
+#'
+ref = function(x, ref){
+    check_arg(x, "vector mbt")
+
+    if(missing(ref)){
+        return(as.factor(x))
+    }
+
+    ref = error_sender(eval_dot(ref), arg_name = "ref")
+    check_arg(ref, "list | vector mbt")
+
+    varname = deparse(substitute(x))[1]
+
+    IS_SPECIAL = FALSE
+    if(!is.list(ref)){
+        if(is.character(ref[1]) && grepl("^(cut|bin)", ref[1])){
+            IS_SPECIAL = TRUE
+            if(!is.numeric(x)){
+                stop(.dsb("To use the special binning '.[ref[1]]' the variable ",
+                          "'.[varname]' must be numeric. Currently this is not the case ",
+                          "(it is of class .[3KO, C?class(x)] instead)."))
+            }
+        } else {
+            ref = as.list(ref)
+        }
+    }
+
+    if(!IS_SPECIAL && !is.factor(x)){
+        x = as.factor(x)
+    }
+
+    if(!IS_SPECIAL && ref[[1]] != "@"){
+        ref_new = list("@")
+        index = 1:length(ref) + 1
+        ref_new[index] = ref
+        names(ref_new)[index] = names(ref)
+        ref = ref_new
+    }
+
+    bin_factor(ref, x, varname)
 }
 
 
@@ -3049,11 +3207,11 @@ bin = function(x, bin){
 #'
 #' @section Regular expressions:
 #'
-#' You can catch several variable names at once by using regular expressions. To use regular expressions, you need to enclose it in the dot-dot function: \code{..("regex")}. For example, \code{..("Sepal")} will catch both the variables \code{Sepal.Length} and \code{Sepal.Width} from the \code{iris} data set. In a \code{fixest} estimation, the variables names from which the regex will be applied come from the data set. If you use \code{xpd}, you need to provide either a data set or a vector of names in the argument \code{data}.
+#' You can catch several variable names at once by using regular expressions. To use regular expressions, you need to enclose it in the dot-dot or the regex function: \code{..("regex")} or \code{regex("regex")}. For example, \code{regex("Sepal")} will catch both the variables \code{Sepal.Length} and \code{Sepal.Width} from the \code{iris} data set. In a \code{fixest} estimation, the variables names from which the regex will be applied come from the data set. If you use \code{xpd}, you need to provide either a data set or a vector of names in the argument \code{data}.
 #'
-#' By default the variables are aggregated with a sum. For example in a data set with the variables x1 to x10, \code{..("x(1|2)"} will yield \code{x1 + x2 + x10}. You can instead ask for "comma" aggregation by using a comma first, just before the regular expression: \code{y ~ sw(..(,"x(1|2)"))} would lead to \code{y ~ sw(x1, x2, x10)}.
+#' By default the variables are aggregated with a sum. For example in a data set with the variables x1 to x10, \code{regex("x(1|2)"} will yield \code{x1 + x2 + x10}. You can instead ask for "comma" aggregation by using a comma first, just before the regular expression: \code{y ~ sw(regex(,"x(1|2)"))} would lead to \code{y ~ sw(x1, x2, x10)}.
 #'
-#' Note that the dot square bracket operator (DSB, see before) is applied before the regular expression is evaluated. This means that \code{..("x.[3:4]_sq")} will lead, after evaluation of the DSB, to \code{..("x3_sq|x4_sq")}. It is a handy way to insert range of numbers in a regular expression.
+#' Note that the dot square bracket operator (DSB, see before) is applied before the regular expression is evaluated. This means that \code{regex("x.[3:4]_sq")} will lead, after evaluation of the DSB, to \code{regex("x3_sq|x4_sq")}. It is a handy way to insert range of numbers in a regular expression.
 #'
 #'
 #' @return
@@ -3130,25 +3288,21 @@ bin = function(x, bin){
 #' setFixest_fml(..many_vars = grep("GNP|ployed", names(longley), value = TRUE))
 #' feols(Armed.Forces ~ Population + ..many_vars, longley)
 #'
-#' # Example 2: using ..("regex") to grep the variables "live"
+#' # Example 2: using ..("regex") or regex("regex") to grep the variables "live"
 #'
 #' feols(Armed.Forces ~ Population + ..("GNP|ployed"), longley)
 #'
 #' # Example 3: same as Ex.2 but without using a fixest estimation
 #'
 #' # Here we need to use xpd():
-#' lm(xpd(Armed.Forces ~ Population + ..("GNP|ployed"), data = longley), longley)
+#' lm(xpd(Armed.Forces ~ Population + regex("GNP|ployed"), data = longley), longley)
 #'
-#' #
-#' # You can also put numbers in macros
-#' #
+#' # Stepwise estimation with regex: use a comma after the parenthesis
+#' feols(Armed.Forces ~ Population + sw(regex(,"GNP|ployed")), longley)
 #'
-#' res_all = list()
-#' for(p in 1:3){
-#'   res_all[[p]] = feols(xpd(Ozone ~ Wind + poly(Temp, ..p), ..p = p), airquality)
-#' }
+#' # Multiple LHS
+#' etable(feols(..("GNP|ployed") ~ Population, longley))
 #'
-#' etable(res_all)
 #'
 #' #
 #' # lhs and rhs arguments
@@ -3185,14 +3339,44 @@ bin = function(x, bin){
 #'
 #' # DSB can be used within regular expressions
 #' re = c("GNP", "Pop")
-#' xpd(Unemployed ~ ..(".[re]"), data = longley)
+#' xpd(Unemployed ~ regex(".[re]"), data = longley)
 #'
-#' # => equivalent to ..("GNP|Pop")
+#' # => equivalent to regex("GNP|Pop")
 #'
 #' # Use .[,var] (NOTE THE COMMA!) to expand with commas
 #' # !! can break the formula if missused
 #' vars = c("wage", "unemp")
 #' xpd(c(y.[,1:3]) ~ csw(.[,vars]))
+#'
+#'
+#' # Example of use of .[] within a loop
+#' res_all = list()
+#' for(p in 1:3){
+#'   res_all[[p]] = feols(Ozone ~ Wind + poly(Temp, .[p]), airquality)
+#' }
+#'
+#' etable(res_all)
+#'
+#' # The former can be compactly estimated with:
+#' res_compact = feols(Ozone ~ Wind + sw(.[, "poly(Temp, .[1:3])"]), airquality)
+#'
+#' etable(res_compact)
+#'
+#' # How does it work?
+#' # 1)  .[, stuff] evaluates stuff and, if a vector, aggregates it with commas
+#' #     Comma aggregation is done thanks to the comma placed after the square bracket
+#' #     If .[stuff], then aggregation is with sums.
+#' # 2) stuff is evaluated, and if it is a character string, it is evaluated with
+#' # the function dsb which expands values in .[]
+#' #
+#' # Wrapping up:
+#' # 2) evaluation of dsb("poly(Temp, .[1:3])") leads to the vector:
+#' #    c("poly(Temp, 1)", "poly(Temp, 2)", "poly(Temp, 3)")
+#' # 1) .[, c("poly(Temp, 1)", "poly(Temp, 2)", "poly(Temp, 3)")] leads to
+#' #    poly(Temp, 1), poly(Temp, 2), poly(Temp, 3)
+#' #
+#' # Hence sw(.[, "poly(Temp, .[1:3])"]) becomes:
+#' #       sw(poly(Temp, 1), poly(Temp, 2), poly(Temp, 3))
 #'
 #'
 xpd = function(fml, ..., lhs, rhs, data = NULL){
@@ -3204,7 +3388,6 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
     is_lhs = !missing(lhs)
     is_rhs = !missing(rhs)
     if(is_lhs || is_rhs){
-        # No short-circuit in condition!
 
         if(check) check_arg(fml, .type = "formula", .up = 1)
 
@@ -3250,24 +3433,40 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
     is_data = !missnull(data)
     fml_funs = all.vars(fml, functions = TRUE)
     is_brackets = "[" %in% fml_funs
-    is_dot_dot = ".." %in% fml_funs
-    if(!(is_macro || is_data || is_brackets || is_dot_dot)) return(fml)
+    is_regex = any(c("regex", "..") %in% fml_funs)
+    if(!(is_macro || is_data || is_brackets || is_regex)) return(fml)
 
     fml_dp = NULL
 
     if(is_macro){
+        # We allow recursion + auto-blocking at 5th depth
+        # to allow crazy things from the user side (but not too much)
+        max_depth = 5
+        depth  = 0
+        any_done = TRUE
         qui = which(names(macros) %in% all.vars(fml))
-        if(length(qui) > 0){
-            fml_dp = deparse_long(fml)
+        while(length(qui) > 0 && any_done && depth < max_depth){
+            depth = depth + 1
+            fml_dp_origin = fml_dp = deparse_long(fml)
             # We need to add a lookafter assertion: otherwise if we have ..ctrl + ..ctrl_long, there will be a replacement in ..ctrl_long
             for(i in qui){
                 fml_dp = gsub(paste0(escape_regex(names(macros)[i]), "(?=$|[^[:alnum:]_\\.])"), macros[[i]], fml_dp, perl = TRUE)
             }
+
             fml = as.formula(fml_dp, frame)
+
+            qui = which(names(macros) %in% all.vars(fml))
+            any_done = fml_dp_origin != fml_dp
+        }
+
+        if(depth == max_depth && length(qui) > 0){
+            warning(dsb("In xpd, max recursivity has been reached. ",
+                        "Please revise the recursive definition of your variables. ",
+                        "It concerns the variable.[*s_, q, C?names(macros)[qui]]."))
         }
     }
 
-    if(is_dot_dot){
+    if(is_regex){
         # We expand only if data is provided (it means the user wants us to check)
         # if .[]: we expand inside the ..(".[1:3]") => ..("1|2|3")
 
@@ -3291,11 +3490,13 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
                 }
             }
 
-            fml_dp_split = strsplit(fml_dp, '\\.\\.\\((?=[,"])', perl = TRUE)[[1]]
+            fml_dp_split = strsplit(fml_dp, '(?!<[[:alnum:]._])(regex|\\.\\.)\\((?=[,"])',
+                                    perl = TRUE)[[1]]
 
             res = fml_dp_split
             for(i in 2:length(res)){
-                re = gsub('"\\).*', "", res[i])
+
+                re = sub('"\\).*', "", res[i])
 
                 re_width = nchar(re)
 
@@ -3346,88 +3547,6 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
     }
 
     fml
-}
-
-
-
-#' Extends strings with variables using the Dot Square Bracket operator
-#'
-#' Simple utility to insert variables into character strings using the "dot square bracket" operator. Typically \code{dsb("Hello I'm .[x]!")} is equivalent to \code{paste0("hello I'm ", x, "!")}.
-#'
-#' @param x A character string, must be of length 1. Every expression inside \code{.[]} is evaluated in the current frame and then coerced to character and inserted into the character string. For example: \code{dsb("hello .[name]")} is equivalent to \code{paste0("hello ", name)}. You can add a string literal as first or last element in the \code{.[]}. Doing so will collapse the expression. If first, as in \code{.['text', expr]}, the expression is first collapsed: \code{paste0(expr, collapse = "text")} is applied. If last, as in \code{"before.[expr, 'text']"}, the expression is collapsed to the previous adjacent text: \code{paste0("before", expr, collapse = "text")} is applied. The collapsing is always done with the previous text only. To collapse the whole string, use the argument `collapse`.
-#' @param collapse If the variables inserted into the string are of length greater than 1, you can merge into a single string with \code{collapse}.
-#'
-#' Every expression inside \code{.[]} is evaluated in the current frame and then coerced to character and inserted into the character string.
-#'
-#' @section Collapsing:
-#'
-#' If the expression inside \code{.[]} is a vector, a vector will be returned, except when we explicitly request the character string to be "collapsed". There are three main ways to do the collapsing that we detail below. Throughout, consider that the variable \code{name} is equal to \code{name = c("Romeo", "Juliet")} and the example \code{dsb("hello .[name], what's up?")}.
-#'
-#'
-#' \itemize{
-#'
-#' \item{full collapse:}{The argument \code{collapse} is used. All the string elements are attached. For example \code{dsb("hello .[name], what's up?", collapse = " And... ")} leads to \code{"hello Romeo, what's up? And... hello Juliet, what's up?"}.}
-#' \item{expression-collapse:}{There is a string literal in the first position of \code{.[]}. In that case the expression in brackets is first collapsed before being merged. For example in \code{dsb("hello .[' and ', name], what's up?")} leads to \code{"hello Romeo and Juliet, what's up?"}. If you add a comma but omit the string literal, the default is to collapse with a space: \code{.[,expr]} is equivalent to \code{.[" ", expr]}.}
-#' \item{text-expression-collapse:}{There is a string literal in the second position of \code{.[]}. In that case the expression in brackets is collapsed to the adjacent string on the left. For example in \code{dsb("hello .[name, ' and '], what's up?")} leads to \code{"hello Romeo and hello Juliet, what's up?"}. If you add a comma but omit the string literal, the default is to collapse with a space: \code{.[expr,]} is equivalent to \code{.[expr, " "]}.}
-#'
-#' }
-#'
-#' @return
-#' A character vector. It is of length > 1 only if the variables inserted are of length > 1.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' guy_all = c("Jenny", "Bryan")
-#' loc_all = c("kitchen", "bathroom")
-#'
-#' guy = sample(guy_all, 1)
-#' loc = sample(loc_all, 1)
-#'
-#' dsb("Where is .[guy]? .[guy] is in the .[loc].")
-#'
-#' # Since the stuff in brackets is evaluated in the current frame,
-#' # you can do things like:
-#'
-#' guy_gen = function() sample(guy_all, 1)
-#' loc_gen = function() sample(loc_all, 1)
-#'
-#' dsb("Where is .[g <- guy_gen()]? .[g] is in the .[loc_gen()].")
-#'
-#'
-#' #
-#' # Collapsing options
-#' #
-#'
-#' name = c("Romeo", "Juliet")
-#'
-#' # full collapse with argument collapse
-#' dsb("hello .[name], what's up?", collapse = " and ")
-#'
-#' # collapse the expression by adding a string literal
-#' # in the *first* position of .[]
-#' dsb("hello .[' and ', name], what's up?")
-#'
-#' # collapsing the epression with the previous string
-#' # using a string literal in the *second* position
-#' dsb("hello .[name, ' and '], what's up?")
-#'
-#' # The elements can also be empty, leading to collapse with a " "
-#' dsb("hello .[, name], what's up?")
-#' dsb("hello .[name, ], what's up?")
-#'
-dsb = function(x, collapse = NULL){
-    check_arg(x, "character scalar")
-    check_arg(collapse, "NULL character scalar")
-
-    res = dot_square_bracket(x, frame = parent.frame(), text = TRUE)
-    if(!is.null(collapse)){
-        res = paste0(res, collapse = collapse)
-    }
-
-    res
 }
 
 
@@ -4704,7 +4823,7 @@ n_unik = function(x){
         }
 
         rhs_txt = as.character(fml)[[2]]
-        rhs_txt = gsub("(^| )\\.( |$)", dsb(".[dot_default]", "+"), rhs_txt)
+        rhs_txt = gsub("(^| )\\.( |$)", dsb(".['+'c? dot_default]"), rhs_txt)
         fml = .xpd(rhs = rhs_txt)
     }
 
@@ -4714,7 +4833,7 @@ n_unik = function(x){
 
         var_diff = which(naked_vars != origin_vars)
 
-        for(i in seq_along(var_diff)){
+        for(i in var_diff){
             re = paste0("(?!<[[:alnum:]._])", origin_vars[i], "(?!=[[:alnum:]._])")
             fml_txt = gsub(re, naked_vars[i], fml_txt, perl = TRUE)
         }
@@ -4745,7 +4864,7 @@ n_unik = function(x){
 
             var_new = gsub("^([[:alpha:].][[:alnum:]._]*)\\[", "\\1[sw0(", var)
             if(grepl("sw0([", var_new, fixed = TRUE)){
-                var_new = sub("sw0([", "sw(", str_trim(var_new, 1), fixed = TRUE)
+                var_new = sub("sw0([", "sw(", str_trim(var_new, -1), fixed = TRUE)
             }
             var_new = sub("\\]$", ")]", var_new)
 
@@ -5221,7 +5340,9 @@ print.list_n_unik = function(x, ...){
         }
 
         for(pair in info_pairs){
+
             data_id = attr(pair, "data_id")
+            pair = as.data.frame(pair)
 
             if(n_x == 2){
                 # data_col = paste0(hash, sfill(" ", var_width, right = TRUE), "|Excl:")
@@ -5232,7 +5353,11 @@ print.list_n_unik = function(x, ...){
             }
 
             # formatting the NAs
+            for(i in 1:(ncol(pair) - 2)){
+                pair[[i]] = fsignif(pair[[i]])
+            }
             pair[is.na(pair)] = " "
+            pair = as.matrix(pair)
 
             # adding the data col
             pair = cbind(data_col, pair)
@@ -5310,32 +5435,61 @@ print.osize = function(x, ...){
 #'
 #' @param x A data set: either a vector, a matrix or a data frame.
 #' @param n The number of random rows/elements to sample randomly.
+#' @param previous Logical scalar. Whether the results of the previous draw should be returned.
 #'
 #' @return
-#' A data base (resp vector) with n rows (resp elements).
+#' A data base (resp vector) with \code{n} rows (resp elements).
 #'
 #' @examples
 #'
 #' sample_df(iris)
 #'
-sample_df = function(x, n = 10){
+#' sample_df(iris, previous = TRUE)
+#'
+sample_df = function(x, n = 10, previous = FALSE){
 
     check_arg(n, "integer scalar")
+    check_arg(previous, "logical scalar")
 
     if(MISSNULL(x)){
         if(missing(x)) stop("The argument 'x' cannot be missing, please provide it.")
         if(is.null(x)) stop("The argument 'x' must be a vector, matrix or data.frame. Currently it is NULL.")
     }
 
-    if(is.null(dim(x)) || inherits(x, "table")){
-        n = min(n, length(x))
-        return(x[sample(length(x), n)])
+    all_draws = getOption("fixest_sample_df")
+    x_dp = deparse(substitute(x))
+
+    make_draw = TRUE
+    if(previous){
+        if(x_dp %in% names(all_draws)){
+            draw__ = all_draws[[x_dp]]
+            make_draw = FALSE
+        } else {
+            warning("No previous draw found for this data. Making a new draw.")
+        }
     }
 
-    n = min(n, nrow(x))
-    # complicated var name to avoid issue with data.table variables
-    XXXselectedXXX = sample(nrow(x), n)
-    x[XXXselectedXXX, ]
+    is_unidim = is.null(dim(x)) || inherits(x, "table")
+    n_data = if(is_unidim) length(x) else nrow(x)
+
+
+    n = min(n, n_data)
+
+    if(make_draw){
+        # complicated var name to avoid issue with data.table variables
+        draw__ = sample(n_data, n)
+    }
+
+    # saving
+    all_draws[[x_dp]] = draw__
+    options(fixest_sample_df = all_draws)
+
+    # returning
+    if(is_unidim){
+        return(x[draw__])
+    } else {
+        return(x[draw__, ])
+    }
 }
 
 len_unique = function(x, nthreads = getFixest_nthreads()){
@@ -5366,6 +5520,205 @@ len_unique = function(x, nthreads = getFixest_nthreads()){
 
     length(x_quf$items) + ANY_NA
 }
+
+#' Replicates \code{fixest} objects
+#'
+#' Simple function that replicates \code{fixest} objects while (optionally) computing different standard-errors. Useful mostly in combination with \code{\link[fixest]{etable}} or \code{\link[fixest]{coefplot}}.
+#'
+#' @param x Either a \code{fixest} object, either a list of \code{fixest} objects created with \code{.l()}.
+#' @param times Integer vector giving the number of repetitions of the vector of elements. By default \code{times = 1}. It must be either of length 1, either of the same length as the argument \code{x}.
+#' @param each Integer scalar indicating the repetition of each element. Default is 1.
+#' @param vcov A list containing the types of standard-error to be computed, default is missing. If not missing, it must be of the same length as \code{times}, \code{each}, or the final vector. Note that if the arguments \code{times} and \code{each} are missing, then \code{times} becomes equal to the length of \code{vcov}. To see how to summon a VCOV, see the dedicated section in the \href{https://lrberge.github.io/fixest/articles/fixest_walkthrough.html#the-vcov-argument-1}{vignette}.
+#' @param ... In \code{.l()}: \code{fixest} objects. In \code{rep()}: not currently used.
+#'
+#' @details
+#' To apply \code{rep.fixest} on a list of \code{fixest} objects, it is absolutely necessary to use \code{.l()} and not \code{list()}.
+#'
+#' @return
+#' Returns a list of the appropriate length. Each element of the list is a \code{fixest} object.
+#'
+#' @examples
+#'
+#' # Let's show results with different standard-errors
+#'
+#' est = feols(Ozone ~ Solar.R + Wind + Temp, data = airquality)
+#'
+#' my_vcov = list(~ Month, ~ Day, ~ Day + Month)
+#'
+#' etable(rep(est, vcov = my_vcov))
+#'
+#' coefplot(rep(est, vcov = my_vcov), drop = "Int")
+#'
+#' #
+#' # To rep multiple objects, you need to use .l()
+#' #
+#'
+#' est_bis = feols(Ozone ~ Solar.R + Wind + Temp | Month, airquality)
+#'
+#' etable(rep(.l(est, est_bis), vcov = my_vcov))
+#'
+#' # using each
+#' etable(rep(.l(est, est_bis), each = 3, vcov = my_vcov))
+#'
+#'
+rep.fixest = function(x, times = 1, each = 1, vcov, ...){
+    # each is applied first, then times
+    # x can be either a list of fixest objects, either a fixest object
+
+    check_arg(x, "class(fixest, fixest_list) mbt")
+    check_arg(times, "integer scalar GE{1} | integer vector no na GE{0}")
+    check_arg(each, "integer scalar GE{1} | logical scalar")
+    check_arg(vcov, "class(list)")
+
+    validate_dots(suggest_args = c("times", "each"), stop = TRUE)
+
+    # Checking the arguments
+    IS_LIST = FALSE
+    if("fixest_list" %in% class(x)){
+        IS_LIST = TRUE
+        class(x) = "list"
+
+        n = length(x)
+
+    } else {
+        n = 1
+    }
+
+    if(is.logical(each) && each == FALSE){
+        stop("Argument 'each' cannot be equal to FALSE.")
+    }
+
+    IS_MULTI_VCOV = !missing(vcov)
+    if(IS_MULTI_VCOV){
+        n_vcov = length(vcov)
+
+        if(times == 1 && each == 1){
+            if(isTRUE(each)){
+                each = n_vcov
+            } else {
+                times = n_vcov
+            }
+
+        }
+    }
+
+    res_int = rep(1:n, times = times, each = each)
+    n_res = length(res_int)
+
+    if(IS_MULTI_VCOV){
+        # Checking and expanding
+
+        vcov_mapping = 1:n_res
+        if(times == 1){
+            if(n_vcov != each && n_vcov != n_res){
+                stop("In rep, the argument 'vcov' (currently of length ", n_vcov, ") must be a list either of length ", each, " or of length ", n_res, ".")
+            }
+
+            if(n_vcov == each) vcov_mapping = rep(1:each, times = n)
+
+        } else if(each == 1){
+            if(n_vcov != times && n_vcov != n_res){
+                stop("In rep, the argument 'vcov' (currently of length ", n_vcov, ") must be a list either of length ", times, " or of length ", n_res, ".")
+            }
+
+            if(n_vcov == times) vcov_mapping = rep(1:n_vcov, each = n)
+
+        } else {
+            if(n_vcov != n_res){
+                stop("In rep, the argument 'vcov' (currently of length ", n_vcov, ") must be a list either of length ", n_res, ".")
+            }
+        }
+    }
+
+    res = vector("list", length(res_int))
+
+    if(IS_MULTI_VCOV){
+        for(i in 1:n_res){
+            if(IS_LIST){
+                res[[i]] = summary(x[[res_int[i]]], vcov = vcov[[vcov_mapping[i]]])
+            } else {
+                res[[i]] = summary(x, vcov = vcov[[vcov_mapping[i]]])
+            }
+        }
+
+    } else {
+        for(i in unique(res_int)){
+            if(IS_LIST){
+                res[res_int == i] = x[[i]]
+            } else {
+                res[res_int == i] = list(x)
+            }
+        }
+    }
+
+    for(i in 1:n_res){
+        res[[i]]$model_id = res_int[i]
+    }
+
+    res
+}
+
+#' @rdname rep.fixest
+rep.fixest_list = function(x, times = 1, each = 1, vcov, ...){
+    rep.fixest(x, times = times, each = each, vcov = vcov, ...)
+}
+
+#' @rdname rep.fixest
+.l = function(...){
+
+    check_arg(..., "mbt class(fixest) | list")
+
+    dots = list(...)
+    if(all(sapply(dots, function(x) "fixest" %in% class(x)))){
+        class(dots) = "fixest_list"
+
+        return(dots)
+    }
+
+    if(length(dots) == 1){
+
+        if("fixest_multi" %in% class(dots[[1]])){
+            res = attr(dots[[1]], "data")
+            class(res) = "fixest_list"
+            return(res)
+        }
+
+        if(all(sapply(dots[[1]], function(x) "fixest" %in% class(x)))){
+            res = dots[[1]]
+            class(res) = "fixest_list"
+            return(res)
+        }
+    }
+
+    res = list()
+    for(i in seq_along(dots)){
+        if("fixest" %in% class(dots[[i]])){
+            res[[length(res) + 1]] = dots[[i]]
+        } else {
+            obj = dots[[i]]
+
+            if(class(obj) %in% "fixest_multi"){
+                data = attr(obj, "data")
+                for(j in seq_along(data)){
+                    res[[length(res) + 1]] = data[[j]]
+                }
+
+            } else {
+                for(j in seq_along(obj)){
+                    if(!"fixest" %in% class(obj[[j]])){
+                        stop("In .l(...), each argument must be either a fixest object, or a list of fixest objects. Problem: The ", n_th(j), " element of the ", n_th(i), " argument (the latter being a list) is not a fixest object.")
+                    }
+
+                    res[[length(res) + 1]] = obj[[j]]
+                }
+            }
+        }
+    }
+
+    class(res) = "fixest_list"
+    res
+}
+
 
 #### ................. ####
 #### Internal Funs     ####
@@ -5459,7 +5812,8 @@ value2stringCall = function(value_raw, call = FALSE, check = FALSE, frame = NULL
     res
 }
 
-dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE, up = 0){
+dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE,
+                              forced_merge = FALSE, up = 0){
     # transforms "x.[i]" into x1 if i==1
     # z = "XX" ; x = ".[z] + x.[1:5] + y.[1:2]_t"
     # x = "x.[a] | fe[b] + m.[o]"
@@ -5486,7 +5840,7 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
     }
 
     # nesting: a ~ .["x.[1:2]_sq"] + b
-    any_nested = any(grepl("^\"", x_split_open[-1]))
+    any_nested = any(grepl("^\"", x_split_open[-1])) && !text
     if(any_nested){
 
         i_open_quote = setdiff(which(grepl("^\"", x_split_open)), 1)
@@ -5549,28 +5903,70 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
     }
 
     if(text){
-        # NA means no aggregation
-        agg = rep(NA_character_, n)
-        agg_full = rep(FALSE, n)
+        # NA means no operation
+        operator = rep(NA_character_, n)
+        do_split = rep(FALSE, n)
     }
 
     res = as.list(x_split)
     for(i in (1:n)[(1:n) %% 2 == 0]){
 
-        # catching the aggregator
-        if(text && grepl(",", x_split[i], fixed = TRUE)){
-            # taking care of the empty commas
-            x_txt = sub("(^(?=,)|(?<=,)$)", "' '", trimws(x_split[i]), perl = TRUE)
-            x_txt = paste0("dsb_check_set_agg(", x_txt, ")")
-            my_list = list(dsb_check_set_agg = dsb_check_set_agg)
-            info_agg = error_sender(eval(str2lang(x_txt), my_list, frame),
-                                    "Dot square bracket operator: Evaluation of '.[",
-                                    x_split[i], "]' led to an error:",
-                                    up = up + 1)
-            agg[i] = info_agg$agg
-            agg_full[i] = isTRUE(attr(info_agg$agg, "full"))
-            my_call = info_agg$call
-        } else {
+        # catching the operation
+        do_lang = TRUE
+        if(text){
+
+            x_txt = trimws(x_split[i])
+
+            op = NULL
+            is_agg = is_split = FALSE
+            if(grepl("^,", x_txt)){
+                # default value of the aggregation
+                op = ''
+                x_txt = str_trim(x_txt, 1)
+                is_agg = TRUE
+            } else if(grepl("^/", x_txt)){
+                # default value of the split
+                op = "@, *"
+                x_txt = str_trim(x_txt, 1)
+                is_split = TRUE
+            }
+
+            if(!is_split && !is_agg){
+                info_op = regexpr("^(('[^']*')|(\"[^\"]*\"))[,/]", x_txt)
+                if(info_op != -1){
+                    arg_pos = attr(info_op, "match.length")
+                    op = substr(x_txt, 2, arg_pos - 2)
+                    arg = substr(x_txt, arg_pos, arg_pos)
+                    x_txt = str_trim(x_txt, arg_pos)
+
+                    is_agg = arg == ","
+                    is_split = !is_agg
+                }
+            }
+
+            if(is_split){
+                do_lang = FALSE
+
+                operator[i] = op
+                do_split[i] = TRUE
+                my_call = x_txt
+
+            } else if(is_agg){
+                do_lang = FALSE
+
+                x_txt = paste0("dsb_check_set_agg(", x_txt, ")")
+                my_list = list(dsb_check_set_agg = dsb_check_set_agg)
+                my_call = error_sender(eval(str2lang(x_txt), my_list, frame),
+                                       "Dot square bracket operator: Evaluation of '.[",
+                                       x_split[i], "]' led to an error:",
+                                       up = up + 1)
+
+                operator[i] = op
+            }
+        }
+
+
+        if(do_lang){
             my_call = error_sender(str2lang(x_split[i]),
                                    "Dot square bracket operator: Evaluation of '.[",
                                    x_split[i], "]' led to an error:",
@@ -5579,7 +5975,7 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
 
         if(is.character(my_call) && grepl(".[", my_call, fixed = TRUE)){
             # Nested call
-            value = dot_square_bracket(my_call, frame = frame, text = TRUE, up = up + 1)
+            value = .dsb(my_call, frame = frame)
 
         } else {
             # Informative error message
@@ -5600,7 +5996,23 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
     }
 
     if(max(lengths(res)) == 1) {
-        res = paste(res, collapse = "")
+
+        if(text && any(do_split)){
+            res_txt = res[[1]]
+            for(i in 2:length(res)){
+
+                if(do_split[i]){
+                    res_txt = paste0(res_txt, str_split(res[[i]], operator[i])[[1]])
+                } else {
+                    res_txt = paste0(res_txt, res[[i]])
+                }
+            }
+
+            res = res_txt
+
+        } else {
+            res = paste(res, collapse = "")
+        }
 
     } else {
         # first value is NEVER a vector ("" is added automatically in split)
@@ -5609,18 +6021,27 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
         while(i <= n){
 
             if(length(res[[i]]) == 1){
-                res_txt = paste0(res_txt, res[[i]])
+
+                if(text && do_split[i]){
+                    res_txt = paste0(res_txt, str_split(res[[i]], operator[i])[[1]])
+                } else {
+                    res_txt = paste0(res_txt, res[[i]])
+                }
+
                 i = i + 1
 
             } else if(text){
-                if(is.na(agg[i])){
-                    res_txt = paste0(res_txt, res[[i]])
-                } else {
-                    if(agg_full[i]){
-                        res_txt = paste0(res_txt, res[[i]], collapse = agg[i])
+                if(is.na(operator[i])){
+                    if(forced_merge){
+                        res_txt = paste0(res_txt, paste0(res[[i]], collapse = "_MERGE_"))
                     } else {
-                        res_txt = paste0(res_txt, paste0(res[[i]], collapse = agg[i]))
+                        res_txt = paste0(res_txt, res[[i]])
                     }
+
+                } else {
+                    # If we're here => must be an aggregation requested
+                    # (if it was a split, it would be of length 1)
+                    res_txt = paste0(res_txt, paste0(res[[i]], collapse = operator[i]))
                 }
 
                 i = i + 1
@@ -5667,57 +6088,18 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
 
 
 dsb_check_set_agg = function(...){
-    if(...length() > 2){
-        stop("You cannot have more than two elements in between .[]. Currently there are ", ...length(), ".")
+    # Here we should have only one element, everything has been cleaned up before
+
+    if(...length() > 1){
+        if(...length() == 2){
+            stop_up("The operator .[] accepts only up to two elements, if so the first one MUST be a string literal (eg: .['text', y]). Problem: it is not a string literal.")
+        }
+        stop_up("You cannot have more than two elements in between .[]. Currently there are ", ...length() + 1, ".")
     }
 
     mc = match.call()
-    if(...length() == 1){
-        res = list(agg = NA_character_, call = mc[[2]])
-    } else if(is.character(mc[[2]])){
-        res = list(agg = mc[[2]], call = mc[[3]])
-    } else if(is.character(mc[[3]])){
-        agg = mc[[3]]
-        attr(agg, "full") = TRUE
-        res = list(agg = agg, call = mc[[2]])
-    } else {
-        stop("The operator .[] accepts only up to two elements, one of the MUST be a string literal (eg: .['text', y]). Problem: none of the two elements is a string literal.")
-    }
 
-    return(res)
-}
-
-
-# style_name = "fixef"
-# keywords = c("title", "prefix", "suffix")
-parse_style = function(x, keywords){
-    # x is a character scalar, example x = "title:Variables:;below:_"
-    # style_name: name of the style, only to format the error message
-    # keywords: the vector of accepted keywords
-
-    style_name = gsub(".+\\$", "", deparse(substitute(x)))
-
-    set_up(1)
-
-    res = setNames(as.list(rep("", length(keywords))), keywords)
-    if(grepl("^ *$", x)) return(res)
-
-    x_split = strsplit(x, ";")[[1]]
-    if(!all(grepl(":", x_split))){
-        stop_up("In argument 'style', the styles must be of the form 'keyword1:value1; keyword2:value2' etc. A colon is currently missing in the '", style_name, "' style (i.e. '", x, "' is not valid).")
-    }
-
-    kws = gsub("^ +|:.*", "", x_split)
-
-    check_value(kws, "multi charin", .choices = keywords, .message = paste0("In argument 'style', the keywords of '", style_name, "' must be equal to ", enumerate_items(keywords, "quote.or"), "."))
-
-    values = as.list(gsub("^[^:]+:", "", x_split))
-
-    for(i in seq_along(kws)){
-        res[[kws[i]]] = escape_latex(values[i], up = 3, TRUE)
-    }
-
-    res
+    return(mc[[2]])
 }
 
 print_coeftable = function(coeftable, lastLine = "", show_signif = TRUE){
@@ -5848,7 +6230,7 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
     all_var_names = attr(t, "term.labels")
 
     # We take care of interactions: references can be multiple, then ':' is legal
-    all_vars = colon_to_star(all_var_names)
+    all_vars = cpp_colon_to_star(all_var_names)
 
     # Forming the call
     if(attr(t, "intercept") == 1 && !fake_intercept){
@@ -6119,13 +6501,19 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
         xlev = .getXlevels(t_mf, mf)
 
         if(!identical(attr(t_mf,"variables"), attr(t_mf,"predvars")) || length(xlev) > 0){
-            mf = model.frame(t_mf, newdata, xlev = xlev)
+            mf = model.frame(t_mf, newdata, xlev = xlev, na.action = na.pass)
         } else {
             mf = NULL
         }
     }
 
+    GLOBAL_fixest_mm_info = list()
+
     new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref, mf = mf)
+
+    if(length(GLOBAL_fixest_mm_info) > 0){
+        attr(new_matrix, "model_matrix_info") = GLOBAL_fixest_mm_info
+    }
 
     new_matrix
 }
@@ -6147,7 +6535,7 @@ fixef_terms = function(fml, stepwise = FALSE, origin_type = "feols"){
         # we need to take care of the ^ used to combine variables
         fml_char = as.character(fml[2])
         if(grepl("^", fml_char, fixed = TRUE)){
-            fml_char_new = gsub("^", "_impossible_var_name_", fml_char, fixed = TRUE)
+            fml_char_new = gsub("^", "%^%", fml_char, fixed = TRUE)
             fml = as.formula(paste0("~", fml_char_new))
         }
 
@@ -6256,7 +6644,7 @@ fixef_terms = function(fml, stepwise = FALSE, origin_type = "feols"){
     my_vars = unique(my_vars)
 
     # we put the ^ back
-    my_vars = gsub("_impossible_var_name_", "^", my_vars, fixed = TRUE)
+    my_vars = gsub(" %^% ", "^", my_vars, fixed = TRUE)
 
     res = list(fml_terms = my_vars)
     # OLD version
@@ -6304,18 +6692,12 @@ prepare_df = function(vars, base, fastCombine = NA){
         # special indicator to combine factors
         # ^ is a special character: only used to combine variables!!!
 
-        fun2combine = ifelse(fastCombine, "combine_clusters_fast", "combine_clusters")
+        vars = fml_combine(vars, fastCombine, vars = TRUE)
 
-        vars_new = gsub("([[:alpha:]\\.][[:alnum:]_\\.]*(\\^[[:alpha:]\\.][[:alnum:]_\\.]*)+)",
-                        paste0(fun2combine, "(\\1)"), vars)
-
-        vars_new = gsub("\\^", ", ", vars_new)
-
-        vars = vars_new
         changeNames = TRUE
     }
 
-    all_vars = gsub(":", "*", vars)
+    all_vars = cpp_colon_to_star(vars)
 
     if(all(all_vars %in% names(base))){
         res = base[, all_vars, drop = FALSE]
@@ -6334,10 +6716,7 @@ prepare_df = function(vars, base, fastCombine = NA){
         res = do.call("data.frame", data_list)
 
         if(changeNames){
-            qui = grepl("combine_clusters", all_var_names, fixed = TRUE)
-            new_names = gsub("combine_clusters(_fast)?\\(|\\)", "", all_var_names[qui])
-            new_names = gsub(", ?", "^", new_names)
-            all_var_names[qui] = new_names
+            all_var_names = rename_hat(all_var_names)
         }
 
         names(res) = all_var_names
@@ -6347,20 +6726,57 @@ prepare_df = function(vars, base, fastCombine = NA){
 }
 
 
-fml_combine = function(fml_char, fastCombine){
+# fml_char = "x + y + u^factor(v1, v2) + x5"
+fml_combine = function(fml_char, fastCombine, vars = FALSE){
     # function that transforms "hat" interactions into a proper function call:
     # Origin^Destination^Product + Year becomes ~combine_clusters(Origin, Destination, Product) + Year
 
     fun2combine = ifelse(fastCombine, "combine_clusters_fast", "combine_clusters")
 
-    fml_char_new = gsub("([[:alpha:]\\.][[:alnum:]_\\.]*(\\^[[:alpha:]\\.][[:alnum:]_\\.]*)+)",
-                        paste0(fun2combine, "(\\1)"),
-                        fml_char)
+    # we need to change ^ into %^% otherwise terms sends error
+    labels = attr(terms(.xpd(rhs = gsub("\\^(?=[^0-9])", "%^%", fml_char, perl = TRUE))), "term.labels")
 
-    fml_char_new = gsub("\\^(?=[[:alpha:]\\.])", ", ", fml_char_new, perl = TRUE)
-    fml = as.formula(paste0("~", fml_char_new))
+    # now we work this out
+    for(i in seq_along(labels)){
+        lab = labels[i]
+        if(grepl("^", lab, fixed = TRUE)){
+            lab_split = trimws(strsplit(lab, "%^%", fixed = TRUE)[[1]])
+            if(grepl("(", lab, fixed = TRUE)){
+                # we add some error control -- imperfect, but... it's enough
+                lab_collapsed = gsub("\\([^\\)]+\\)", "", lab)
+                if(length(lab_split) != length(strsplit(lab_collapsed, "%^%", fixed = TRUE)[[1]])){
+                    msg = "Wrong formatting of the fixed-effects interactions. The '^' operator should not be within parentheses."
+                    stop(msg)
+                }
+            }
+            labels[i] = paste0(fun2combine, "(", paste0(lab_split, collapse = ", "), ")")
+        }
+    }
+
+    if(vars){
+        return(labels)
+    }
+
+    fml = .xpd(rhs = labels)
 
     fml
+}
+
+# x = c('combine_clusters(bin(fe1, "!bin::2"), fe2)', 'fe3')
+rename_hat = function(x){
+
+    qui = grepl("combine_clusters", x, fixed = TRUE)
+    if(!any(qui)) return(x)
+
+    for(i in which(qui)){
+        xi_new = gsub("combine_clusters(_fast)?", "sw", x[i])
+        sw_only = extract_fun(xi_new, "sw")
+        sw_eval = eval(str2lang(sw_only$fun))
+        new_var = paste0(sw_only$before, paste0(sw_eval, collapse = "^"), sw_only$after)
+        x[i] = new_var
+    }
+
+    x
 }
 
 prepare_cluster_mat = function(fml, base, fastCombine){
@@ -6390,10 +6806,7 @@ prepare_cluster_mat = function(fml, base, fastCombine){
         res = do.call("data.frame", data_list)
 
         if(changeNames){
-            qui = grepl("combine_clusters", all_var_names)
-            new_names = gsub("combine_clusters(_fast)?\\(|\\)", "", all_var_names[qui])
-            new_names = gsub(", ?", "^", new_names)
-            all_var_names[qui] = new_names
+            all_var_names = rename_hat(all_var_names)
         }
 
         names(res) = all_var_names
@@ -6828,7 +7241,9 @@ assign_flags = function(flags, ...){
     }
 }
 
-items_to_drop = function(items, x, varname, keep = FALSE, argname, keep_first = FALSE, up = 1, no_error = FALSE){
+items_to_drop = function(items, x, varname, keep = FALSE, argname,
+                         keep_first = FALSE, up = 1, no_error = FALSE,
+                         valid_ref = FALSE){
     # selection of items
     # the selection depends on the type of x
     # always returns the IDs of the items to drop
@@ -6839,7 +7254,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname, keep_first = 
         argname = deparse(substitute(x))
     }
 
-    ref = argname == "ref"
+    ref = argname == "ref" && !valid_ref
 
     if(keep_first && (keep || ref)){
         stop("Internal error: keep_first should not be used with 'keep' or 'ref'.")
@@ -6907,7 +7322,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname, keep_first = 
                     my_x = items[qui_ok]
                     my_x = my_x[!is.na(my_x)]
                 } else {
-                    check_value_plus(my_x, "match", .choices = items, .message = paste0("The argument '", argname, "' should contain values of the variable '", varname, "'."))
+                    check_value_plus(my_x, "match", .choices = unique(items), .message = paste0("The argument '", argname, "' should contain values of the variable '", varname, "'."))
                 }
 
                 all_x = c(all_x, my_x)
@@ -6989,14 +7404,32 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
 
     bin_dp = deparse_long(bin)
     if(grepl(".[", bin_dp, fixed = TRUE)){
-        bin_dsb = dot_square_bracket(bin_dp, frame = parent.frame(2), text = TRUE, up = 1)
-        if(length(bin_dsb) > 1){
-            bin_dsb = paste0(bin_dsb, collapse = "")
+
+        bin_names = names(bin)
+        if(!is.null(bin_names)){
+            qui = which(grepl(".[", bin_names, fixed = TRUE))
+            for(i in qui){
+                bin_names[i] = error_sender(dsb(bin_names[i], frame = parent.frame(2), nest = FALSE,
+                                                vectorize = TRUE, collapse = ""),
+                                            dsb("Error when binning: the name (.[bin_names[i]]) expanded",
+                                                " with '.[]' led to an error:"))
+
+            }
+        }
+        names(bin) = bin_names
+
+        qui = which(sapply(bin, function(x) is.character(x) && any(grepl(".[", x, fixed = TRUE))))
+        for(i in qui){
+            value = as.list(bin[[i]])
+            qui_bis = which(grepl(".[", value, fixed = TRUE))
+            for(j in qui_bis){
+                value[[j]] = error_sender(.dsb(value[[j]], frame = parent.frame(2), nest = FALSE),
+                                           dsb("Error when binning: the name (.[value[[j]]]) expanded",
+                                               " with '.[]' led to an error:"))
+            }
+            bin[[i]] = unlist(value)
         }
 
-        bin_dsb_call = error_sender(str2lang(bin_dsb),
-                                    "Error when binning: the values expanded with '.[]' led to an error:")
-        bin = eval(bin)
     }
 
     #
@@ -7087,18 +7520,18 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
         # the binned values as first elements of the new factor
         bin[[1]] = NULL
         if(is.null(names(bin))){
-            names(bin) = paste0("@", seq_along(bin), names(bin))
+            names(bin) = paste0("@", seq_along(bin), " ", names(bin))
         } else {
             qui_ok = !grepl("^@\\d+", names(bin))
-            names(bin)[qui_ok] = paste0("@", seq(sum(qui_ok)), names(bin)[qui_ok])
+            names(bin)[qui_ok] = paste0("@", seq(sum(qui_ok)), " ", names(bin)[qui_ok])
         }
-
     }
 
     x_map = x_range = seq_along(x_int$items)
     id_bin = list()
     for(i in seq_along(bin)){
-        id_bin[[i]] = items_to_drop(x_items, bin[[i]], varname, up = 2, argname = argname, keep_first = TRUE, no_error = no_error)
+        id_bin[[i]] = items_to_drop(x_items, bin[[i]], varname, up = 2, argname = argname,
+                                    keep_first = TRUE, no_error = no_error, valid_ref = TRUE)
     }
 
     # sanity check
@@ -7284,7 +7717,7 @@ cut_vector = function(x, bin){
     x_order = order(x)
     x_sorted = x[x_order]
 
-    my_cut = dsb(gsub("^cut::", "", bin))
+    my_cut = gsub("^cut::", "", bin)
 
     if(is_numeric_in_char(my_cut)){
         my_cut = as.numeric(my_cut)
@@ -7306,7 +7739,7 @@ cut_vector = function(x, bin){
         cut_points = numeric(n_cuts)
         for(i in seq_along(values)){
 
-            v = values[i]
+            v = trimws(values[i])
 
             if(is_numeric_in_char(v)){
                 cut_points[i] = as.numeric(v)
@@ -7509,61 +7942,6 @@ fixest_CI_factor = function(x, level, vcov){
 #### Small Utilities ####
 ####
 
-escape_all = function(x){
-    # we escape all
-    res = gsub("((?<=[^\\\\])|(?<=^))(\\$|_|%|&|\\^|#)", "\\\\\\2", x, perl = TRUE)
-    res
-}
-
-escape_latex = function(x_all, up = 0, noArg = FALSE){
-    # This is super tricky to escape properly!
-    # We do NOT escape within equations
-
-    x_name = deparse(substitute(x_all))
-
-    res = c()
-
-    for(index in seq_along(x_all)){
-        x = x_all[index]
-
-        # 1) finding out equations, ie non escaped dollar signs
-        dollars = gregexpr("((?<=[^\\\\])|(?<=^))\\$", x, perl = TRUE)[[1]]
-
-        is_eq = FALSE
-        if(length(dollars) > 1){
-            is_eq = TRUE
-            if(length(dollars) %% 2 != 0){
-                my_arg = "T"
-                if(!noArg){
-                    my_arg = paste0("In argument '", x_name, "', t")
-                }
-                stop_up(up = up, my_arg, "here are ", length(dollars), " dollar signs in the following character string:\n", x, "\nIt will raise a Latex error (which '$' means equation? which means dollar-sign?): if you want to use a regular dollar sign, please escape it like that: \\\\$.")
-            }
-        }
-
-        # 2) Escaping but conditionally on not being in an equation
-        if(is_eq){
-            # Finding out the equations
-            all_items = strsplit(paste0(x, " "), "((?<=[^\\\\])|(?<=^))\\$", perl = TRUE)[[1]]
-            for(i in seq_along(all_items)){
-                if(i %% 2 == 1){
-                    all_items[i] = escape_all(all_items[i])
-                }
-            }
-
-            res[index] = gsub(" $", "", paste(all_items, collapse = "$"))
-        } else {
-            res[index] = escape_all(x)
-        }
-    }
-
-    if(!is.null(names(x_all))){
-        names(res) = names(x_all)
-    }
-
-    res
-}
-
 escape_regex = function(x){
     # escape special characters in regular expressions => to make it as "fixed"
 
@@ -7730,7 +8108,9 @@ dict_apply = function(x, dict = NULL){
 
     # We make the dictionary names space agnostic, adds a handful of us only
     if(any(grepl(" ", x, fixed = TRUE))){
-        x = gsub(" ", "", x, fixed = TRUE)
+        x_tmp = gsub(" ", "", x, fixed = TRUE)
+    } else {
+        x_tmp = x
     }
 
     if(any(grepl(" ", names(dict), fixed = TRUE))){
@@ -7742,8 +8122,8 @@ dict_apply = function(x, dict = NULL){
         }
     }
 
-    who = x %in% names(dict)
-    x[who] = dict[as.character(x[who])]
+    who = x_tmp %in% names(dict)
+    x[who] = dict[as.character(x_tmp[who])]
     x
 }
 
@@ -8028,26 +8408,13 @@ fml2varnames = function(fml, combine_fun = FALSE){
     # Only the ^ users "pay the price"
 
     if("^" %in% all.vars(fml, functions = TRUE)){
-        fml_char = gsub(" ", "", as.character(fml)[2], fixed = TRUE)
-
-        if(grepl("[[:alpha:]\\.][[:alnum:]\\._]*\\^", fml_char)){
-            fml_char_new = gsub("([[:alpha:]\\.][[:alnum:]\\._]*)\\^", "\\1_xXx_", fml_char)
-            fml = .xpd(rhs = fml_char_new)
+        # new algo using fml_combine, more robust
+        fml_char = as.character(fml)[2]
+        all_var_names = fml_combine(fml_char, TRUE, vars = TRUE)
+        if(!combine_fun){
+            all_var_names = rename_hat(all_var_names)
         }
 
-        t = terms(fml)
-        all_var_names = attr(t, "term.labels")
-
-        if(combine_fun){
-            # we rewrite the variables with combine_cluster_fast
-
-            qui = grepl("_xXx_[[:alpha:]\\.]", all_var_names)
-
-            all_var_names[qui] = paste0("combine_clusters_fast(", gsub("_xXx_", ", ", all_var_names[qui]), ")")
-        }
-
-        all_var_names = gsub("_xXx_", "^", all_var_names) # even with combine_fun=TRUE, some can remain (real powers)
-        all_var_names = gsub(":", "*", all_var_names)
     } else {
         t = terms(fml)
         all_var_names = attr(t, "term.labels")
@@ -8305,11 +8672,18 @@ error_sender = function(expr, ..., clean, up = 0, arg_name){
             call_non_informative = deparse(substitute(expr), 100)[1]
             call_error = deparse(res[[1]], 100)[1]
 
-            if(call_error == call_non_informative){
+            if(call_error == call_non_informative || call_error == "NULL" ||
+               grepl("^(doTry|eval)", call_error)){
                 call_error = ""
 
             } else {
                 call_error = paste0("In ", call_error, ": ")
+            }
+
+            err = res[[2]]
+
+            if(grepl("^in eval\\(str[^:]+:\n", err)){
+                err = sub("^in eval\\(str[^:]+:\n", "", err)
             }
 
             if(!missing(clean)){
@@ -8323,9 +8697,9 @@ error_sender = function(expr, ..., clean, up = 0, arg_name){
                     to = ""
                 }
 
-                stop_up(msg, "\n  ", call_error, gsub(from, to, res[[2]]))
+                stop_up(msg, "\n  ", call_error, gsub(from, to, err))
             } else {
-                stop_up(msg, "\n  ", call_error, res[[2]])
+                stop_up(msg, "\n  ", call_error, err)
             }
         }
     }
@@ -8487,7 +8861,7 @@ fixest_fml_rewriter = function(fml){
                         do_sub = grepl("^", fml_fixef_text, fixed = TRUE)
 
                         if(do_sub){
-                            fml_fixef = as.formula(gsub("^", "__impossible_var__", fml_fixef_text, fixed = TRUE))
+                            fml_fixef = as.formula(gsub("^", "%^%", fml_fixef_text, fixed = TRUE))
                         }
 
                         fixef_terms = attr(terms(fml_fixef), "term.labels")
@@ -8495,7 +8869,7 @@ fixest_fml_rewriter = function(fml){
                                                   "Problem in the formula regarding lag/leads: ", clean = "__expand")
 
                         if(do_sub){
-                            fixef_text = gsub("__impossible_var__", "^", fixef_text, fixed = TRUE)
+                            fixef_text = gsub(" %^% ", "^", fixef_text, fixed = TRUE)
                         }
 
                         fml_fixef = as.formula(paste("~", paste(fixef_text, collapse = "+")))
@@ -8680,60 +9054,6 @@ all_vars_with_i_prefix = function(fml){
     vars
 }
 
-
-colon_to_star = function(x){
-    # used to transform ":" from interactions into proper multiplications
-    # This is needed for evaluation (so that : is not interpreted as the sequence operator)
-    # basically we leave all colon in parentheses untouched
-    # this code is not robust to formulas including textual parentheses, like "(" or ")"
-    # I don't see when it should happen so it's OK
-    #
-    # it would have been easier to write c code dealing at the character level
-    # but this also works
-    #
-    # fml = ~ x1:x2:a(6:7) + x5 + i(aa, 5:6):jjl + base::poly(x, 5)
-    # x = get_vars(fml)
-
-    qui_colon = grepl(":", x, fixed = TRUE)
-    qui_paren = grepl("(", x, fixed = TRUE)
-
-    if(any(qui_colon)){
-
-        res = x
-        res[qui_colon & !qui_paren] = gsub("(^|[^:]):($|[^:])", "\\1*\\2", res[qui_colon & !qui_paren])
-
-        qui_check = qui_colon & qui_paren
-
-        for(i in which(qui_check)){
-            var = x[i]
-
-            var_split_open = strsplit(var, "(", fixed = TRUE)[[1]]
-            n_open = -1
-            for(j in 1:length(var_split_open)){
-                n_open = n_open + 1
-
-                element = var_split_open[j]
-                element_split_close = strsplit(element, ")", fixed = TRUE)[[1]]
-
-                n_close = length(element_split_close) - 1
-                n_open = n_open - n_close
-                if(n_open == 0){
-                    n_el = length(element_split_close)
-                    element_split_close[n_el] = gsub("(^|[^:]):($|[^:])", "\\1*\\2", element_split_close[n_el])
-                    var_split_open[j] = paste(element_split_close, collapse = ")")
-                }
-            }
-
-            res[i] = paste(var_split_open, collapse = "(")
-
-        }
-
-        return(res)
-
-    } else {
-        return(x)
-    }
-}
 
 # function to normalize character vectors into variable names
 as_varname = function(x){
@@ -8927,12 +9247,36 @@ insert_in_between = function(x, y){
     res
 }
 
-str_trim = function(x, n, first = FALSE){
-    if(first){
-        substr(x, 1 + n, nchar(x))
-    } else {
-        substr(x, 1, nchar(x) - n)
+str_trim = function(x, n_first = 0, n_last = 0){
+    # positive values: first
+    # negative values: last
+
+    if(is.character(n_first)){
+        n_first = nchar(n_first)
+    } else if(n_first < 0){
+        n_last = -n_first
+        n_first = 0
     }
+
+    res = substr(x, 1 + n_first, nchar(x) - n_last)
+}
+
+str_split = function(x, split){
+    # Simple wrapper
+
+    fixed = TRUE
+    perl = FALSE
+    if(grepl("@", split, fixed = TRUE)){
+        if(grepl("^\\\\@", split)){
+            split = str_trim(split, 1)
+        } else if(grepl("^@", split)){
+            split = str_trim(split, 1)
+            fixed = FALSE
+            perl = TRUE
+        }
+    }
+
+    strsplit(x, split, fixed = fixed, perl = perl)
 }
 
 NA_fun = function(..., df){
@@ -8966,6 +9310,10 @@ eval_dot = function(x, up = 1){
 
     sysOrigin = sys.parent(up)
     mc = match.call(sys.function(sysOrigin), sys.call(sysOrigin))
+
+    if(!x_dp %in% names(mc)){
+        return(x)
+    }
 
     my_list = list("." = list)
 
@@ -9701,10 +10049,7 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 			        stop("You cannot use predict() based on the initial regression since the fixed-effect '", fe_var, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'combine.quick=FALSE'.")
 			    }
 
-			    fe_var_new = gsub("([[:alpha:]_\\.][[:alnum:]_\\.]*(\\^[[:alpha:]_\\.][[:alnum:]_\\.]*)+)",
-			                    "combine_clusters(\\1)", fe_var)
-
-			    fe_var = gsub("\\^", ", ", fe_var_new)
+			    fe_var = fml_combine(fe_var, fastCombine = FALSE, vars = TRUE)
 			}
 
 			# Obtaining the vector of fixed-effect
@@ -9846,11 +10191,32 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 
 		varNotHere = setdiff(linear.varnames, names(newdata))
 		if(length(varNotHere) > 0){
-			stop("The variable", enumerate_items(varNotHere, "s.quote"), " used to estimate the model (in fml) ", ifsingle(varNotHere, "is", "are"), " missing in the data.frame given by the argument 'newdata'.")
+			stop("The variable", enumerate_items(varNotHere, "s.quote"),
+			     " used to estimate the model (in fml) ", ifsingle(varNotHere, "is", "are"),
+			     " missing in the data.frame given by the argument 'newdata'.")
 		}
 
 		# we create the matrix
 		matrix_linear = error_sender(fixest_model_matrix_extra(object = object, newdata = newdata, original_data = FALSE, fml = rhs_fml, i_noref = TRUE), "Error when creating the linear matrix: ")
+
+		# Checking the levels created with i()
+		mm_info_new = attr(matrix_linear, "model_matrix_info")
+		if(!is.null(mm_info_new)){
+		    mm_info = object$model_matrix_info
+		    # The order of creation is exactly the same (same fun used),
+		    # so the two mm_info are identical in structure
+		    for(i in seq_along(mm_info)){
+		        mm_new_i = mm_info_new[[i]]
+		        mm_i = mm_info[[i]]
+		        if("coef_names_full" %in% names(mm_i)){
+		            pblm = setdiff(mm_new_i$coef_names_full, mm_i$coef_names_full)
+		            if(length(pblm) > 0){
+		                stop(dsb("In i(), predictions cannot be done for values that were not present at estimation time.",
+		                         " It concerns the value.[*s_, 3KO, C?pblm]."))
+		            }
+		        }
+		    }
+		}
 
 		var_keep = intersect(names(coef), colnames(matrix_linear))
 		value_linear = value_linear + as.vector(matrix_linear[, var_keep, drop = FALSE] %*% coef[var_keep])
@@ -10475,7 +10841,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
 		}
 		data = as.data.frame(data)
 	}
-	# The conversion of the data (due to data.table)
+
 	if(!"data.frame" %in% class(data)){
 		stop("The argument 'data' must be a data.frame or a matrix.")
 	}
@@ -10501,7 +10867,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
         res[["lhs"]] = as.data.frame(lhs)
 	}
 
-	if("rhs" %in% type){
+	if("rhs" %in% type && !isTRUE(object$onlyFixef)){
 	    # we kick out the intercept if there is presence of fixed-effects
 	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
 
@@ -10511,7 +10877,11 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
 	        fml = .xpd(..lhs ~ ..endo + ..rhs, ..lhs = fml[[2]], ..endo = fml_iv[[2]], ..rhs = fml[[3]])
 	    }
 
-	    linear.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS could not be evaluated: ")
+	    linear.mat = error_sender(fixest_model_matrix_extra(
+	        object = object, newdata = data, original_data = original_data,
+	        fml = fml, fake_intercept = fake_intercept,
+	        subset = subset),
+	        "In 'model.matrix', the RHS could not be evaluated: ")
 
 	    if(collin.rm){
 	        qui = which(colnames(linear.mat) %in% object$collin.var)
@@ -10519,6 +10889,17 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
 	            linear.mat = NULL
 	        } else if(length(qui) > 0){
 	            linear.mat =  linear.mat[, -qui, drop = FALSE]
+	        }
+
+	        coefs = object$coefficients
+	        if(length(coefs) == ncol(linear.mat) && any(colnames(linear.mat) != names(coefs))){
+	            # we reorder the matrix
+	            # This can happen in multiple estimations, where we respect the
+	            # order of the user
+
+	            if(all(names(coefs) %in% colnames(linear.mat))){
+	                linear.mat = linear.mat[, names(coefs), drop = FALSE]
+	            }
 	        }
 	    }
 
@@ -10799,216 +11180,6 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
 #'
 terms.fixest = function(x, ...){
     terms(formula(x, type = "linear"))
-}
-
-
-
-#' Replicates fixest objects
-#'
-#' Simple function that replicates fixest objects while (optionally) computing different standard-errors. Useful mostly in combination with \code{\link[fixest]{etable}} or \code{\link[fixest]{coefplot}}.
-#'
-#' @param x Either a fixest object, either a list of fixest objects created with \code{.l()}.
-#' @param times Integer vector giving the number of repetitions of the vector of elements. By default \code{times = 1}. It must be either of length 1, either of the same length as the argument \code{x}.
-#' @param each Integer scalar indicating the repetition of each element. Default is 1.
-#' @param cluster A list containing the types of standard-error to be computed, default is missing. If not missing, it must be of the same length as \code{times}, \code{each}, or the final vector. Note that if the arguments \code{times} and \code{each} are missing, then \code{times} becomes equal to the length of \code{cluster}. (Note that \code{cluster} accepts the character values \code{"standard"} or \code{"hetero"} to compute non-clustered SEs.)
-#' @param ... In \code{.l()}: \code{fixest} objects. In \code{rep()}: not currently used.
-#'
-#' @details
-#' To apply \code{rep.fixest} on a list of fixest objects, it is absolutely necessary to use \code{.l()} and not \code{list()}.
-#'
-#' @return
-#' Returns a list of the appropriate length. Each element of the list is a fixest object.
-#'
-#' @examples
-#'
-#' # Let's show results with different standard-errors
-#'
-#' est = feols(Ozone ~ Solar.R + Wind + Temp, data = airquality)
-#'
-#' my_cluster = list("Month", "Day", ~ Day + Month)
-#'
-#' etable(rep(est, cluster = my_cluster))
-#'
-#' coefplot(rep(est, cluster = my_cluster), drop = "Int")
-#'
-#' #
-#' # To rep multiple objects, you need to use .l()
-#' #
-#'
-#' est_bis = feols(Ozone ~ Solar.R + Wind + Temp | Month, airquality)
-#'
-#' etable(rep(.l(est, est_bis), cluster = my_cluster))
-#'
-#' # using each
-#' etable(rep(.l(est, est_bis), each = 3, cluster = my_cluster))
-#'
-#'
-rep.fixest = function(x, times = 1, each = 1, cluster, ...){
-    # each is applied first, then times
-    # x can be either a list of fixest objects, either a fixest object
-
-    check_arg(x, "class(fixest, fixest_list) mbt")
-    check_arg(times, "integer scalar GE{1} | integer vector no na GE{0}")
-    check_arg(each, "integer scalar GE{1} | logical scalar")
-    check_arg(cluster, "class(list)")
-
-    validate_dots(suggest_args = c("times", "each"), stop = TRUE)
-
-    # Checking the arguments
-    IS_LIST = FALSE
-    if("fixest_list" %in% class(x)){
-        IS_LIST = TRUE
-        class(x) = "list"
-
-        n = length(x)
-
-    } else {
-        n = 1
-    }
-
-    if(is.logical(each) && each == FALSE){
-        stop("Argument 'each' cannot be equal to FALSE.")
-    }
-
-    IS_MULTI_CLUST = !missing(cluster)
-    if(IS_MULTI_CLUST){
-        n_clu = length(cluster)
-
-        if(times == 1 && each == 1){
-            if(isTRUE(each)){
-                each = n_clu
-            } else {
-                times = n_clu
-            }
-
-        }
-    }
-
-    res_int = rep(1:n, times = times, each = each)
-    n_res = length(res_int)
-
-    if(IS_MULTI_CLUST){
-        # Checking and expanding
-
-        cluster_mapping = 1:n_res
-        if(times == 1){
-            if(n_clu != each && n_clu != n_res){
-                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", each, " or of length ", n_res, ".")
-            }
-
-            if(n_clu == each) cluster_mapping = rep(1:each, times = n)
-
-        } else if(each == 1){
-            if(n_clu != times && n_clu != n_res){
-                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", times, " or of length ", n_res, ".")
-            }
-
-            if(n_clu == times) cluster_mapping = rep(1:n_clu, each = n)
-
-        } else {
-            if(n_clu != n_res){
-                stop("In rep, the argument 'cluster' (currently of length ", n_clu, ") must be a list either of length ", n_res, ".")
-            }
-        }
-
-        se_all = vector("list", n_clu)
-        for(m in 1:n_clu){
-            if(identical(cluster[[m]], "IID")){
-                se_all[[m]] = "iid"
-            } else if(identical(cluster[[m]], "hetero")){
-                se_all[[m]] = "hetero"
-            }
-        }
-
-    }
-
-    res = vector("list", length(res_int))
-
-    if(IS_MULTI_CLUST){
-        for(i in 1:n_res){
-            if(IS_LIST){
-                res[[i]] = summary(x[[res_int[i]]], se = se_all[[cluster_mapping[i]]], cluster = cluster[[cluster_mapping[i]]])
-            } else {
-                res[[i]] = summary(x, se = se_all[[cluster_mapping[i]]], cluster = cluster[[cluster_mapping[i]]])
-            }
-        }
-
-    } else {
-        for(i in unique(res_int)){
-            if(IS_LIST){
-                res[res_int == i] = x[[i]]
-            } else {
-                res[res_int == i] = list(x)
-            }
-        }
-    }
-
-    for(i in 1:n_res){
-        res[[i]]$model_id = res_int[i]
-    }
-
-    res
-}
-
-#' @rdname rep.fixest
-rep.fixest_list = function(x, times = 1, each = 1, cluster, ...){
-    rep.fixest(x, times = times, each = each, cluster = cluster, ...)
-}
-
-#' @rdname rep.fixest
-.l = function(...){
-
-    check_arg(..., "mbt class(fixest) | list")
-
-    dots = list(...)
-    if(all(sapply(dots, function(x) "fixest" %in% class(x)))){
-        class(dots) = "fixest_list"
-
-        return(dots)
-    }
-
-    if(length(dots) == 1){
-
-        if("fixest_multi" %in% class(dots[[1]])){
-            res = attr(dots[[1]], "data")
-            class(res) = "fixest_list"
-            return(res)
-        }
-
-        if(all(sapply(dots[[1]], function(x) "fixest" %in% class(x)))){
-            res = dots[[1]]
-            class(res) = "fixest_list"
-            return(res)
-        }
-    }
-
-    res = list()
-    for(i in seq_along(dots)){
-        if("fixest" %in% class(dots[[i]])){
-            res[[length(res) + 1]] = dots[[i]]
-        } else {
-            obj = dots[[i]]
-
-            if(class(obj) %in% "fixest_multi"){
-                data = attr(obj, "data")
-                for(j in seq_along(data)){
-                    res[[length(res) + 1]] = data[[j]]
-                }
-
-            } else {
-                for(j in seq_along(obj)){
-                    if(!"fixest" %in% class(obj[[j]])){
-                        stop("In .l(...), each argument must be either a fixest object, or a list of fixest objects. Problem: The ", n_th(j), " element of the ", n_th(i), " argument (the latter being a list) is not a fixest object.")
-                    }
-
-                    res[[length(res) + 1]] = obj[[j]]
-                }
-            }
-        }
-    }
-
-    class(res) = "fixest_list"
-    res
 }
 
 #### ............... ####
@@ -11388,6 +11559,11 @@ getFixest_estimation = function(){
     getOption("fixest_estimation")
 }
 
+#### ............... ####
+#### Startup         ####
+####
+
+
 
 #' Permanently removes the fixest package startup message
 #'
@@ -11441,9 +11617,19 @@ initialize_startup_msg = function(startup_msg){
         return(FALSE)
     }
 
+    if(is_Rmarkdown()){
+        # Never in Rmarkdown: too ugly
+        return(FALSE)
+    }
+
+    if(is.null(find_project_path())){
+        return(FALSE)
+    }
+
     # message("getting version")
 
     previous_version = config_get("fixest_version")
+    is_corrupt_version = !is.null(previous_version) && !is_pkg_version(previous_version)
 
     # message("version is ", previous_version)
 
@@ -11455,7 +11641,12 @@ initialize_startup_msg = function(startup_msg){
 
     current_version = fixest_version()
 
-    if(is.null(previous_version)){
+    if(!is_pkg_version(current_version)){
+        # If we're here, it's a bug: this should NEVER happen
+        return(FALSE)
+    }
+
+    if(!is_pkg_version(previous_version)){
         # We first update the version
         # message("updating the version")
         config_update("fixest_version", current_version)
@@ -11463,7 +11654,7 @@ initialize_startup_msg = function(startup_msg){
         # message("Is fixest used? ", is_fixest_used())
 
         # Is it a new project? Or was fixest simply never used before?
-        if(is_fixest_used()){
+        if(!is_corrupt_version && is_fixest_used()){
             # => message
             # Since I register versions since 0.9.0, this means that the
             # version of fixest used was anterior => all msgs should pop
@@ -11471,7 +11662,7 @@ initialize_startup_msg = function(startup_msg){
             config_update("fixest_startup_msg", TRUE)
             return(TRUE)
         } else {
-            # fixest was never used
+            # fixest was never used or the version was corrupt
             # => we don't show any message since it will not break any existing code
             config_update("fixest_startup_msg", FALSE)
             return(FALSE)
@@ -11541,20 +11732,25 @@ fixest_version = function(){
     as.character(packageVersion("fixest"))
 }
 
+is_pkg_version = function(x){
+    length(x) == 1 && is.character(x) && length(strsplit(x, "\\.")[[1]]) == 3
+}
+
 is_fixest_used = function(){
     # To return TRUE:
     # - fixest in the files
     # - + file saved > 7 days
     #
-    # - if fixest but file saved > 7 days, very likely a new project
+    # - if fixest but file saved < 7 days, very likely a new project
 
     # Only level 1 recursivity
     files = list.files(pattern = "\\.(r|R)$")
     dirs = c("./", list.dirs(recursive = FALSE))
     sub_files = unlist(lapply(dirs, list.files, pattern = "\\.(r|R)$", full.names = TRUE))
-    file_extra = grep("\\.Rprofile", list.files(all.files = TRUE), value = TRUE)
+    file_extra = if(file.exists(".Rprofile")) ".Rprofile" else NULL
 
     files = c(files, file_extra, sub_files)
+    files = files[!dir.exists(files)]
 
     if(length(files) == 0) return(FALSE)
 
@@ -11570,13 +11766,15 @@ is_fixest_used = function(){
 
     for(f in fixest_files){
         f_created = file.mtime(f)
-        d = as.numeric(difftime(now, f_created, units = "days"))
-        if(d > 7){
-            return(TRUE)
+        if("POSIXt" %in% class(f_created)){
+            d = as.numeric(difftime(now, f_created, units = "days"))
+            if(d > 7){
+                return(TRUE)
+            }
         }
     }
 
-    return(TRUE)
+    return(FALSE)
 }
 
 renvir_get = function(key){
@@ -11728,6 +11926,11 @@ renvir_update = function(key, value){
 }
 
 find_config_path = function(){
+
+    if(getRversion() < "4.0.0"){
+        return(NULL)
+    }
+
     dir = tools::R_user_dir("fixest", "config")
 
     # We create the directory if needed
@@ -11781,7 +11984,7 @@ config_get = function(key){
 
     path = find_config_path()
 
-    if(!file.exists(path)){
+    if(is.null(path) || !file.exists(path)){
         return(NULL)
     }
 

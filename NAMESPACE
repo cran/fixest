@@ -7,8 +7,10 @@ useDynLib(fixest, .registration = TRUE)
 # main funs
 export(feNmlm, femlm, feols, feglm, fepois, fenegbin)
 export(feglm.fit, feols.fit)
+export(est_env)
 # etable
 export(etable, style.tex, style.df)
+export(log_etable)
 export(extralines_register)
 # misc funs
 export(collinearity)
@@ -26,9 +28,9 @@ export(dof, ssc, degrees_freedom)
 # Lag related
 export(panel, unpanel, f, l, d)
 # factor/interactions/binning
-export(i, bin)
+export(i, bin, ref)
 # macro
-export(xpd, dsb)
+export(xpd)
 # utilities
 export(to_integer, demean, obs)
 # setters & getters
@@ -40,10 +42,12 @@ export(vcov_cluster, vcov_DK, vcov_NW, vcov_conley)
 # other stuff
 export(n_unik, osize, sample_df)
 
+# dsb
+export(dsb, .dsb, .dsb0)
+S3method(print, dsb)
 
 # deprecated
-export(obs2remove, esttex, esttable)
-S3method(summary, fixest.obs2remove)
+export(esttex, esttable)
 
 # Base methods
 S3method(print, fixest)
@@ -65,6 +69,9 @@ S3method("$", fixest_multi)
 S3method(print, fixest_multi)
 S3method(summary, fixest_multi)
 S3method(as.list, fixest_multi)
+# etable
+S3method(print, etable_tex)
+S3method(print, etable_df)
 
 # rep
 S3method(rep, fixest) # rep fixest objects
@@ -133,7 +140,8 @@ importFrom(stats, model.matrix, sigma, deviance, weights, terms,
 			  confint, vcov, binomial, setNames, complete.cases, pchisq, pf,
 			  aggregate, cancor, rnorm, median, qt, .getXlevels, quantile)
 
-importFrom(utils, combn, head, tail, packageVersion, object.size, read.csv, write.csv)
+importFrom(utils, combn, head, tail, packageVersion, object.size, read.csv,
+           write.csv, write.table, capture.output, as.roman)
 
 importFrom(Rcpp, evalCpp)
 

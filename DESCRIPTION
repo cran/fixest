@@ -1,7 +1,7 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.10.1
+Version: 0.10.2
 Authors@R: 
     c(person(given = "Laurent",
              family = "Berge",
@@ -16,8 +16,9 @@ Authors@R:
              email = "grantmcd@uoregon.edu",
              comment = c(ORCID = "0000-0001-7883-8573")))
 Imports: stats, graphics, grDevices, tools, utils, methods, numDeriv,
-        nlme, sandwich, Rcpp, dreamerr(>= 1.2.3)
-Suggests: knitr, rmarkdown, data.table, plm, MASS, pander, ggplot2, lfe
+        nlme, sandwich, Rcpp(>= 1.0.5), dreamerr(>= 1.2.3)
+Suggests: knitr, rmarkdown, data.table, plm, MASS, pander, ggplot2,
+        lfe, tinytex, pdftools
 LinkingTo: Rcpp
 Depends: R(>= 3.5.0)
 Description: Fast and user-friendly estimation of econometric models with multiple fixed-effects. Includes ordinary least squares (OLS), generalized linear models (GLM) and the negative binomial.
@@ -33,10 +34,10 @@ LazyData: true
 RoxygenNote: 7.1.2
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2021-10-30 21:18:53 UTC; berge028
+Packaged: 2022-02-17 22:24:08 UTC; berge028
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb],
   Grant McDermott [ctb] (<https://orcid.org/0000-0001-7883-8573>)
 Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2021-10-30 22:00:02 UTC
+Date/Publication: 2022-02-17 23:02:03 UTC

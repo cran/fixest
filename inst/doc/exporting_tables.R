@@ -26,7 +26,7 @@ etable(est)
 
 ## -----------------------------------------------------------------------------
 etable(est, style.df = style.df(depvar.title = "", fixef.title = "", 
-                                 fixef.suffix = " fixed effect", yesNo = "yes"))
+                                fixef.suffix = " fixed effect", yesNo = "yes"))
 
 ## ---- eval = is_pander--------------------------------------------------------
 library(pander)
@@ -78,11 +78,11 @@ set_rules = function(x, heavy, light){
 etable(est, est_slopes, postprocess.tex = set_rules, heavy = "0.14em", tex = TRUE)
 
 ## -----------------------------------------------------------------------------
-setFixest_etable(style.tex = style.tex("aer"), postprocess.tex = set_rules, 
-                 fitstat = ~ r2 + n, signifCode = NA)
+setFixest_etable(style.tex = style.tex("aer", signif.code = NA), postprocess.tex = set_rules, 
+                 fitstat = ~ r2 + n)
 
 ## -----------------------------------------------------------------------------
-etable(est, est_slopes, heavy = "0.14em", tex = TRUE)
+etable(est, heavy = "0.14em", tex = TRUE)
 
 ## -----------------------------------------------------------------------------
 fitstat_register(type = "p_s", alias = "pvalue (standard)",

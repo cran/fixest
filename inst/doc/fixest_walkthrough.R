@@ -320,10 +320,10 @@ feols(y ~ x1 + ..ctrl, base)
 
 ## -----------------------------------------------------------------------------
 data(longley)
-xpd(Armed.Forces ~ Population + ..("GNP|ployed"), data = longley)
+xpd(Armed.Forces ~ Population + regex("GNP|ployed"), data = longley)
 
 ## -----------------------------------------------------------------------------
-feols(Armed.Forces ~ Population + ..("GNP|ployed"), longley)
+feols(Armed.Forces ~ Population + regex("GNP|ployed"), longley)
 
 ## -----------------------------------------------------------------------------
 base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
@@ -332,8 +332,15 @@ z = "i(species)"
 feols(y ~ x.[i] + .[z], base)
 
 ## -----------------------------------------------------------------------------
-i = 1:5
-xpd(y ~ ..x, ..x = "x.[i]_sq")
+i = 1:3
+xpd(y ~ .["x.[i]_sq"])
+
+## -----------------------------------------------------------------------------
+etable(feols(y ~ csw(x.[, 1:3]), base))
+
+## -----------------------------------------------------------------------------
+vars = c("x1", "x2", "x3") # Equiv. to: dsb("x.[1:3]")
+etable(feols(.[vars] ~ i(species), base))
 
 ## -----------------------------------------------------------------------------
 est1 = feols(y ~ l(x1, 0:1), base_did, panel.id = ~id+period)

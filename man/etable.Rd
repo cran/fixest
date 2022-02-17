@@ -4,6 +4,9 @@
 \alias{etable}
 \alias{setFixest_etable}
 \alias{getFixest_etable}
+\alias{print.etable_tex}
+\alias{print.etable_df}
+\alias{log_etable}
 \alias{esttable}
 \alias{esttex}
 \title{Estimations table (export the results of multiples estimations to a DF or to Latex)}
@@ -16,32 +19,32 @@ etable(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov,
+  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
   tex,
-  fitstat,
-  title,
+  fitstat = NULL,
+  title = NULL,
   coefstat = "se",
   ci = 0.95,
   se.row = NULL,
   se.below = NULL,
-  keep,
-  drop,
-  order,
-  dict,
-  file,
+  keep = NULL,
+  drop = NULL,
+  order = NULL,
+  dict = TRUE,
+  file = NULL,
   replace = FALSE,
-  convergence,
-  signifCode,
-  label,
-  float,
+  convergence = NULL,
+  signif.code = NULL,
+  label = NULL,
+  float = NULL,
   headers = list("auto"),
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
   keepFactors = TRUE,
-  family,
+  family = NULL,
   powerBelow = -5,
   interaction.combine = NULL,
   interaction.order = NULL,
@@ -58,14 +61,26 @@ etable(
   poly_dict = c("", " square", " cube"),
   postprocess.tex = NULL,
   postprocess.df = NULL,
+  tpt = FALSE,
+  arraystretch = NULL,
+  adjustbox = NULL,
+  fontsize = NULL,
   fit_format = "__var__",
   coef.just = NULL,
+  tabular = "normal",
+  highlight = NULL,
+  coef.style = NULL,
   meta = NULL,
   meta.time = NULL,
   meta.author = NULL,
   meta.sys = NULL,
   meta.call = NULL,
-  meta.comment = NULL
+  meta.comment = NULL,
+  view = FALSE,
+  export = NULL,
+  markdown = NULL,
+  page.width = "fit",
+  div.class = "etable"
 )
 
 setFixest_etable(
@@ -79,7 +94,6 @@ setFixest_etable(
   drop,
   order,
   dict,
-  signifCode,
   float,
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
@@ -95,6 +109,10 @@ setFixest_etable(
   fixef.group = NULL,
   placement = "htbp",
   drop.section = NULL,
+  view = FALSE,
+  markdown = NULL,
+  view.cache = FALSE,
+  page.width = "fit",
   postprocess.tex = NULL,
   postprocess.df = NULL,
   fit_format = "__var__",
@@ -109,6 +127,12 @@ setFixest_etable(
 
 getFixest_etable()
 
+\method{print}{etable_tex}(x, ...)
+
+\method{print}{etable_df}(x, ...)
+
+log_etable(type = "pdflatex")
+
 esttable(
   ...,
   vcov = NULL,
@@ -117,28 +141,28 @@ esttable(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov,
+  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
-  fitstat,
+  fitstat = NULL,
   coefstat = "se",
   ci = 0.95,
   se.row = NULL,
   se.below = NULL,
-  keep,
-  drop,
-  order,
-  dict,
-  file,
+  keep = NULL,
+  drop = NULL,
+  order = NULL,
+  dict = TRUE,
+  file = NULL,
   replace = FALSE,
-  convergence,
-  signifCode,
+  convergence = NULL,
+  signif.code = NULL,
   headers = list("auto"),
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
   keepFactors = TRUE,
-  family,
+  family = NULL,
   powerBelow = -5,
   interaction.combine = NULL,
   interaction.order = NULL,
@@ -152,7 +176,12 @@ esttable(
   poly_dict = c("", " square", " cube"),
   postprocess.df = NULL,
   fit_format = "__var__",
-  coef.just = NULL
+  coef.just = NULL,
+  highlight = NULL,
+  coef.style = NULL,
+  export = NULL,
+  page.width = "fit",
+  div.class = "etable"
 )
 
 esttex(
@@ -163,31 +192,31 @@ esttex(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov,
+  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
-  fitstat,
-  title,
+  fitstat = NULL,
+  title = NULL,
   coefstat = "se",
   ci = 0.95,
   se.row = NULL,
   se.below = NULL,
-  keep,
-  drop,
-  order,
-  dict,
-  file,
+  keep = NULL,
+  drop = NULL,
+  order = NULL,
+  dict = TRUE,
+  file = NULL,
   replace = FALSE,
-  convergence,
-  signifCode,
-  label,
-  float,
+  convergence = NULL,
+  signif.code = NULL,
+  label = NULL,
+  float = NULL,
   headers = list("auto"),
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
   keepFactors = TRUE,
-  family,
+  family = NULL,
   powerBelow = -5,
   interaction.combine = NULL,
   interaction.order = NULL,
@@ -202,13 +231,25 @@ esttex(
   drop.section = NULL,
   poly_dict = c("", " square", " cube"),
   postprocess.tex = NULL,
+  tpt = FALSE,
+  arraystretch = NULL,
+  adjustbox = NULL,
+  fontsize = NULL,
   fit_format = "__var__",
+  tabular = "normal",
+  highlight = NULL,
+  coef.style = NULL,
   meta = NULL,
   meta.time = NULL,
   meta.author = NULL,
   meta.sys = NULL,
   meta.call = NULL,
-  meta.comment = NULL
+  meta.comment = NULL,
+  view = FALSE,
+  export = NULL,
+  markdown = NULL,
+  page.width = "fit",
+  div.class = "etable"
 )
 }
 \arguments{
@@ -222,7 +263,7 @@ esttex(
 
 \item{se}{Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{hetero}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "iid"}. Note that this argument is deprecated, you should use \code{vcov} instead.}
 
-\item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link[fixest]{ssc}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{ssc}} for this argument. The arguments and defaults of the function \code{\link[fixest]{ssc}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "conventional"}, \code{t.df = "conventional"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{ssc}} for details.}
+\item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link[fixest]{ssc}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{ssc}} for this argument. The arguments and defaults of the function \code{\link[fixest]{ssc}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"}, \code{t.df = "min"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{ssc}} for details.}
 
 \item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as fixed-effects in the estimation, you can leave it blank with \code{vcov = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] fixed-effect). You can interact two variables using \code{^} with the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"}.}
 
@@ -262,7 +303,7 @@ esttex(
 
 \item{convergence}{Logical, default is missing. Should the convergence state of the algorithm be displayed? By default, convergence information is displayed if at least one model did not converge.}
 
-\item{signifCode}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default). To suppress the significance codes, use \code{signifCode=NA} or \code{signifCode=NULL}. Can also be equal to \code{"letters"}, then the default becomes \code{c("a"=0.01, "b"=0.05, "c"=0.10)}.}
+\item{signif.code}{Named numeric vector, used to provide the significance codes with respect to the p-value of the coefficients. Default is \code{c("***"=0.01, "**"=0.05, "*"=0.10)} for a Latex table and \code{c("***"=0.001, "**"=0.01, "*"=0.05, "."=0.10)} for a data.frame (to conform with R's default). To suppress the significance codes, use \code{signif.code=NA} or \code{signif.code=NULL}. Can also be equal to \code{"letters"}, then the default becomes \code{c("a"=0.01, "b"=0.05, "c"=0.10)}.}
 
 \item{label}{(Tex only.) Character scalar. The label of the Latex table.}
 
@@ -292,7 +333,7 @@ esttex(
 
 \item{style.df}{An object created by the function \code{\link[fixest]{style.df}. }It represents the style of the data frame returned (if \code{tex = FALSE}), see the documentation of \code{\link[fixest]{style.df}}.}
 
-\item{notes}{(Tex only.) Character vector. If provided, a \code{"notes"} section will be added at the end right after the end of the table, containing the text of this argument. Note that if it is a vector, it will be collapsed with new lines.}
+\item{notes}{(Tex only.) Character vector. If provided, a \code{"notes"} section will be added at the end right after the end of the table, containing the text of this argument. If it is a vector, it will be collapsed with new lines. If \code{tpt = TRUE}, the behavior is different: each element of the vector is an item. If the first element of the vector starts with \code{"@"}, then it will be included verbatim, and in case of \code{tpt = TRUE}, right before the first item. If that element is provided, it will replace the value defined in \code{style.tex(notes.intro)} or \code{style.tex(notes.tpt.intro)}.}
 
 \item{group}{A list. The list elements should be vectors of regular expressions. For each elements of this list: A new line in the table is created, all variables that are matched by the regular expressions are discarded (same effect as the argument \code{drop}) and \code{TRUE} or \code{FALSE} will appear in the model cell, depending on whether some of the previous variables were found in the model. Example: \code{group=list("Controls: personal traits"=c("gender", "height", "weight"))} will create an new line with \code{"Controls: personal traits"} in the leftmost cell, all three variables gender, height and weight are discarded, \code{TRUE} appearing in each model containing at least one of the three variables (the style of \code{TRUE}/\code{FALSE} is governed by the argument \code{yesNo}). You can control the placement of the new row by using 1 or 2 special characters at the start of the row name. The meaning of these special characters are: 1) \code{"^"}: coef., \code{"-"}: fixed-effect, \code{"_"}: stats, section; 2) \code{"^"}: 1st, \code{"_"}: last, row. For example: \code{group=list("_^Controls"=stuff)} will place the line at the top of the 'stats' section, and using \code{group=list("^_Controls"=stuff)} will make the row appear at the bottom of the coefficients section. For details, see the dedicated section.}
 
@@ -310,9 +351,25 @@ esttex(
 
 \item{postprocess.df}{A function that will postprocess.tex the resulting data.frame. Only when \code{tex = FALSE}. By default it is equal to \code{NULL}, meaning that there is no postprocessing. When \code{tex = TRUE}, see the argument \code{postprocess.tex}.}
 
+\item{tpt}{(Tex only.) Logical scalar, default is FALSE. Whether to use the \code{threeparttable} environment. If so, the \code{notes} will be integrated into the \code{tablenotes} environment.}
+
+\item{arraystretch}{(Tex only.) A numeric scalar, default is \code{NULL}. If provided, the command \code{\\renewcommand*{\\arraystretch}{x}} is inserted, replacing \code{x} by the value of \code{arraystretch}. The changes are specific to the current table and do not affect the rest of the document.}
+
+\item{adjustbox}{(Tex only.) A logical, numeric or character scalar, default is \code{NULL}. If not \code{NULL}, the table is inserted within the \code{adjustbox} environment. By default the options are \code{width = 1\\textwidth, center} (if \code{TRUE}). A numeric value changes the value before \code{\\textwidth}. You can also add a character of the form \code{"x tw"} or \code{"x th"} with \code{x} a number and where tw (th) stands for text-width (text-height). Finally any other character value is passed verbatim as an \code{adjustbox} option.}
+
+\item{fontsize}{(Tex only.) A character scalar, default is \code{NULL}. Can be equal to \code{tiny}, \code{scriptsize}, \code{footnotesize}, \code{small}, \code{normalsize}, \code{large}, or \code{Large}. The change affect the table only (and not the rest of the document).}
+
 \item{fit_format}{Character scalar, default is \code{"__var__"}. Only used in the presence of IVs. By default the endogenous regressors are named \code{fit_varname} in the second stage. The format of the endogenous regressor to appear in the table is governed by \code{fit_format}. For instance, by default, the prefix \code{"fit_"} is removed, leading to only \code{varname} to appear. If \code{fit_format = "$\\\\hat{__var__}$"}, then \code{"$\\hat{varname}$"} will appear in the table.}
 
 \item{coef.just}{(DF only.) Either \code{"."}, \code{"("}, \code{"l"}, \code{"c"} or \code{"r"}, default is \code{NULL}. How the coefficients should be justified. If \code{NULL} then they are right aligned if \code{se.below = FALSE} and aligned to the dot if \code{se.below = TRUE}. The keywords stand respectively for dot-, parenthesis-, left-, center- and right-aligned.}
+
+\item{tabular}{(Tex only.) Character scalar equal to "normal" (default), "*" or "X". Represents the type of tabular environment to use: either \code{tabular}, \code{tabular*} or \code{tabularx}.}
+
+\item{highlight}{List containing coefficients to highlight. Highlighting is of the form \code{.("options1" = "coefs1", "options2" = "coefs2", etc)}.
+The coefficients to be highlighted can be written in three forms: 1) row, eg \code{"x1"} will highlight the full row of the variable \code{x1}; 2) cells, use \code{'@'} after the coefficient name to give the column, it accepts ranges, eg \code{"x1@2, 4-6, 8"} will highlight only the columns 2, 4, 5, 6, and 8 of the variable \code{x1}; 3) range, by giving the top-left and bottom-right values separated with a semi-colon, eg \code{"x1@2 ; x3@5"} will highlight from the column 2 of \code{x1} to the 5th column of \code{x3}. Coefficient names are partially matched, use a \code{'\%'} first to refer to the original name (before dictionary) and use \code{'@'} first to use a regular expression. You can add a vector of row/cell/range.
+The options are a comma-separated list of items. By default the highlighting is done with a frame (a thick box) around the coefficient, use \code{'rowcol'} to highlight with a row color instead. Here are the other options: \code{'se'} to highlight the standard-errors too; \code{'square'} to have a square box (instead of rounded); \code{'thick1'} to \code{'thick6'} to monitor the width of the box; \code{'sep0'} to \code{'sep9'} to monitor the inner spacing. Finally the remaining option is the color: simply add an R color (it must be a valid R color!). You can use \code{"color!alpha"} with "alpha" a number between 0 to 100 to change the alpha channel of the color.}
+
+\item{coef.style}{Named list containing styles to be applied to the coefficients. It must be of the form \code{.("style1" = "coefs1", "style2" = "coefs2", etc)}. The style must contain the string \code{":coef:"} (or \code{":coef_se:"} to style both the coefficient and its standard-error). The string \code{:coef:} will be replaced verbatim by the coefficient value. For example use \code{"\\textbf{:coef:}"} to put the coefficient in bold. Note that markdown markup is enabled so \code{"**:coef:**"} would also put it in bold. The coefficients to be styled can be written in three forms: 1) row, eg \code{"x1"} will style the full row of the variable \code{x1}; 2) cells, use \code{'@'} after the coefficient name to give the column, it accepts ranges, eg \code{"x1@2, 4-6, 8"} will style only the columns 2, 4, 5, 6, and 8 of the variable \code{x1}; 3) range, by giving the top-left and bottom-right values separated with a semi-colon, eg \code{"x1@2 ; x3@5"} will style from the column 2 of \code{x1} to the 5th column of \code{x3}. Coefficient names are partially matched, use a \code{'\%'} first to refer to the original name (before dictionary) and use \code{'@'} first to use a regular expression. You can add a vector of row/cell/range.}
 
 \item{meta}{(Tex only.) A one-sided formula that shall contain the following elements: date or time, sys, author, comment and call. Default is \code{NULL}. This argument is a shortcut to controlling the meta information that can be displayed in comments before the table. Typically if the element is in the formula, it means that the argument will be equal to \code{TRUE}. Example: \code{meta = ~time+call} is equivalent to \code{meta.time = TRUE} and \code{meta.call = TRUE}. The "author" and "comment" elements are a bit special. Using \code{meta = ~author("Mark")} is equivalent to \code{meta.author = "Mark"} while \code{meta=~author} is equiv. to \code{meta.author = TRUE}. The "comment" must be used with a character string inside: \code{meta = ~comment("this is a comment")}. The order in the formula controls the order of appearance of the meta elements. It also has precedence over the \code{meta.XX} arguments.}
 
@@ -326,9 +383,25 @@ esttex(
 
 \item{meta.comment}{(Tex only.) A character vector containing free-form comments to be inserted right before the table.}
 
+\item{view}{Logical, default is \code{FALSE}. If \code{TRUE}, then the table generated in Latex by \code{etable} and then is displayed in the viewer pane. Note that for this option to work you need i) pdflatex, ii) imagemagick and iii) ghostscript. All three software must be installed and on the path.}
+
+\item{export}{Character scalar giving the path to a PNG file to be created, default is \code{NULL}. If provided, the Latex table will be converted to PNG and copied to the \code{export} location. Note that for this option to work you need a working distribution of \code{pdflatex}, \code{imagemagick} and \code{ghostscript}.}
+
+\item{markdown}{Character scalar giving the location of a directory, or a logical scalar. Default is \code{NULL}. This argument only works in Rmarkdown documents, when knitting the document. If provided: two behaviors depending on context. A) if the output document is Latex, the table is exported in Latex. B) if the output document is not Latex, the table will be exported to PNG at the desired location and inserted in the document via a markdown link. If equal to \code{TRUE}, the default location of the PNGs is a temporary folder for \code{R > 4.0.0}, or to \code{"images/etable/"} for earlier versions.}
+
+\item{page.width}{Character scalar equal to \code{'fit'} (default), \code{'a4'} or \code{'us'}; or a single Latex measure (like \code{'17cm'}) or a double one (like \code{"21, 2cm"}). Only used when the Latex table is to be viewed (\code{view = TRUE}), exported (\code{export != NULL}) or displayed in Rmarkdown (\code{markdown != NULL}). It represents the text width of the page in which the Latex table will be inserted. By default, \code{'fit'}, the page fits exactly the table (i.e. text width = table width). If \code{'a4'} or \code{'us'}, two times 2cm is removed from the page width to account for margins. Providing a page width and a margin width, like in \code{"17in, 1in"}, enables a correct display of the argument \code{adjustbox}. Note that the margin width represent the width of a single side margin (and hence will be doubled).}
+
+\item{div.class}{Character scalar, default is \code{"etable"}. Only used in Rmarkdown documents when \code{markdown = TRUE}. The table in an image format is embedded in a \code{<div>} container, and that container is of class \code{div.class}.}
+
+\item{view.cache}{Logical, default is \code{FALSE}. Only used when \code{view = TRUE}. Whether the PNGs of the tables should be cached.}
+
 \item{reset}{(\code{setFixest_etable} only.) Logical, default is \code{FALSE}. If \code{TRUE}, this will reset all the default values that were already set by the user in previous calls.}
 
 \item{save}{Either a logical or equal to \code{"reset"}. Default is \code{FALSE}. If \code{TRUE} then the value is set permanently at the project level, this means that if you restart R, you will still obtain the previously saved defaults. This is done by writing in the \code{".Renviron"} file, located in the project's working directory, hence we must have write permission there for this to work, and only works with Rstudio. If equal to "reset", the default at the project level is erased. Since there is writing in a file involved, permission is asked to the user.}
+
+\item{x}{An object returned by \code{etable}.}
+
+\item{type}{Character scalar equal to 'pdflatex' (default), 'magick', 'dir' or 'tex'. Which log file to report; if 'tex', the full source code of the tex file is returned, if 'dir': the directory of the log files is returned.}
 }
 \value{
 If \code{tex = TRUE}, the lines composing the Latex table are returned invisibly while the table is directly prompted on the console.
@@ -425,12 +498,17 @@ Note, importantly, that equations are NOT escaped. This means that \code{title="
 If for some reason you don't want the escaping to take place, the arguments \code{headers} and \code{extralines} are the only ones allowing that. To disable escaping, add the special token ":tex:" in the row names. Example: in \code{headers=list(":tex:Row title"="weird & & \%\\n tex stuff\\\\")}, the elements will be displayed verbatim. Of course, since it can easily ruin your table, it is only recommended to super users.
 }
 
+\section{Markdown markup}{
+
+
+Within anything that is Latex-escaped (see previous section), you can use a markdown-style markup to put the text in italic and/or bold. Use \code{*text*}, \code{**text**} or \code{***text***} to put some text in, respectively, italic (with \code{\\textit}), bold (with \code{\\textbf}) and italic-bold.
+}
+
 \examples{
 
-aq = airquality
 
-est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = aq)
-est2 = feols(Ozone ~ i(Month, Wind) + Temp | Month, data = aq)
+est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = airquality)
+est2 = feols(Ozone ~ i(Month, Wind) + Temp | Month, data = airquality)
 
 # Displaying the two results in a single table
 etable(est1, est2)
@@ -472,10 +550,10 @@ dict = c("Month::5"="May", "Month::6"="Jun", "Month::7"="Jul",
 etable(est1, est2, dict = dict, keep = "\%Month")
 
 #
-# signifCode
+# signif.code
 #
 
-etable(est1, est2, signifCode = c(" A"=0.01, " B"=0.05, " C"=0.1, " D"=0.15, " F"=1))
+etable(est1, est2, signif.code = c(" A"=0.01, " B"=0.05, " C"=0.1, " D"=0.15, " F"=1))
 
 #
 # Using the argument style to customize Latex exports
@@ -505,9 +583,9 @@ etable(est1, est2, dict = dict, tex = TRUE, style.tex = style.tex("aer"))
 # You can achieve that with the group argument
 
 setFixest_fml(..ctrl = ~ poly(Wind, 2) + poly(Temp, 2))
-est_c0 = feols(Ozone ~ Solar.R, data = aq)
-est_c1 = feols(Ozone ~ Solar.R + ..ctrl, data = aq)
-est_c2 = feols(Ozone ~ Solar.R + Solar.R^2 + ..ctrl, data = aq)
+est_c0 = feols(Ozone ~ Solar.R, data = airquality)
+est_c1 = feols(Ozone ~ Solar.R + ..ctrl, data = airquality)
+est_c2 = feols(Ozone ~ Solar.R + Solar.R^2 + ..ctrl, data = airquality)
 
 etable(est_c0, est_c1, est_c2, group = list(Controls = "poly"))
 
@@ -515,10 +593,13 @@ etable(est_c0, est_c1, est_c2, group = list(Controls = "poly"))
 # with TRUE/FALSE where the variables were found
 
 # 'extralines' adds an extra line, where you can add the value for each model
-est_all  = feols(Ozone ~ Solar.R + Temp + Wind, data = aq)
-est_sub1 = feols(Ozone ~ Solar.R + Temp + Wind, data = aq[aq$Month \%in\% 5:6, ])
-est_sub2 = feols(Ozone ~ Solar.R + Temp + Wind, data = aq[aq$Month \%in\% 7:8, ])
-est_sub3 = feols(Ozone ~ Solar.R + Temp + Wind, data = aq[aq$Month == 9, ])
+est_all  = feols(Ozone ~ Solar.R + Temp + Wind, data = airquality)
+est_sub1 = feols(Ozone ~ Solar.R + Temp + Wind, data = airquality,
+                 subset = ~ Month \%in\% 5:6)
+est_sub2 = feols(Ozone ~ Solar.R + Temp + Wind, data = airquality,
+                 subset = ~ Month \%in\% 7:8)
+est_sub3 = feols(Ozone ~ Solar.R + Temp + Wind, data = airquality,
+                 subset = ~ Month == 9)
 
 etable(est_all, est_sub1, est_sub2, est_sub3,
        extralines = list("Sub-sample" = c("All", "May-June", "Jul.-Aug.", "Sept.")))
@@ -551,7 +632,7 @@ etable(est_all, est_sub1, est_sub2, est_sub3,
 # These lines will appear at the top of the table
 
 # first, 3 estimations
-est_header = feols(c(Ozone, Solar.R, Wind) ~  poly(Temp, 2), aq)
+est_header = feols(c(Ozone, Solar.R, Wind) ~  poly(Temp, 2), airquality)
 
 # header => vector: adds a line w/t title
 etable(est_header, headers = c("A", "A", "B"))
@@ -596,9 +677,9 @@ etable(est_header, headers = .("^Currency" = .("US $" = 2, "CA $" = 1)))
 
 # You can group the fixed-effects line with fixef.group
 
-est_0fe = feols(Ozone ~ Solar.R + Temp + Wind, aq)
-est_1fe = feols(Ozone ~ Solar.R + Temp + Wind | Month, aq)
-est_2fe = feols(Ozone ~ Solar.R + Temp + Wind | Month + Day, aq)
+est_0fe = feols(Ozone ~ Solar.R + Temp + Wind, airquality)
+est_1fe = feols(Ozone ~ Solar.R + Temp + Wind | Month, airquality)
+est_2fe = feols(Ozone ~ Solar.R + Temp + Wind | Month + Day, airquality)
 
 # A) automatic way => simply use fixef.group = TRUE
 
@@ -660,7 +741,7 @@ etable(est1, est2, fitstat = ~ ll + .)
 # Computing a different SE for each model
 #
 
-est = feols(Ozone ~ Solar.R + Wind + Temp, data = aq)
+est = feols(Ozone ~ Solar.R + Wind + Temp, data = airquality)
 
 #
 # Method 1: use summary
@@ -675,7 +756,7 @@ etable(list(s1, s2, s3, s4))
 #
 # Method 2: using a list in the argument 'vcov'
 
-est_bis = feols(Ozone ~ Solar.R + Wind + Temp | Month, data = aq)
+est_bis = feols(Ozone ~ Solar.R + Wind + Temp | Month, data = airquality)
 etable(est, est_bis, vcov = list("hetero", ~ Month))
 
 # When you have only one model, this model is replicated
@@ -696,6 +777,21 @@ etable(est, est_bis, vcov = list("each", "iid", ~ Month, ~ Day))
 
 # times
 etable(est, est_bis, vcov = list("times", "iid", ~ Month, ~ Day))
+
+#
+# Notes and markup
+#
+
+# Notes can be also be set in a dictionary
+# You can use markdown markup to put text into italic/bold
+
+dict = c("note 1" = "*Notes:* This data is not really random.",
+         "source 1" = "**Source:** the internet?")
+
+est = feols(Ozone ~ csw(Solar.R, Wind, Temp), data = airquality)
+
+etable(est, dict = dict, tex = TRUE, notes = c("note 1", "source 1"))
+
 
 
 }

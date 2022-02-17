@@ -543,7 +543,7 @@ vcov.fixest = function(object, vcov = NULL, se = NULL, cluster, ssc = NULL, attr
                         stop("The variable", enumerate_items(pblm, "s.quote"), " used to compute the VCOV ", plural_len(pblm, "is"), " not in the original data set. Only variables in the data set can be used.")
                     }
 
-                    var_names_all[vcov_var_name] = fix_combined_names(vname)
+                    var_names_all[vcov_var_name] = rename_hat(vname)
                     if(only_varnames) {
                         var_names_all[vcov_var_name] = vname_all[1]
                         # To handle combined clusters
@@ -1343,7 +1343,7 @@ vcov_cluster = function(x, cluster = NULL, ssc = NULL){
 #'
 #' Driscoll JC, Kraay AC (1998). "Consistent Covariance Matrix Estimation with Spatially Dependent Panel Data." \emph{The Review of Economics and Statistics}, 80(4), 549-560. doi:10.1162/003465398557825.
 #'
-#' Milo G (2017). "Robust Standard Error Estimators for Panel Models: A Unifying Approach" \emph{Journal of Statistical Software}, 82(3). doi:10.18637/jss.v082.i03.
+#' Millo G (2017). "Robust Standard Error Estimators for Panel Models: A Unifying Approach" \emph{Journal of Statistical Software}, 82(3). doi:10.18637/jss.v082.i03.
 #'
 #' @return
 #' If the first argument is a \code{fixest} object, then a VCOV is returned (i.e. a symmetric matrix).
@@ -2425,16 +2425,6 @@ cutoff_deduce = function(lat, lon){
     cutoff
 }
 
-fix_combined_names = function(x){
-    if(grepl("combine_clusters", x)){
-        x = gsub("combine_clusters(_fast)?\\(", "", substr(x, 1, nchar(x) - 1))
-        x = gsub(", ", "^", x, fixed = TRUE)
-    }
-
-    x
-}
-
-
 is_function_in_it = function(x){
     if(is.function(x)){
         return(TRUE)
@@ -2516,7 +2506,7 @@ setFixest_vcov = function(no_FE = "iid", one_FE = "cluster", two_FE = "cluster",
                           panel = "cluster", all = NULL, reset = FALSE){
 
     # NOTE:
-    # The default walues should ALWAYS be working.
+    # The default values should ALWAYS be working.
     # That's why I don't allow conley SEs nor NW SEs
     # => they can be not working at times
 

@@ -349,6 +349,52 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_dsb
+List cpp_dsb(SEXP Rstr);
+RcppExport SEXP _fixest_cpp_dsb(SEXP RstrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type Rstr(RstrSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_dsb(Rstr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_dsb_full_string
+List cpp_dsb_full_string(SEXP Rstr);
+RcppExport SEXP _fixest_cpp_dsb_full_string(SEXP RstrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type Rstr(RstrSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_dsb_full_string(Rstr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_dsb_if_extract
+List cpp_dsb_if_extract(SEXP Rstr);
+RcppExport SEXP _fixest_cpp_dsb_if_extract(SEXP RstrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type Rstr(RstrSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_dsb_if_extract(Rstr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_paste_conditional
+StringVector cpp_paste_conditional(StringVector x, IntegerVector id, int n);
+RcppExport SEXP _fixest_cpp_paste_conditional(SEXP xSEXP, SEXP idSEXP, SEXP nSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< StringVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type id(idSEXP);
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_paste_conditional(x, id, n));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_cholesky
 List cpp_cholesky(NumericMatrix X, double tol, int nthreads);
 RcppExport SEXP _fixest_cpp_cholesky(SEXP XSEXP, SEXP tolSEXP, SEXP nthreadsSEXP) {
@@ -757,6 +803,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_hash_string
+double cpp_hash_string(std::string x);
+RcppExport SEXP _fixest_cpp_hash_string(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_hash_string(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_get_nb_threads
 int cpp_get_nb_threads();
 RcppExport SEXP _fixest_cpp_get_nb_threads() {
@@ -1048,6 +1105,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_colon_to_star
+StringVector cpp_colon_to_star(SEXP Rstr);
+RcppExport SEXP _fixest_cpp_colon_to_star(SEXP RstrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type Rstr(RstrSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_colon_to_star(Rstr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_newey_west
 NumericMatrix cpp_newey_west(NumericMatrix S, NumericVector w, int nthreads);
 RcppExport SEXP _fixest_cpp_newey_west(SEXP SSEXP, SEXP wSEXP, SEXP nthreadsSEXP) {
@@ -1128,6 +1196,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fixest_update_deriv_single", (DL_FUNC) &_fixest_update_deriv_single, 5},
     {"_fixest_cpp_demean", (DL_FUNC) &_fixest_cpp_demean, 13},
     {"_fixest_cpp_which_na_inf", (DL_FUNC) &_fixest_cpp_which_na_inf, 2},
+    {"_fixest_cpp_dsb", (DL_FUNC) &_fixest_cpp_dsb, 1},
+    {"_fixest_cpp_dsb_full_string", (DL_FUNC) &_fixest_cpp_dsb_full_string, 1},
+    {"_fixest_cpp_dsb_if_extract", (DL_FUNC) &_fixest_cpp_dsb_if_extract, 1},
+    {"_fixest_cpp_paste_conditional", (DL_FUNC) &_fixest_cpp_paste_conditional, 3},
     {"_fixest_cpp_cholesky", (DL_FUNC) &_fixest_cpp_cholesky, 3},
     {"_fixest_cpp_sparse_products", (DL_FUNC) &_fixest_cpp_sparse_products, 5},
     {"_fixest_cpppar_crossprod", (DL_FUNC) &_fixest_cpppar_crossprod, 3},
@@ -1159,6 +1231,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fixest_cpp_combine_clusters", (DL_FUNC) &_fixest_cpp_combine_clusters, 2},
     {"_fixest_cpp_cut", (DL_FUNC) &_fixest_cpp_cut, 3},
     {"_fixest_cpp_is_int", (DL_FUNC) &_fixest_cpp_is_int, 1},
+    {"_fixest_cpp_hash_string", (DL_FUNC) &_fixest_cpp_hash_string, 1},
     {"_fixest_cpp_get_nb_threads", (DL_FUNC) &_fixest_cpp_get_nb_threads, 0},
     {"_fixest_cpppar_exp", (DL_FUNC) &_fixest_cpppar_exp, 2},
     {"_fixest_cpppar_log", (DL_FUNC) &_fixest_cpppar_log, 2},
@@ -1182,6 +1255,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fixest_cpppar_check_only_0", (DL_FUNC) &_fixest_cpppar_check_only_0, 2},
     {"_fixest_cpp_quf_gnl", (DL_FUNC) &_fixest_cpp_quf_gnl, 1},
     {"_fixest_cpppar_quf_table_sum", (DL_FUNC) &_fixest_cpppar_quf_table_sum, 11},
+    {"_fixest_cpp_colon_to_star", (DL_FUNC) &_fixest_cpp_colon_to_star, 1},
     {"_fixest_cpp_newey_west", (DL_FUNC) &_fixest_cpp_newey_west, 3},
     {"_fixest_cpp_newey_west_panel", (DL_FUNC) &_fixest_cpp_newey_west_panel, 7},
     {"_fixest_cpp_driscoll_kraay", (DL_FUNC) &_fixest_cpp_driscoll_kraay, 5},

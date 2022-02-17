@@ -69,6 +69,22 @@ cpp_which_na_inf <- function(x, nthreads) {
     .Call(`_fixest_cpp_which_na_inf`, x, nthreads)
 }
 
+cpp_dsb <- function(Rstr) {
+    .Call(`_fixest_cpp_dsb`, Rstr)
+}
+
+cpp_dsb_full_string <- function(Rstr) {
+    .Call(`_fixest_cpp_dsb_full_string`, Rstr)
+}
+
+cpp_dsb_if_extract <- function(Rstr) {
+    .Call(`_fixest_cpp_dsb_if_extract`, Rstr)
+}
+
+cpp_paste_conditional <- function(x, id, n) {
+    .Call(`_fixest_cpp_paste_conditional`, x, id, n)
+}
+
 cpp_cholesky <- function(X, tol = 1.0/100000.0/100000.0, nthreads = 1L) {
     .Call(`_fixest_cpp_cholesky`, X, tol, nthreads)
 }
@@ -193,6 +209,10 @@ cpp_is_int <- function(x) {
     .Call(`_fixest_cpp_is_int`, x)
 }
 
+cpp_hash_string <- function(x) {
+    .Call(`_fixest_cpp_hash_string`, x)
+}
+
 cpp_get_nb_threads <- function() {
     .Call(`_fixest_cpp_get_nb_threads`)
 }
@@ -283,6 +303,10 @@ cpp_quf_gnl <- function(x) {
 
 cpppar_quf_table_sum <- function(x, y, do_sum_y, rm_0, rm_1, rm_single, only_slope, nthreads, do_refactor, r_x_sizes, obs2keep) {
     .Call(`_fixest_cpppar_quf_table_sum`, x, y, do_sum_y, rm_0, rm_1, rm_single, only_slope, nthreads, do_refactor, r_x_sizes, obs2keep)
+}
+
+cpp_colon_to_star <- function(Rstr) {
+    .Call(`_fixest_cpp_colon_to_star`, Rstr)
 }
 
 cpp_newey_west <- function(S, w, nthreads) {

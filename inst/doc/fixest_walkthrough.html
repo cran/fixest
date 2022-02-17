@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge and Grant McDermott" />
 
-<meta name="date" content="2021-10-30" />
+<meta name="date" content="2022-02-17" />
 
 <title>Fast Fixed-Effects Estimation: Short introduction</title>
 
@@ -321,13 +321,13 @@ div.tocify {
 
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short introduction</h1>
 <h4 class="author">Laurent Berge and Grant McDermott</h4>
-<h4 class="date">2021-10-30</h4>
+<h4 class="date">2022-02-17</h4>
 
 </div>
 
 
 <!-- Help on vignette writing here: http://r-pkgs.had.co.nz/vignettes.html. -->
-<p>The package <code>fixest</code> provides a family of functions to perform estimations with multiple fixed-effects. The two main functions are <code>feols</code> for linear models and <code>feglm</code> for generalized linear models. In addition, the function <code>femlm</code> performs direct maximum likelihood estimation, and <code>feNmlm</code> extends the latter to allow the inclusion of non-linear in parameters right-hand-sides. Finally, the functions <code>fepois</code> and <code>fenegbin</code> are aliases for Poisson and negative binomial fixed-effect estimations. Each of these functions supports any number of fixed-effects and is implemented with full fledged multi-threading in c++. Functions <code>feols</code> and <code>feglm</code> further support variables with varying slopes.</p>
+<p>The package <code>fixest</code> provides a family of functions to perform estimations with multiple fixed-effects. The two main functions are <code>feols</code> for linear models and <code>feglm</code> for generalized linear models. In addition, the function <code>femlm</code> performs direct maximum likelihood estimation, and <code>feNmlm</code> extends the latter to allow the inclusion of non-linear in parameters right-hand-sides. Finally, the functions <code>fepois</code> and <code>fenegbin</code> are aliases for Poisson and negative binomial fixed-effect estimations. Each of these functions supports any number of fixed-effects and is implemented with full fledged multi-threading in C++. Functions <code>feols</code> and <code>feglm</code> further support variables with varying slopes.</p>
 <p>This package is currently (Feb. 2020) the fastest software available to perform fixed-effects estimations. See the project’s <a href="https://lrberge.github.io/fixest/">homepage</a> for a set of benchmarks.</p>
 <p>The standard-errors of the estimates can be easily and intuitively clustered (up to four-way).</p>
 <p>The function <code>etable</code> allows to seamlessly export the results of multiple estimations into either a data.frame, or into a Latex table.</p>
@@ -748,27 +748,34 @@ div.tocify {
 <p>So far we have seen how to report the results of multiple estimations on the R console. Now, using the same function <code>etable</code>, we can also export the results to high quality Latex tables. We just need to provide the argument <code>tex = TRUE</code>:</p>
 <div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># with two-way clustered SEs</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(res_multi, <span class="at">cluster =</span> <span class="sc">~</span>Origin<span class="sc">+</span>Destination, <span class="at">tex =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \begin{tabular}{lcccc}</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \tabularnewline\midrule\midrule</span></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Dependent Variable: &amp; \multicolumn{4}{c}{Euros}\\</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Model:              &amp; (1)                   &amp; (2)                   &amp; (3)                   &amp; (4)\\</span></span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule \emph{Variables} &amp;   &amp;   &amp;   &amp;  \\</span></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    (Intercept)         &amp; 24.71$^{***}$         &amp;                       &amp;                       &amp;   \\</span></span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                        &amp; (1.125)               &amp;                       &amp;                       &amp;   \\</span></span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    log(dist\_km)      &amp; -1.029$^{***}$        &amp; -1.029$^{***}$        &amp; -1.226$^{***}$        &amp; -1.518$^{***}$\\</span></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                        &amp; (0.1580)              &amp; (0.1581)              &amp; (0.2045)              &amp; (0.1282)\\</span></span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule \emph{Fixed-effects} &amp;   &amp;   &amp;   &amp;  \\</span></span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Year                &amp;                       &amp; Yes                   &amp; Yes                   &amp; Yes\\</span></span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Destination         &amp;                       &amp;                       &amp; Yes                   &amp; Yes\\</span></span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Origin              &amp;                       &amp;                       &amp;                       &amp; Yes\\</span></span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule \emph{Fit statistics} &amp;   &amp;   &amp;   &amp;  \\</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Observations        &amp; 38,325                &amp; 38,325                &amp; 38,325                &amp; 38,325\\</span></span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Squared Correlation &amp; 0.05511               &amp; 0.05711               &amp; 0.16420               &amp; 0.38479\\</span></span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Pseudo R$^2$        &amp; 0.18502               &amp; 0.18833               &amp; 0.35826               &amp; 0.59312\\</span></span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    BIC                 &amp; $4.85\times 10^{12}$ &amp; $4.83\times 10^{12}$ &amp; $3.82\times 10^{12}$ &amp; $2.42\times 10^{12}$\\</span></span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule\midrule\multicolumn{5}{l}{\emph{Clustered (Origin \&amp; Destination) standard-errors in parentheses}}\\</span></span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\</span></span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \end{tabular}</span></span></code></pre></div>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \begingroup</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \centering</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \begin{tabular}{lcccc}</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \tabularnewline \midrule \midrule</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Dependent Variable: &amp; \multicolumn{4}{c}{Euros}\\</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Model:              &amp; (1)                   &amp; (2)                   &amp; (3)                   &amp; (4)\\  </span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \emph{Variables}\\</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    (Intercept)         &amp; 24.71$^{***}$         &amp;                       &amp;                       &amp;   \\   </span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                        &amp; (1.125)               &amp;                       &amp;                       &amp;   \\   </span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    log(dist\_km)       &amp; -1.029$^{***}$        &amp; -1.029$^{***}$        &amp; -1.226$^{***}$        &amp; -1.518$^{***}$\\   </span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                        &amp; (0.1580)              &amp; (0.1581)              &amp; (0.2045)              &amp; (0.1282)\\   </span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \emph{Fixed-effects}\\</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Year                &amp;                       &amp; Yes                   &amp; Yes                   &amp; Yes\\  </span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Destination         &amp;                       &amp;                       &amp; Yes                   &amp; Yes\\  </span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Origin              &amp;                       &amp;                       &amp;                       &amp; Yes\\  </span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \emph{Fit statistics}\\</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Observations        &amp; 38,325                &amp; 38,325                &amp; 38,325                &amp; 38,325\\  </span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Squared Correlation &amp; 0.05511               &amp; 0.05711               &amp; 0.16420               &amp; 0.38479\\  </span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    Pseudo R$^2$        &amp; 0.18502               &amp; 0.18833               &amp; 0.35826               &amp; 0.59312\\  </span></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    BIC                 &amp; $4.85\times 10^{12}$  &amp; $4.83\times 10^{12}$  &amp; $3.82\times 10^{12}$  &amp; $2.42\times 10^{12}$\\   </span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \midrule \midrule</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \multicolumn{5}{l}{\emph{Clustered (Origin \&amp; Destination) standard-errors in parentheses}}\\</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    \multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \end{tabular}</span></span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; \par\endgroup</span></span></code></pre></div>
 <p>The user can export the Latex table directly into a file (argument <code>file</code>), add a title (arg. <code>title</code>) and a label to the table (arg. <code>label</code>). Note that when the argument <code>file</code> is present, the Latex format becomes the default (i.e. <code>tex = TRUE</code> by default).</p>
 <p>The coefficients can be renamed easily (arg. <code>dict</code>), some can be dropped (arg. <code>drop</code>) and they can be easily reordered with regular expressions (arg. <code>order</code>).</p>
 <p>The significance codes can easily be changed (arg. <code>signifCode</code>) and all quality of fit information can be customized (argument <code>fitstat</code>). Among others, the number of fixed-effect per fixed-effect dimension can also be displayed using the argument <code>fixef_sizes</code>.</p>
@@ -1029,7 +1036,9 @@ div.tocify {
 <span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id             by: id</span></span>
 <span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                 1,080              1,080              1,080</span></span>
 <span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.38715            0.38715            0.38715</span></span>
-<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Within R2                  0.26507            0.26507            0.26507</span></span></code></pre></div>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Within R2                  0.26507            0.26507            0.26507</span></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>Instead of providing the argument <code>ssc</code>, you can instead add the <code>ssc</code> call directly within the formula of the <code>vcov</code>. In this case you should simply add it as a variable. We now replicate the previous example using a list of several VCOVs in <code>etable</code> (that’s the only function that accepts lists in the argument <code>vcov</code>):</p>
 <div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est, <span class="at">vcov =</span> <span class="fu">list</span>(<span class="sc">~</span>id, <span class="sc">~</span>id <span class="sc">+</span> <span class="fu">ssc</span>(<span class="at">fixef.K =</span> <span class="st">&quot;full&quot;</span>), </span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>                        <span class="sc">~</span>id <span class="sc">+</span> <span class="fu">ssc</span>(<span class="at">adj =</span> <span class="cn">FALSE</span>, <span class="at">cluster.adj =</span> <span class="cn">FALSE</span>)))</span>
@@ -1043,7 +1052,9 @@ div.tocify {
 <span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id             by: id</span></span>
 <span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                 1,080              1,080              1,080</span></span>
 <span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.38715            0.38715            0.38715</span></span>
-<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Within R2                  0.26507            0.26507            0.26507</span></span></code></pre></div>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Within R2                  0.26507            0.26507            0.26507</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>You can also tweak <code>iid</code> or <code>hetero</code> SEs using a formula:</p>
 <div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">feols</span>(y <span class="sc">~</span> x1 <span class="sc">|</span> id, base_did, iid <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">adj =</span> <span class="cn">FALSE</span>))</span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; OLS estimation, Dep. Var.: y</span></span>
@@ -1229,7 +1240,9 @@ div.tocify {
 <span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                              0.96121           0.07234          0.84211</span></span>
 <span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Within R2                       0.33841           0.06392          0.58591</span></span>
 <span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; F-test (IV only)                 21.581            4.7882           8.3352</span></span>
-<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Wald (IV only), p-value         2.29e-9           1.32e-9          2.94e-8</span></span></code></pre></div>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Wald (IV only), p-value         2.29e-9           1.32e-9          2.94e-8</span></span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb41-20"><a href="#cb41-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>Here we use <code>stage = 1:2</code> to get all first stage regressions followed by the second stage. Using <code>stage = 2:1</code> would have done the opposite.</p>
 <p>Now some explanations regarding <code>fitstat</code>. The suffix <code>all</code> concerns IV only and means the following: if it’s a first stage regression, then the first-stage F-stat is displayed, otherwise it’s the second stage F-stat. The suffix <code>.p</code> is used in <code>ivwaldall.p</code> to access the p-value and not the statistic. Finally, you can permanently set which fit statistic to display in <code>etable</code> by using <code>setFixest_etable</code>, like for example <code>setFixest_etable(fitstat = ~ . + ivfall + ivwaldall.p)</code>.</p>
 </div>
@@ -1341,31 +1354,34 @@ div.tocify {
 <span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                 </span></span>
 <span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)                     3.219 (7.919)   40.12*** (7.828)</span></span>
 <span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; May                                            -36.90*** (8.201)</span></span>
-<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=June                      5.069 (10.98)   -31.83** (11.05)</span></span>
-<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=7                      31.04*** (8.018)     -5.861 (8.146)</span></span>
-<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=8                      36.90*** (8.201)                   </span></span>
-<span id="cb48-16"><a href="#cb48-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=9                         8.912 (7.763)  -27.99*** (7.845)</span></span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = June                    5.069 (10.98)   -31.83** (11.05)</span></span>
+<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 7                    31.04*** (8.018)     -5.861 (8.146)</span></span>
+<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 8                    36.90*** (8.201)                   </span></span>
+<span id="cb48-16"><a href="#cb48-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 9                       8.912 (7.763)  -27.99*** (7.845)</span></span>
 <span id="cb48-17"><a href="#cb48-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Solar Radiation (Langleys) 0.1148*** (0.0300) 0.1148*** (0.0300)</span></span>
 <span id="cb48-18"><a href="#cb48-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; __________________________ __________________ __________________</span></span>
 <span id="cb48-19"><a href="#cb48-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E. type                                 IID                IID</span></span>
 <span id="cb48-20"><a href="#cb48-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                              111                111</span></span>
 <span id="cb48-21"><a href="#cb48-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                                    0.31974            0.31974</span></span>
 <span id="cb48-22"><a href="#cb48-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                               0.28735            0.28735</span></span>
-<span id="cb48-23"><a href="#cb48-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                        res_i3</span></span>
-<span id="cb48-24"><a href="#cb48-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                   Ozone (ppb)</span></span>
-<span id="cb48-25"><a href="#cb48-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                              </span></span>
-<span id="cb48-26"><a href="#cb48-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)                  25.82*** (6.681)</span></span>
-<span id="cb48-27"><a href="#cb48-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; May                         -24.50*** (6.936)</span></span>
-<span id="cb48-28"><a href="#cb48-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=June                    -19.46. (10.46)</span></span>
-<span id="cb48-29"><a href="#cb48-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=7                                      </span></span>
-<span id="cb48-30"><a href="#cb48-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=8                                      </span></span>
-<span id="cb48-31"><a href="#cb48-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month=9                                      </span></span>
-<span id="cb48-32"><a href="#cb48-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Solar Radiation (Langleys) 0.1253*** (0.0311)</span></span>
-<span id="cb48-33"><a href="#cb48-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; __________________________ __________________</span></span>
-<span id="cb48-34"><a href="#cb48-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E. type                                 IID</span></span>
-<span id="cb48-35"><a href="#cb48-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                              111</span></span>
-<span id="cb48-36"><a href="#cb48-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                                    0.22452</span></span>
-<span id="cb48-37"><a href="#cb48-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                               0.20278</span></span></code></pre></div>
+<span id="cb48-23"><a href="#cb48-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb48-24"><a href="#cb48-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                        res_i3</span></span>
+<span id="cb48-25"><a href="#cb48-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                   Ozone (ppb)</span></span>
+<span id="cb48-26"><a href="#cb48-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                              </span></span>
+<span id="cb48-27"><a href="#cb48-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)                  25.82*** (6.681)</span></span>
+<span id="cb48-28"><a href="#cb48-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; May                         -24.50*** (6.936)</span></span>
+<span id="cb48-29"><a href="#cb48-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = June                  -19.46. (10.46)</span></span>
+<span id="cb48-30"><a href="#cb48-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 7                                    </span></span>
+<span id="cb48-31"><a href="#cb48-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 8                                    </span></span>
+<span id="cb48-32"><a href="#cb48-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Month = 9                                    </span></span>
+<span id="cb48-33"><a href="#cb48-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Solar Radiation (Langleys) 0.1253*** (0.0311)</span></span>
+<span id="cb48-34"><a href="#cb48-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; __________________________ __________________</span></span>
+<span id="cb48-35"><a href="#cb48-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E. type                                 IID</span></span>
+<span id="cb48-36"><a href="#cb48-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                              111</span></span>
+<span id="cb48-37"><a href="#cb48-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                                    0.22452</span></span>
+<span id="cb48-38"><a href="#cb48-38" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                               0.20278</span></span>
+<span id="cb48-39"><a href="#cb48-39" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb48-40"><a href="#cb48-40" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>Now that we’ve seen the basic <code>i()</code> functionality with a single variable, let’s see how it can be put to use in an interaction context. We will consider two DiD examples of increasing complexity.</p>
 </div>
 <div id="simple-difference-in-differences-twfe" class="section level3" number="4.2.2">
@@ -1481,27 +1497,29 @@ div.tocify {
 <p>Under the hood, the <code>sunab()</code> function creates <code>cohort x time to treatment</code> interactions with the function <code>i()</code>, the coefficients are then aggregated at the appropriate level with the function <code>aggregate.fixest</code>. To obtain the coefficients for each <code>cohort x time to treatment</code>, one simply needs to remove the aggregation:</p>
 <div class="sourceCode" id="cb56"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Full disaggregation (you could have used summary instead of etable)</span></span>
 <span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">etable</span>(res_sa20, <span class="at">agg =</span> <span class="cn">FALSE</span>), <span class="dv">20</span>)</span>
-<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                               res_sa20</span></span>
-<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                      y</span></span>
-<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                       </span></span>
-<span id="cb56-6"><a href="#cb56-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1                  0.9947*** (0.0184)</span></span>
-<span id="cb56-7"><a href="#cb56-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-9 x cohort=10    0.3518 (0.3591)</span></span>
-<span id="cb56-8"><a href="#cb56-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-8 x cohort=9     0.0339 (0.4714)</span></span>
-<span id="cb56-9"><a href="#cb56-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-8 x cohort=10   -0.1919 (0.3529)</span></span>
-<span id="cb56-10"><a href="#cb56-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-7 x cohort=8    -0.5894 (0.7369)</span></span>
-<span id="cb56-11"><a href="#cb56-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-7 x cohort=9    0.8730. (0.4934)</span></span>
-<span id="cb56-12"><a href="#cb56-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-7 x cohort=10    0.0195 (0.6034)</span></span>
-<span id="cb56-13"><a href="#cb56-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-6 x cohort=7    -0.0421 (0.8657)</span></span>
-<span id="cb56-14"><a href="#cb56-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-6 x cohort=8    -0.6576 (0.5733)</span></span>
-<span id="cb56-15"><a href="#cb56-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-6 x cohort=9     0.8777 (0.5333)</span></span>
-<span id="cb56-16"><a href="#cb56-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-6 x cohort=10   -0.4036 (0.3474)</span></span>
-<span id="cb56-17"><a href="#cb56-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-5 x cohort=6    -0.6580 (0.9134)</span></span>
-<span id="cb56-18"><a href="#cb56-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-5 x cohort=7    -0.3170 (0.6979)</span></span>
-<span id="cb56-19"><a href="#cb56-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-5 x cohort=8    -0.2382 (0.4697)</span></span>
-<span id="cb56-20"><a href="#cb56-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-5 x cohort=9     0.3015 (0.6042)</span></span>
-<span id="cb56-21"><a href="#cb56-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-5 x cohort=10   -0.5648 (0.4632)</span></span>
-<span id="cb56-22"><a href="#cb56-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-4 x cohort=5    -0.9835 (0.6345)</span></span>
-<span id="cb56-23"><a href="#cb56-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year=-4 x cohort=6     0.3604 (0.8583)</span></span></code></pre></div>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                   res_sa20</span></span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                          y</span></span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                           </span></span>
+<span id="cb56-6"><a href="#cb56-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1                      0.9947*** (0.0184)</span></span>
+<span id="cb56-7"><a href="#cb56-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -9 x cohort = 10    0.3518 (0.3591)</span></span>
+<span id="cb56-8"><a href="#cb56-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -8 x cohort = 9     0.0339 (0.4714)</span></span>
+<span id="cb56-9"><a href="#cb56-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -8 x cohort = 10   -0.1919 (0.3529)</span></span>
+<span id="cb56-10"><a href="#cb56-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -7 x cohort = 8    -0.5894 (0.7369)</span></span>
+<span id="cb56-11"><a href="#cb56-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -7 x cohort = 9    0.8730. (0.4934)</span></span>
+<span id="cb56-12"><a href="#cb56-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -7 x cohort = 10    0.0195 (0.6034)</span></span>
+<span id="cb56-13"><a href="#cb56-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -6 x cohort = 7    -0.0421 (0.8657)</span></span>
+<span id="cb56-14"><a href="#cb56-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -6 x cohort = 8    -0.6576 (0.5733)</span></span>
+<span id="cb56-15"><a href="#cb56-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -6 x cohort = 9     0.8777 (0.5333)</span></span>
+<span id="cb56-16"><a href="#cb56-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -6 x cohort = 10   -0.4036 (0.3474)</span></span>
+<span id="cb56-17"><a href="#cb56-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -5 x cohort = 6    -0.6580 (0.9134)</span></span>
+<span id="cb56-18"><a href="#cb56-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -5 x cohort = 7    -0.3170 (0.6979)</span></span>
+<span id="cb56-19"><a href="#cb56-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -5 x cohort = 8    -0.2382 (0.4697)</span></span>
+<span id="cb56-20"><a href="#cb56-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -5 x cohort = 9     0.3015 (0.6042)</span></span>
+<span id="cb56-21"><a href="#cb56-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -5 x cohort = 10   -0.5648 (0.4632)</span></span>
+<span id="cb56-22"><a href="#cb56-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -4 x cohort = 5    -0.9835 (0.6345)</span></span>
+<span id="cb56-23"><a href="#cb56-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; year = -4 x cohort = 6     0.3604 (0.8583)</span></span>
+<span id="cb56-24"><a href="#cb56-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb56-25"><a href="#cb56-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 </div>
 </div>
 </div>
@@ -1553,13 +1571,13 @@ div.tocify {
 <span id="cb58-12"><a href="#cb58-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
 <span id="cb58-13"><a href="#cb58-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
 <span id="cb58-14"><a href="#cb58-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; RMSE: 0.30128   Adj. R2: 0.862108</span></span></code></pre></div>
-<p>The function <code>xpd</code> also accepts regular expression macros of the form <code>..(&quot;regex&quot;)</code>. If these macros are encountered and provided a character vector/data.frame is in the argument <code>data</code>, then all variables names matching the regular expression will be placed in the formula.</p>
+<p>The function <code>xpd</code> also accepts regular expression macros of the form <code>regex(&quot;regex&quot;)</code>. If these macros are encountered and provided a character vector/data.frame is in the argument <code>data</code>, then all variables names matching the regular expression will be placed in the formula.</p>
 <div class="sourceCode" id="cb59"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(longley)</span>
-<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="fu">xpd</span>(Armed.Forces <span class="sc">~</span> Population <span class="sc">+</span> <span class="fu">..</span>(<span class="st">&quot;GNP|ployed&quot;</span>), <span class="at">data =</span> longley)</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="fu">xpd</span>(Armed.Forces <span class="sc">~</span> Population <span class="sc">+</span> <span class="fu">regex</span>(<span class="st">&quot;GNP|ployed&quot;</span>), <span class="at">data =</span> longley)</span>
 <span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Armed.Forces ~ Population + GNP.deflator + GNP + Unemployed + </span></span>
 <span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     Employed</span></span></code></pre></div>
 <p>Again, since <code>xpd</code> is called internally, the following works:</p>
-<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="fu">feols</span>(Armed.Forces <span class="sc">~</span> Population <span class="sc">+</span> <span class="fu">..</span>(<span class="st">&quot;GNP|ployed&quot;</span>), longley)</span>
+<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="fu">feols</span>(Armed.Forces <span class="sc">~</span> Population <span class="sc">+</span> <span class="fu">regex</span>(<span class="st">&quot;GNP|ployed&quot;</span>), longley)</span>
 <span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; OLS estimation, Dep. Var.: Armed.Forces</span></span>
 <span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations: 16 </span></span>
 <span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
@@ -1594,11 +1612,43 @@ div.tocify {
 <span id="cb61-15"><a href="#cb61-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
 <span id="cb61-16"><a href="#cb61-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; RMSE: 0.333482   Adj. R2: 0.832221</span></span></code></pre></div>
 <p>What just happened? When <code>.[]</code> is encountered in a formula, its value is evaluated and inserted verbatim in the formula. Further, when the value in brackets is a vector, as many variables are added in the model. That’s why <code>x.[i]</code> led to <code>x2 + x3</code>. Of course, numbers can be used directly: <code>x.[2:3]</code> would have led to the same result.</p>
-<p>Variable names in which <code>.[]</code> is in the middle of the name can also be created, but the use of macros is then mandatory:</p>
-<div class="sourceCode" id="cb62"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>i <span class="ot">=</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span></span>
-<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="fu">xpd</span>(y <span class="sc">~</span> ..x, <span class="at">..x =</span> <span class="st">&quot;x.[i]_sq&quot;</span>)</span>
-<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; y ~ x1_sq + x2_sq + x3_sq + x4_sq + x5_sq</span></span></code></pre></div>
-<p>The use of a character string is mandatory here to avoid formula parsing problems.</p>
+<p>Variable names in which <code>.[]</code> is in the middle of the name can also be created, but it has to be nested:</p>
+<div class="sourceCode" id="cb62"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>i <span class="ot">=</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="fu">xpd</span>(y <span class="sc">~</span> .[<span class="st">&quot;x.[i]_sq&quot;</span>])</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; y ~ x1_sq + x2_sq + x3_sq</span></span></code></pre></div>
+<p>How does it work? <code>.[stuff]</code> evaluates <code>stuff</code> and if stuff is a string literal, the function <code>dsb</code>, which expands anything in <code>.[]</code>, is applied. In the previous example, <code>dsb(&quot;x.[i]_sq&quot;)</code> leads to the vector <code>c(&quot;x1_sq&quot;, &quot;x2_sq&quot;, &quot;x3_sq&quot;)</code>. Then vector is then aggregated with a sum due to the initial <code>.[]</code>, leading to <code>x1_sq + x2_sq + x3_sq</code> being inserted in the formula.</p>
+<p>By default, when <code>stuff</code> is a vector, the aggregation is done with a sum. But in some instances, it can be interesting to aggregate with commas: e.g. when you want to perform a stepwise estimation. To summon comma-aggregation, place a comma right after the opening square bracket. Here’s an example:</p>
+<div class="sourceCode" id="cb63"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(<span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">csw</span>(x.[, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]), base))</span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                           model 1            model 2             model 3</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                 y                  y                   y</span></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                         </span></span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)     6.526*** (0.4789)  2.249*** (0.2480)   1.856*** (0.2508)</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1               -0.2234 (0.1551) 0.5955*** (0.0693)  0.6508*** (0.0667)</span></span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x2                                0.4719*** (0.0171)  0.7091*** (0.0567)</span></span>
+<span id="cb63-8"><a href="#cb63-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x3                                                   -0.5565*** (0.1275)</span></span>
+<span id="cb63-9"><a href="#cb63-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; _______________ _________________ __________________ ___________________</span></span>
+<span id="cb63-10"><a href="#cb63-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E. type                     IID                IID                 IID</span></span>
+<span id="cb63-11"><a href="#cb63-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                  150                150                 150</span></span>
+<span id="cb63-12"><a href="#cb63-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                        0.01382            0.84018             0.85861</span></span>
+<span id="cb63-13"><a href="#cb63-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                   0.00716            0.83800             0.85571</span></span>
+<span id="cb63-14"><a href="#cb63-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb63-15"><a href="#cb63-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
+<p>Finally, there is a special shortcut to facilitate multiple estimations with variable names stored in a vector. If <code>vars</code> is a vector of variable names, just use <code>.[vars]</code> in the LHS to perform a multiple estimation:</p>
+<div class="sourceCode" id="cb64"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a>vars <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;x1&quot;</span>, <span class="st">&quot;x2&quot;</span>, <span class="st">&quot;x3&quot;</span>) <span class="co"># Equiv. to: dsb(&quot;x.[1:3]&quot;)</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(<span class="fu">feols</span>(.[vars] <span class="sc">~</span> <span class="fu">i</span>(species), base))</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                  model 1           model 2            model 3</span></span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                       x1                x2                 x3</span></span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                              </span></span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)            3.428*** (0.0480) 1.462*** (0.0609) 0.2460*** (0.0289)</span></span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; species = versicolor -0.6580*** (0.0679) 2.798*** (0.0861)  1.080*** (0.0409)</span></span>
+<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; species = virginica  -0.4540*** (0.0679) 4.090*** (0.0861)  1.780*** (0.0409)</span></span>
+<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ____________________ ___________________ _________________ __________________</span></span>
+<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E. type                            IID               IID                IID</span></span>
+<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                         150               150                150</span></span>
+<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                               0.40078           0.94137            0.92888</span></span>
+<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                          0.39263           0.94057            0.92792</span></span>
+<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 </div>
 </div>
 <div id="lagging-variables" class="section level2" number="5.2">
@@ -1608,23 +1658,25 @@ div.tocify {
 <h3><span class="header-section-number">5.2.1</span> Lagging variables in an estimation</h3>
 <p>There are two ways to provide leads and/or lags in a <code>fixest</code> estimation. Either “on-the-fly” by using the argument <code>panel.id</code>, either by setting up a panel data set with the function <code>panel</code> (useful if you run multiple models needing lags and/or leads), described in the next subsection.</p>
 <p>To set up the panel on-the-fly, you need to use the <code>panel.id</code> argument, which will give you access to the functions <code>f</code> and <code>l</code> to create leads and lags, respectively. Let’s give an example, using the previous data set, where we use lags and leads of the explanatory and dependent variables.</p>
-<div class="sourceCode" id="cb63"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a>est1 <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
-<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>est2 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">f</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="sc">-</span><span class="dv">1</span><span class="sc">:</span><span class="dv">1</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
-<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>est3 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">l</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
-<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est1, est2, est3, <span class="at">order =</span> <span class="st">&quot;f&quot;</span>, <span class="at">drop =</span> <span class="st">&quot;Int&quot;</span>)</span>
-<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                               est1               est2               est3</span></span>
-<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                  y             f(y,1)             l(y,1)</span></span>
-<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                         </span></span>
-<span id="cb63-8"><a href="#cb63-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(x1,1)                            0.9940*** (0.0542)                   </span></span>
-<span id="cb63-9"><a href="#cb63-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1              0.9948*** (0.0487)    0.0081 (0.0592)   -0.0534 (0.0545)</span></span>
-<span id="cb63-10"><a href="#cb63-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,1)            0.0410 (0.0558)    0.0157 (0.0640) 0.9871*** (0.0551)</span></span>
-<span id="cb63-11"><a href="#cb63-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,2)                                                  0.0220 (0.0580)</span></span>
-<span id="cb63-12"><a href="#cb63-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,3)                                                  0.0102 (0.0639)</span></span>
-<span id="cb63-13"><a href="#cb63-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; _______________ __________________ __________________ __________________</span></span>
-<span id="cb63-14"><a href="#cb63-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id             by: id</span></span>
-<span id="cb63-15"><a href="#cb63-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                   972                864                756</span></span>
-<span id="cb63-16"><a href="#cb63-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.26558            0.25697            0.25875</span></span>
-<span id="cb63-17"><a href="#cb63-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                    0.26406            0.25438            0.25480</span></span></code></pre></div>
+<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>est1 <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>est2 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">f</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="sc">-</span><span class="dv">1</span><span class="sc">:</span><span class="dv">1</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a>est3 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">l</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span>), base_did, <span class="at">panel.id =</span> <span class="sc">~</span>id<span class="sc">+</span>period)</span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est1, est2, est3, <span class="at">order =</span> <span class="st">&quot;f&quot;</span>, <span class="at">drop =</span> <span class="st">&quot;Int&quot;</span>)</span>
+<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                               est1               est2               est3</span></span>
+<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                  y             f(y,1)             l(y,1)</span></span>
+<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                         </span></span>
+<span id="cb65-8"><a href="#cb65-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(x1,1)                            0.9940*** (0.0542)                   </span></span>
+<span id="cb65-9"><a href="#cb65-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1              0.9948*** (0.0487)    0.0081 (0.0592)   -0.0534 (0.0545)</span></span>
+<span id="cb65-10"><a href="#cb65-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,1)            0.0410 (0.0558)    0.0157 (0.0640) 0.9871*** (0.0551)</span></span>
+<span id="cb65-11"><a href="#cb65-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,2)                                                  0.0220 (0.0580)</span></span>
+<span id="cb65-12"><a href="#cb65-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,3)                                                  0.0102 (0.0639)</span></span>
+<span id="cb65-13"><a href="#cb65-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; _______________ __________________ __________________ __________________</span></span>
+<span id="cb65-14"><a href="#cb65-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id             by: id</span></span>
+<span id="cb65-15"><a href="#cb65-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                   972                864                756</span></span>
+<span id="cb65-16"><a href="#cb65-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.26558            0.25697            0.25875</span></span>
+<span id="cb65-17"><a href="#cb65-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                    0.26406            0.25438            0.25480</span></span>
+<span id="cb65-18"><a href="#cb65-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb65-19"><a href="#cb65-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>First of all, the value of <code>panel.id</code> corresponds to panel identifiers: first comes the variable identifying the panel-individuals, then comes the variables identifying the time. In the example, the <code>panel.id</code> came in the form of a one-sided formula, but it could equivalently be equal to <code>panel.id = c(&quot;id&quot;, &quot;period&quot;)</code> or <code>panel.id = &quot;id,period&quot;</code>.</p>
 <p>As we can see, in the first estimation, a lag is created with the function <code>l</code>. The second argument of the function consists of a vector giving the lags we want. In this case, <code>l(x1, 0:1)</code> means we want <code>x1</code> and the first lag of <code>x1</code>. This argument accepts negative values which give leads, as shown in the second estimation where <code>l(x1, -1:1)</code> means that we want the first lead of <code>x1</code>, <code>x1</code>, then its first lag. In this example, we also use the first lead of <code>y</code> as a dependent variable with <code>f(y)</code>.</p>
 </div>
@@ -1632,70 +1684,72 @@ div.tocify {
 <h3><span class="header-section-number">5.2.2</span> Setting up a panel data set</h3>
 <p>You can set up a panel data set with the function <code>panel</code>. There are between two and three advantages of doing so. First, if you have to estimate many models with leads and/or lags, setting up a panel gives you access to the lagging functions, <code>f</code> and <code>l</code>, without having to provide the <code>panel.id</code> argument we’ve seen in the previous subsection. Second, even when you estimate models with a sub-selection of the panel data, the data set is still a proper panel, meaning you can still use the lagging functions. Finally, and only if you are a <code>data.table</code> user, you can use the lagging functions to create new variables.</p>
 <p>Let’s repeat the previous example, now with a panel data set:</p>
-<div class="sourceCode" id="cb64"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co"># setting up the panel</span></span>
-<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>pdat <span class="ot">=</span> <span class="fu">panel</span>(base_did, <span class="sc">~</span>id <span class="sc">+</span> period)</span>
-<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Now the panel.id argument is not required</span></span>
-<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>est1 <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), pdat)</span>
-<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>est2 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">f</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="sc">-</span><span class="dv">1</span><span class="sc">:</span><span class="dv">1</span>), pdat)</span>
-<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a><span class="co"># You can use sub selections of the panel data</span></span>
-<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a>est_sub <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), pdat[<span class="sc">!</span>pdat<span class="sc">$</span>period <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>)])</span>
-<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est1, est2, est_sub, <span class="at">order =</span> <span class="st">&quot;f&quot;</span>, <span class="at">drop =</span> <span class="st">&quot;Int&quot;</span>)</span>
-<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                               est1               est2           est_sub</span></span>
-<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                  y             f(y,1)                 y</span></span>
-<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                        </span></span>
-<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(x1,1)                            0.9940*** (0.0542)                  </span></span>
-<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1              0.9948*** (0.0487)    0.0081 (0.0592) 1.013*** (0.0707)</span></span>
-<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,1)            0.0410 (0.0558)    0.0157 (0.0640)  -0.0063 (0.0779)</span></span>
-<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; _______________ __________________ __________________ _________________</span></span>
-<span id="cb64-16"><a href="#cb64-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id            by: id</span></span>
-<span id="cb64-17"><a href="#cb64-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                   972                864               540</span></span>
-<span id="cb64-18"><a href="#cb64-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.26558            0.25697           0.26258</span></span>
-<span id="cb64-19"><a href="#cb64-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                    0.26406            0.25438           0.25983</span></span></code></pre></div>
+<div class="sourceCode" id="cb66"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="co"># setting up the panel</span></span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a>pdat <span class="ot">=</span> <span class="fu">panel</span>(base_did, <span class="sc">~</span>id <span class="sc">+</span> period)</span>
+<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Now the panel.id argument is not required</span></span>
+<span id="cb66-4"><a href="#cb66-4" aria-hidden="true" tabindex="-1"></a>est1 <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), pdat)</span>
+<span id="cb66-5"><a href="#cb66-5" aria-hidden="true" tabindex="-1"></a>est2 <span class="ot">=</span> <span class="fu">feols</span>(<span class="fu">f</span>(y) <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="sc">-</span><span class="dv">1</span><span class="sc">:</span><span class="dv">1</span>), pdat)</span>
+<span id="cb66-6"><a href="#cb66-6" aria-hidden="true" tabindex="-1"></a><span class="co"># You can use sub selections of the panel data</span></span>
+<span id="cb66-7"><a href="#cb66-7" aria-hidden="true" tabindex="-1"></a>est_sub <span class="ot">=</span> <span class="fu">feols</span>(y <span class="sc">~</span> <span class="fu">l</span>(x1, <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>), pdat[<span class="sc">!</span>pdat<span class="sc">$</span>period <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>)])</span>
+<span id="cb66-8"><a href="#cb66-8" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est1, est2, est_sub, <span class="at">order =</span> <span class="st">&quot;f&quot;</span>, <span class="at">drop =</span> <span class="st">&quot;Int&quot;</span>)</span>
+<span id="cb66-9"><a href="#cb66-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                               est1               est2           est_sub</span></span>
+<span id="cb66-10"><a href="#cb66-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Dependent Var.:                  y             f(y,1)                 y</span></span>
+<span id="cb66-11"><a href="#cb66-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;                                                                        </span></span>
+<span id="cb66-12"><a href="#cb66-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; f(x1,1)                            0.9940*** (0.0542)                  </span></span>
+<span id="cb66-13"><a href="#cb66-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; x1              0.9948*** (0.0487)    0.0081 (0.0592) 1.013*** (0.0707)</span></span>
+<span id="cb66-14"><a href="#cb66-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; l(x1,1)            0.0410 (0.0558)    0.0157 (0.0640)  -0.0063 (0.0779)</span></span>
+<span id="cb66-15"><a href="#cb66-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; _______________ __________________ __________________ _________________</span></span>
+<span id="cb66-16"><a href="#cb66-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; S.E.: Clustered             by: id             by: id            by: id</span></span>
+<span id="cb66-17"><a href="#cb66-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations                   972                864               540</span></span>
+<span id="cb66-18"><a href="#cb66-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; R2                         0.26558            0.25697           0.26258</span></span>
+<span id="cb66-19"><a href="#cb66-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Adj. R2                    0.26406            0.25438           0.25983</span></span>
+<span id="cb66-20"><a href="#cb66-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb66-21"><a href="#cb66-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes: 0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
 <p>Last, if you also use <code>data.table</code>, let’s give an example of lead/lag creation:</p>
-<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
-<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>pdat_dt <span class="ot">=</span> <span class="fu">panel</span>(<span class="fu">as.data.table</span>(base_did), <span class="sc">~</span>id<span class="sc">+</span>period)</span>
-<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
-<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a>pdat_dt[, x1_l1 <span class="sc">:</span><span class="er">=</span> <span class="fu">l</span>(x1)]</span>
-<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
-<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Now </span></span>
-<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a>pdat_dt[, <span class="fu">c</span>(<span class="st">&quot;x1_l1_fill0&quot;</span>, <span class="st">&quot;y_f2&quot;</span>) <span class="sc">:</span><span class="er">=</span> .(<span class="fu">l</span>(x1, <span class="at">fill =</span> <span class="dv">0</span>), <span class="fu">f</span>(y, <span class="dv">2</span>))]</span>
-<span id="cb65-8"><a href="#cb65-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
-<span id="cb65-9"><a href="#cb65-9" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(pdat_dt)</span>
-<span id="cb65-10"><a href="#cb65-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              y         x1 id period post treat      x1_l1 x1_l1_fill0</span></span>
-<span id="cb65-11"><a href="#cb65-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1:  2.87530627  0.5365377  1      1    0     1         NA   0.0000000</span></span>
-<span id="cb65-12"><a href="#cb65-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2:  1.86065272 -3.0431894  1      2    0     1  0.5365377   0.5365377</span></span>
-<span id="cb65-13"><a href="#cb65-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3:  0.09416524  5.5768439  1      3    0     1 -3.0431894  -3.0431894</span></span>
-<span id="cb65-14"><a href="#cb65-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4:  3.78147485 -2.8300587  1      4    0     1  5.5768439   5.5768439</span></span>
-<span id="cb65-15"><a href="#cb65-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5: -2.55819959 -5.0443544  1      5    0     1 -2.8300587  -2.8300587</span></span>
-<span id="cb65-16"><a href="#cb65-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6:  1.72873240 -0.6363849  1      6    1     1 -5.0443544  -5.0443544</span></span>
-<span id="cb65-17"><a href="#cb65-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           y_f2</span></span>
-<span id="cb65-18"><a href="#cb65-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1:  0.09416524</span></span>
-<span id="cb65-19"><a href="#cb65-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2:  3.78147485</span></span>
-<span id="cb65-20"><a href="#cb65-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3: -2.55819959</span></span>
-<span id="cb65-21"><a href="#cb65-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4:  1.72873240</span></span>
-<span id="cb65-22"><a href="#cb65-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5:  6.28423629</span></span>
-<span id="cb65-23"><a href="#cb65-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6:  4.76688778</span></span></code></pre></div>
+<div class="sourceCode" id="cb67"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>pdat_dt <span class="ot">=</span> <span class="fu">panel</span>(<span class="fu">as.data.table</span>(base_did), <span class="sc">~</span>id<span class="sc">+</span>period)</span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a>pdat_dt[, x1_l1 <span class="sc">:</span><span class="er">=</span> <span class="fu">l</span>(x1)]</span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Now </span></span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a>pdat_dt[, <span class="fu">c</span>(<span class="st">&quot;x1_l1_fill0&quot;</span>, <span class="st">&quot;y_f2&quot;</span>) <span class="sc">:</span><span class="er">=</span> .(<span class="fu">l</span>(x1, <span class="at">fill =</span> <span class="dv">0</span>), <span class="fu">f</span>(y, <span class="dv">2</span>))]</span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb67-9"><a href="#cb67-9" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(pdat_dt)</span>
+<span id="cb67-10"><a href="#cb67-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              y         x1 id period post treat      x1_l1 x1_l1_fill0</span></span>
+<span id="cb67-11"><a href="#cb67-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1:  2.87530627  0.5365377  1      1    0     1         NA   0.0000000</span></span>
+<span id="cb67-12"><a href="#cb67-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2:  1.86065272 -3.0431894  1      2    0     1  0.5365377   0.5365377</span></span>
+<span id="cb67-13"><a href="#cb67-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3:  0.09416524  5.5768439  1      3    0     1 -3.0431894  -3.0431894</span></span>
+<span id="cb67-14"><a href="#cb67-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4:  3.78147485 -2.8300587  1      4    0     1  5.5768439   5.5768439</span></span>
+<span id="cb67-15"><a href="#cb67-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5: -2.55819959 -5.0443544  1      5    0     1 -2.8300587  -2.8300587</span></span>
+<span id="cb67-16"><a href="#cb67-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6:  1.72873240 -0.6363849  1      6    1     1 -5.0443544  -5.0443544</span></span>
+<span id="cb67-17"><a href="#cb67-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           y_f2</span></span>
+<span id="cb67-18"><a href="#cb67-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1:  0.09416524</span></span>
+<span id="cb67-19"><a href="#cb67-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2:  3.78147485</span></span>
+<span id="cb67-20"><a href="#cb67-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3: -2.55819959</span></span>
+<span id="cb67-21"><a href="#cb67-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4:  1.72873240</span></span>
+<span id="cb67-22"><a href="#cb67-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5:  6.28423629</span></span>
+<span id="cb67-23"><a href="#cb67-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6:  4.76688778</span></span></code></pre></div>
 </div>
 <div id="creating-laglead-variables" class="section level3" number="5.2.3">
 <h3><span class="header-section-number">5.2.3</span> Creating lag/lead variables</h3>
 <p>If you just want to create a single lag/lead variable, a simple and fast method has been implemented: <code>lag.formula</code>. Let’s give an example:</p>
-<div class="sourceCode" id="cb66"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a>base_lag <span class="ot">=</span> base_did</span>
-<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
-<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a>base_lag<span class="sc">$</span>x1.l1 <span class="ot">=</span> <span class="fu">lag</span>(x1 <span class="sc">~</span> id <span class="sc">+</span> period, <span class="dv">1</span>, base_lag)</span>
-<span id="cb66-4"><a href="#cb66-4" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(base_lag)</span>
-<span id="cb66-5"><a href="#cb66-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             y         x1 id period post treat      x1.l1</span></span>
-<span id="cb66-6"><a href="#cb66-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1  2.87530627  0.5365377  1      1    0     1         NA</span></span>
-<span id="cb66-7"><a href="#cb66-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2  1.86065272 -3.0431894  1      2    0     1  0.5365377</span></span>
-<span id="cb66-8"><a href="#cb66-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3  0.09416524  5.5768439  1      3    0     1 -3.0431894</span></span>
-<span id="cb66-9"><a href="#cb66-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4  3.78147485 -2.8300587  1      4    0     1  5.5768439</span></span>
-<span id="cb66-10"><a href="#cb66-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5 -2.55819959 -5.0443544  1      5    0     1 -2.8300587</span></span>
-<span id="cb66-11"><a href="#cb66-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6  1.72873240 -0.6363849  1      6    1     1 -5.0443544</span></span></code></pre></div>
+<div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a>base_lag <span class="ot">=</span> base_did</span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a>base_lag<span class="sc">$</span>x1.l1 <span class="ot">=</span> <span class="fu">lag</span>(x1 <span class="sc">~</span> id <span class="sc">+</span> period, <span class="dv">1</span>, base_lag)</span>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(base_lag)</span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             y         x1 id period post treat      x1.l1</span></span>
+<span id="cb68-6"><a href="#cb68-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 1  2.87530627  0.5365377  1      1    0     1         NA</span></span>
+<span id="cb68-7"><a href="#cb68-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2  1.86065272 -3.0431894  1      2    0     1  0.5365377</span></span>
+<span id="cb68-8"><a href="#cb68-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3  0.09416524  5.5768439  1      3    0     1 -3.0431894</span></span>
+<span id="cb68-9"><a href="#cb68-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4  3.78147485 -2.8300587  1      4    0     1  5.5768439</span></span>
+<span id="cb68-10"><a href="#cb68-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5 -2.55819959 -5.0443544  1      5    0     1 -2.8300587</span></span>
+<span id="cb68-11"><a href="#cb68-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6  1.72873240 -0.6363849  1      6    1     1 -5.0443544</span></span></code></pre></div>
 <p>The first two arguments are mandatory. The formula informs on the variable to be lagged (on the left hand side), and the two panel identifiers. Note that the time index <strong>must</strong> appear second. The second argument tells how much lags we want. Using negative values gives leads. Finally the last argument informs on where to find the variables.</p>
 <p>In case you use the popular package <code>data.table</code>, you can create lagged variables very simply:</p>
-<div class="sourceCode" id="cb67"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
-<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>base_lag_dt <span class="ot">=</span> <span class="fu">as.data.table</span>(base_did)</span>
-<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
-<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a>base_lag_dt[, x1.l1 <span class="sc">:</span><span class="er">=</span> <span class="fu">lag</span>(x1 <span class="sc">~</span> id <span class="sc">+</span> period, <span class="dv">1</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb69"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>base_lag_dt <span class="ot">=</span> <span class="fu">as.data.table</span>(base_did)</span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a><span class="co"># we create a lagged value of the variable x1</span></span>
+<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a>base_lag_dt[, x1.l1 <span class="sc">:</span><span class="er">=</span> <span class="fu">lag</span>(x1 <span class="sc">~</span> id <span class="sc">+</span> period, <span class="dv">1</span>)]</span></code></pre></div>
 </div>
 </div>
 <div id="non-linear-in-parameters-example" class="section level2" number="5.3">
@@ -1705,28 +1759,28 @@ div.tocify {
 <p>In fact, this type of model is non-linear in the context of a Poisson model because the sum is embedded within the log:</p>
 <p><span class="math inline">\(E\left(z_i\right) = \exp\left(\log\left(a\times x_i + b\times y_i\right)\right)\)</span>.</p>
 <p>So let’s estimate such a relation. (Note that you can estimate this relation with GLM and identity link, but I carry on for the example.) First we generate the data:</p>
-<div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Generating data:</span></span>
-<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a>n <span class="ot">=</span> <span class="dv">1000</span></span>
-<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a><span class="co"># x and y: two positive random variables</span></span>
-<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a>x <span class="ot">=</span> <span class="fu">rnorm</span>(n, <span class="dv">1</span>, <span class="dv">5</span>)<span class="sc">**</span><span class="dv">2</span></span>
-<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>y <span class="ot">=</span> <span class="fu">rnorm</span>(n, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">5</span>)<span class="sc">**</span><span class="dv">2</span></span>
-<span id="cb68-6"><a href="#cb68-6" aria-hidden="true" tabindex="-1"></a><span class="co"># E(z) = 2*x + 3*y and some noise</span></span>
-<span id="cb68-7"><a href="#cb68-7" aria-hidden="true" tabindex="-1"></a>z <span class="ot">=</span> <span class="fu">rpois</span>(n, <span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> <span class="dv">3</span><span class="sc">*</span>y) <span class="sc">+</span> <span class="fu">rpois</span>(n, <span class="dv">1</span>)</span>
-<span id="cb68-8"><a href="#cb68-8" aria-hidden="true" tabindex="-1"></a>base <span class="ot">=</span> <span class="fu">data.frame</span>(x, y, z)</span></code></pre></div>
+<div class="sourceCode" id="cb70"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Generating data:</span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>n <span class="ot">=</span> <span class="dv">1000</span></span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a><span class="co"># x and y: two positive random variables</span></span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a>x <span class="ot">=</span> <span class="fu">rnorm</span>(n, <span class="dv">1</span>, <span class="dv">5</span>)<span class="sc">**</span><span class="dv">2</span></span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a>y <span class="ot">=</span> <span class="fu">rnorm</span>(n, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">5</span>)<span class="sc">**</span><span class="dv">2</span></span>
+<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a><span class="co"># E(z) = 2*x + 3*y and some noise</span></span>
+<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a>z <span class="ot">=</span> <span class="fu">rpois</span>(n, <span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> <span class="dv">3</span><span class="sc">*</span>y) <span class="sc">+</span> <span class="fu">rpois</span>(n, <span class="dv">1</span>)</span>
+<span id="cb70-8"><a href="#cb70-8" aria-hidden="true" tabindex="-1"></a>base <span class="ot">=</span> <span class="fu">data.frame</span>(x, y, z)</span></code></pre></div>
 <p>To estimate the non-linear relationship, we need to use the argument <code>NL.fml</code> where we put the non-linear part. We also have to provide starting values with the argument <code>NL.start</code>. Finally, to ensure the RHS can be evaluated in any situation, we add lower bounds for the parameters with the argument <code>lower</code>.</p>
-<div class="sourceCode" id="cb69"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a>result_NL <span class="ot">=</span> <span class="fu">feNmlm</span>(z<span class="sc">~</span><span class="dv">0</span>, base, <span class="at">NL.fml =</span> <span class="sc">~</span> <span class="fu">log</span>(a<span class="sc">*</span>x <span class="sc">+</span> b<span class="sc">*</span>y), <span class="at">NL.start =</span> <span class="fu">list</span>(<span class="at">a=</span><span class="dv">1</span>, <span class="at">b=</span><span class="dv">1</span>), <span class="at">lower =</span> <span class="fu">list</span>(<span class="at">a=</span><span class="dv">0</span>, <span class="at">b=</span><span class="dv">0</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb71"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>result_NL <span class="ot">=</span> <span class="fu">feNmlm</span>(z<span class="sc">~</span><span class="dv">0</span>, base, <span class="at">NL.fml =</span> <span class="sc">~</span> <span class="fu">log</span>(a<span class="sc">*</span>x <span class="sc">+</span> b<span class="sc">*</span>y), <span class="at">NL.start =</span> <span class="fu">list</span>(<span class="at">a=</span><span class="dv">1</span>, <span class="at">b=</span><span class="dv">1</span>), <span class="at">lower =</span> <span class="fu">list</span>(<span class="at">a=</span><span class="dv">0</span>, <span class="at">b=</span><span class="dv">0</span>))</span></code></pre></div>
 <p>Note that the arguments <code>NL.start</code> and <code>lower</code> are named lists. Setting <code>lower = list(a=0, b=0)</code> means that the optimization algorithm will never explore parameters for <span class="math inline">\(a\)</span> and <span class="math inline">\(b\)</span> that are lower than 0. The results obtained can be interpreted similarly to results with linear RHS. We can see them with a print:</p>
-<div class="sourceCode" id="cb70"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(result_NL)</span>
-<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Non-linear ML estimation, family = Poisson, Dep. Var.: z</span></span>
-<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations: 1,000 </span></span>
-<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
-<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   Estimate Std. Error t value  Pr(&gt;|t|)    </span></span>
-<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; a  2.02334   0.011217 180.383 &lt; 2.2e-16 ***</span></span>
-<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; b  3.02817   0.012684 238.736 &lt; 2.2e-16 ***</span></span>
-<span id="cb70-8"><a href="#cb70-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb70-9"><a href="#cb70-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
-<span id="cb70-10"><a href="#cb70-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Log-Likelihood: -3,596.8   Adj. Pseudo R2: 0.942674</span></span>
-<span id="cb70-11"><a href="#cb70-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;            BIC:  7,207.5     Squared Cor.: 0.993353</span></span></code></pre></div>
+<div class="sourceCode" id="cb72"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(result_NL)</span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Non-linear ML estimation, family = Poisson, Dep. Var.: z</span></span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Observations: 1,000 </span></span>
+<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
+<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   Estimate Std. Error t value  Pr(&gt;|t|)    </span></span>
+<span id="cb72-6"><a href="#cb72-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; a  2.02334   0.011217 180.383 &lt; 2.2e-16 ***</span></span>
+<span id="cb72-7"><a href="#cb72-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; b  3.02817   0.012684 238.736 &lt; 2.2e-16 ***</span></span>
+<span id="cb72-8"><a href="#cb72-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb72-9"><a href="#cb72-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb72-10"><a href="#cb72-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Log-Likelihood: -3,596.8   Adj. Pseudo R2: 0.942674</span></span>
+<span id="cb72-11"><a href="#cb72-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;            BIC:  7,207.5     Squared Cor.: 0.993353</span></span></code></pre></div>
 <p>We can see that we obtain coefficients close to the generating values.</p>
 <div id="adding-fixed-effects-to-non-linear-in-parameters-models" class="section level3" number="5.3.1">
 <h3><span class="header-section-number">5.3.1</span> Adding fixed-effects to non-linear in parameters models</h3>
@@ -1738,45 +1792,45 @@ div.tocify {
 <p><span class="math inline">\(\gamma_{k} \left( a\times x_i + b\times y_i \right) = \gamma_{k}^{\prime} \left(a^{\prime}\times x_i + b^{\prime}\times y_i \right),\forall i,k\)</span>.</p>
 <p>An example is <span class="math inline">\(\gamma^{\prime}_{k} = 2\times \gamma_k\)</span>, <span class="math inline">\(a^{\prime} = a/2\)</span> and <span class="math inline">\(b^{\prime} = b/2\)</span>. Thus estimating this relation directly will lead to a problem to uniquely identify the coefficients. To circumvent this problem, we just have to fix one of the coefficient, this will ensure that we uniquely identify them.</p>
 <p>Let’s generate this relation:</p>
-<div class="sourceCode" id="cb71"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the class of each observation</span></span>
-<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>id <span class="ot">=</span> <span class="fu">sample</span>(<span class="dv">20</span>, n, <span class="at">replace =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>base<span class="sc">$</span>id <span class="ot">=</span> id</span>
-<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a><span class="co"># the vector of fixed-effects</span></span>
-<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>gamma <span class="ot">=</span> <span class="fu">rnorm</span>(<span class="dv">20</span>)<span class="sc">**</span><span class="dv">2</span></span>
-<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a><span class="co"># the new vector z_bis</span></span>
-<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>z_bis <span class="ot">=</span> <span class="fu">rpois</span>(n, gamma[id] <span class="sc">*</span> (<span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> <span class="dv">3</span><span class="sc">*</span>y)) <span class="sc">+</span> <span class="fu">rpois</span>(n, <span class="dv">1</span>)</span>
-<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a>base<span class="sc">$</span>z_bis <span class="ot">=</span> z_bis</span></code></pre></div>
+<div class="sourceCode" id="cb73"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the class of each observation</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>id <span class="ot">=</span> <span class="fu">sample</span>(<span class="dv">20</span>, n, <span class="at">replace =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>base<span class="sc">$</span>id <span class="ot">=</span> id</span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a><span class="co"># the vector of fixed-effects</span></span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a>gamma <span class="ot">=</span> <span class="fu">rnorm</span>(<span class="dv">20</span>)<span class="sc">**</span><span class="dv">2</span></span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a><span class="co"># the new vector z_bis</span></span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a>z_bis <span class="ot">=</span> <span class="fu">rpois</span>(n, gamma[id] <span class="sc">*</span> (<span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> <span class="dv">3</span><span class="sc">*</span>y)) <span class="sc">+</span> <span class="fu">rpois</span>(n, <span class="dv">1</span>)</span>
+<span id="cb73-8"><a href="#cb73-8" aria-hidden="true" tabindex="-1"></a>base<span class="sc">$</span>z_bis <span class="ot">=</span> z_bis</span></code></pre></div>
 <p>Now we estimate it with the fixed-effects while fixing one of the coefficients (we fix <span class="math inline">\(a\)</span> to its true value but it could be any value):</p>
-<div class="sourceCode" id="cb72"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="co"># we add the fixed-effect in the formula</span></span>
-<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a>result_NL_fe <span class="ot">=</span> <span class="fu">feNmlm</span>(z_bis<span class="sc">~</span><span class="dv">0</span><span class="sc">|</span>id, base, <span class="at">NL.fml =</span> <span class="sc">~</span> <span class="fu">log</span>(<span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> b<span class="sc">*</span>y), <span class="at">NL.start =</span> <span class="fu">list</span>(<span class="at">b=</span><span class="dv">1</span>), <span class="at">lower =</span> <span class="fu">list</span>(<span class="at">b=</span><span class="dv">0</span>))</span>
-<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a><span class="co"># The coef should be around 3</span></span>
-<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a><span class="fu">coef</span>(result_NL_fe)</span>
-<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;        b </span></span>
-<span id="cb72-6"><a href="#cb72-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3.024891</span></span>
-<span id="cb72-7"><a href="#cb72-7" aria-hidden="true" tabindex="-1"></a><span class="co"># the gamma and the exponential of the fixed-effects should be similar</span></span>
-<span id="cb72-8"><a href="#cb72-8" aria-hidden="true" tabindex="-1"></a><span class="fu">rbind</span>(gamma, <span class="fu">exp</span>(<span class="fu">fixef</span>(result_NL_fe)<span class="sc">$</span>id[<span class="fu">as.character</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>)]))</span>
-<span id="cb72-9"><a href="#cb72-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              1         2         3         4           5        6          7</span></span>
-<span id="cb72-10"><a href="#cb72-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 2.679535 0.1707382 0.7294981 0.6375940 0.002920490 2.202472 0.08203791</span></span>
-<span id="cb72-11"><a href="#cb72-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       2.670332 0.1831774 0.7519754 0.6240016 0.008805172 2.220800 0.08548657</span></span>
-<span id="cb72-12"><a href="#cb72-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              8        9       10       11        12       13        14</span></span>
-<span id="cb72-13"><a href="#cb72-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 1.501218 1.262652 1.515043 1.681641 0.1949462 1.095457 1.0023382</span></span>
-<span id="cb72-14"><a href="#cb72-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       1.454965 1.276599 1.493300 1.705419 0.1975139 1.104186 0.9971681</span></span>
-<span id="cb72-15"><a href="#cb72-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              15       16        17        18        19        20</span></span>
-<span id="cb72-16"><a href="#cb72-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 0.3743722 2.606235 0.5238710 0.1428949 0.4871731 0.1550584</span></span>
-<span id="cb72-17"><a href="#cb72-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       0.3896577 2.609243 0.5372464 0.1433603 0.4910665 0.1629123</span></span></code></pre></div>
+<div class="sourceCode" id="cb74"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="co"># we add the fixed-effect in the formula</span></span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>result_NL_fe <span class="ot">=</span> <span class="fu">feNmlm</span>(z_bis<span class="sc">~</span><span class="dv">0</span><span class="sc">|</span>id, base, <span class="at">NL.fml =</span> <span class="sc">~</span> <span class="fu">log</span>(<span class="dv">2</span><span class="sc">*</span>x <span class="sc">+</span> b<span class="sc">*</span>y), <span class="at">NL.start =</span> <span class="fu">list</span>(<span class="at">b=</span><span class="dv">1</span>), <span class="at">lower =</span> <span class="fu">list</span>(<span class="at">b=</span><span class="dv">0</span>))</span>
+<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a><span class="co"># The coef should be around 3</span></span>
+<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a><span class="fu">coef</span>(result_NL_fe)</span>
+<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;        b </span></span>
+<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3.024891</span></span>
+<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a><span class="co"># the gamma and the exponential of the fixed-effects should be similar</span></span>
+<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a><span class="fu">rbind</span>(gamma, <span class="fu">exp</span>(<span class="fu">fixef</span>(result_NL_fe)<span class="sc">$</span>id[<span class="fu">as.character</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>)]))</span>
+<span id="cb74-9"><a href="#cb74-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              1         2         3         4           5        6          7</span></span>
+<span id="cb74-10"><a href="#cb74-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 2.679535 0.1707382 0.7294981 0.6375940 0.002920490 2.202472 0.08203791</span></span>
+<span id="cb74-11"><a href="#cb74-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       2.670332 0.1831774 0.7519754 0.6240016 0.008805172 2.220800 0.08548657</span></span>
+<span id="cb74-12"><a href="#cb74-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              8        9       10       11        12       13        14</span></span>
+<span id="cb74-13"><a href="#cb74-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 1.501218 1.262652 1.515043 1.681641 0.1949462 1.095457 1.0023382</span></span>
+<span id="cb74-14"><a href="#cb74-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       1.454965 1.276599 1.493300 1.705419 0.1975139 1.104186 0.9971681</span></span>
+<span id="cb74-15"><a href="#cb74-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;              15       16        17        18        19        20</span></span>
+<span id="cb74-16"><a href="#cb74-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; gamma 0.3743722 2.606235 0.5238710 0.1428949 0.4871731 0.1550584</span></span>
+<span id="cb74-17"><a href="#cb74-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       0.3896577 2.609243 0.5372464 0.1433603 0.4910665 0.1629123</span></span></code></pre></div>
 <p>As we can see, we obtain the “right” estimates.</p>
 </div>
 </div>
 <div id="multi-threading" class="section level2" number="5.4">
 <h2><span class="header-section-number">5.4</span> Multi-threading</h2>
 <p>The package <code>fixest</code> integrates multi-platform parallelism to hasten the estimation process. By default it makes use of 50% of all available threads. To change the number of threads used, just use the argument <code>nthreads</code>:</p>
-<div class="sourceCode" id="cb73"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sample of results:</span></span>
-<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 1 nthreads: 3.13s</span></span>
-<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">1</span>))</span>
-<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2 nthreads: 1.82s</span></span>
-<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">2</span>))</span>
-<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 4 nthreads: 1.17s</span></span>
-<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">4</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sample of results:</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 1 nthreads: 3.13s</span></span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">1</span>))</span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2 nthreads: 1.82s</span></span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">2</span>))</span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 4 nthreads: 1.17s</span></span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a><span class="fu">system.time</span>(<span class="fu">fenegbin</span>(Euros <span class="sc">~</span> <span class="fu">log</span>(dist_km)<span class="sc">|</span>Origin<span class="sc">+</span>Destination<span class="sc">+</span>Product<span class="sc">+</span>Year, trade, <span class="at">nthreads =</span> <span class="dv">4</span>))</span></code></pre></div>
 <p>As you can see, the efficiency of increasing the number of threads is not 1 to 1. Two threads do not divide the computing time by 2, nor four threads by 4. However it still reduces significantly the computing time, which might be valuable for large sample estimations.</p>
 <p>You can permanently set the number of threads used by <code>fixest</code> using <code>setFixest_nthreads(nthreads)</code>. Note that you can permanently set this number at the project level by using the argument save: <code>setFixest_nthreads(nthreads, save = TRUE)</code>. This way you won’t need to re-set the number of threads whenever you restart <em>R</em>.</p>
 </div>

@@ -10,7 +10,6 @@
 
 library(fixest)
 
-
 test = fixest:::test ; chunk = fixest:::chunk
 vcovClust = fixest:::vcovClust
 
@@ -231,6 +230,14 @@ res = feols(y ~ x1 | fe1^fe2 | x2 ~ x3, base)
 
 # IVs + lags
 res = feols(y ~ x1 | fe1^fe2 | l(x2, -1:1) ~ l(x3, -1:1), base, panel.id = ~ fe1 + period)
+
+# functions in interactions
+res = feols(y ~ x1 | factor(fe1)^factor(fe2), base)
+res = feols(y ~ x1 | round(x2^2), base)
+test(feols(y ~ x1 | factor(fe1^fe2), base), "err")
+
+res = feols(y ~ x1 | bin(x2, "bin::1")^fe1 + fe1^fe2, base)
+
 
 
 ####
@@ -650,6 +657,32 @@ m = summary(est, ssc = ssc(t.df = 5))
 
 test(m$coeftable[, 4], 2*pt(-abs(m$coeftable[, 3]), 5))
 
+#
+# feols.fit
+#
+
+
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+
+est = feols(y ~ x1 | species, base, vcov = "hete")
+est_fit = feols.fit(base$y, base$x1, base$species, vcov = "hete")
+
+test(se(est), se(est_fit))
+
+est = feols(y ~ x1 | species, base, cluster = base$species)
+est_fit = feols.fit(base$y, base$x1, base$species, cluster = base$species)
+
+test(se(est), se(est_fit))
+
+est = feols(y ~ x1 | species, base, vcov = "cluster")
+est_fit = feols.fit(base$y, base$x1, base$species, vcov = "cluster")
+
+test(se(est), se(est_fit))
+
+
+# error for the other VCOVs
+test(feols.fit(base$y, base$x1, base$species, vcov = "hac"), "err")
+test(feols.fit(base$y, base$x1, base$species, vcov = "conley"), "err")
 
 ####
 #### Residuals ####
@@ -1048,19 +1081,26 @@ test(X_dm_slopes[[1]], X_dm_slopes_bis)
 
 chunk("HATVALUES")
 
-set.seed(0)
-x = sin(1:10)
-y = rnorm(10)
-y_int = rpois(10, 2)
-fm  = lm(y ~ x)
-ffm = feols(y ~ x, data.frame(y, x))
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+base$y_int = as.integer(base$y)
+base$y_bin = 1 * (base$y > mean(base$y))
 
+fm  = lm(y ~ x1 + x2, base)
+ffm = feols(y ~ x1 + x2, base)
 test(hatvalues(ffm), hatvalues(fm))
 
-gm  = glm(y_int ~ x, family = poisson())
-fgm = fepois(y_int ~ x, data.frame(y_int, x))
+glm_poi  = glm(y_int ~ x1 + x2, family = poisson(), base)
+feglm_poi = fepois(y_int ~ x1 + x2, base)
+test(hatvalues(feglm_poi), hatvalues(glm_poi))
 
-test(hatvalues(fgm), hatvalues(gm))
+
+glm_logit  = glm(y_bin ~ x1 + x2, family = binomial(), base)
+feglm_logit = feglm(y_bin ~ x1 + x2, base, binomial())
+test(hatvalues(feglm_logit), hatvalues(glm_logit))
+
+glm_probit  = glm(y_bin ~ x1 + x2, family = binomial("probit"), base)
+feglm_probit = feglm(y_bin ~ x1 + x2, base, binomial("probit"))
+test(hatvalues(feglm_probit), hatvalues(glm_probit))
 
 
 ####
@@ -1124,6 +1164,15 @@ env = feNmlm(y ~ x1 + x2 | species, base, only.env = TRUE)
 feNmlm(env = env)
 
 
+# Now we check that modifications work as expected
+
+env = fepois(y ~ x1 + x2 | species, base, only.env = TRUE)
+est_w = fepois(y ~ x1 + x2 | species, base, weights = ~x3)
+
+assign("weights.value", base$x3, env)
+est_env_w = est_env(env = env)
+
+test(coef(est_w), coef(est_env_w))
 
 ####
 #### Non linear tests ####
@@ -1366,7 +1415,19 @@ test(head(predict(res)), predict(res, quoi))
 
 quoi$species = as.character(quoi$species)
 quoi$species[1:3] = "zz"
-test(head(predict(res)), predict(res, quoi))
+test(predict(res, quoi), "err")
+
+# combine FEs
+res = feols(y ~ x1 | species^fe_bis, base)
+test(predict(res), predict(res, base))
+
+# Handling NAs properly
+base_NA = data.frame(a = 1:5, b = c(3:6, NA),
+                     c = as.factor(c("a", "b", "a", "b", "a")))
+
+res = feols(a ~ b + c, base_NA)
+
+test(length(predict(res, newdata = base_NA)), 5)
 
 #
 # prediction with lags
@@ -1467,6 +1528,8 @@ base$fe_bis = sample(letters, 150, TRUE)
 base$x4 = rnorm(150)
 base$x1[sample(150, 5)] = NA
 
+fml = y ~ x1 + x2
+
 # Errors
 test(feols(fml, base, subset = ~species), "err")
 test(feols(fml, base, subset = -1:15), "err")
@@ -1558,7 +1621,7 @@ for(id_fun in 1:5){
     for(s in c("setosa", "versicolor", "virginica")){
         for(lhs in c("y1", "y2")){
             for(rhs in c("x2", "x3")){
-                res = estfun(xpd(..lhs ~ x1 + ..rhs, ..lhs = lhs, ..rhs = rhs), base[base$species == s, ], notes = FALSE)
+                res = estfun(.[lhs] ~ x1 + .[rhs], base[base$species == s, ], notes = FALSE)
 
                 test(coef(est_multi[[k]]), coef(res))
                 test(se(est_multi[[k]], cluster = "fe3"), se(res, cluster = "fe3"))
@@ -1592,6 +1655,48 @@ for(id_fun in 1:5){
     cat("|")
 }
 cat("\n")
+
+
+# No error tests
+# We test with IV + possible corner cases
+
+base$left = rnorm(150)
+base$right = rnorm(150)
+
+est_multi = feols(c(y1, y2) ~ sw0(x1) | sw0(species) | x2 ~ x3, base)
+
+# We check a few
+est_a = feols(y1 ~ 1 | x2 ~ x3, base)
+est_b = feols(y1 ~ x1 | species | x2 ~ x3, base)
+est_c = feols(y2 ~ 1 | x2 ~ x3, base)
+
+test(coef(est_multi[lhs = "y1", rhs = "^1", fixef = "1"]), coef(est_a))
+test(coef(est_multi[lhs = "y1", rhs = "x1", fixef = "spe"]), coef(est_b))
+test(coef(est_multi[lhs = "y2", rhs = "^1", fixef = "1"]), coef(est_c))
+
+# with fixed covariates
+est_multi_LR = feols(c(y1, y2) ~ left + sw0(x1*x4) + right | sw0(species) | x2 ~ x3, base)
+
+est_a = feols(y1 ~ left + right | x2 ~ x3, base)
+est_b = feols(y1 ~ left + x1*x4 + right | species | x2 ~ x3, base)
+est_c = feols(y2 ~ left + right | x2 ~ x3, base)
+
+test(coef(est_multi_LR[lhs = "y1", rhs = "!x1", fixef = "1"]), coef(est_a))
+user_name = c("fit_x2", "left", "x1", "x4", "x1:x4", "right")
+test(names(coef(est_multi_LR[lhs = "y1", rhs = "x1", fixef = "spe"])), user_name)
+test(coef(est_multi_LR[lhs = "y1", rhs = "x1", fixef = "spe"]), coef(est_b)[user_name])
+test(coef(est_multi_LR[lhs = "y2", rhs = "!x1", fixef = "1"]), coef(est_c))
+
+
+# mvsw
+
+est_mvsw = feols(y1 ~ mvsw(x1, x2), base)
+est_mvsw_fe = feols(y1 ~ mvsw(x1, x2) | mvsw(species, fe2), base)
+est_mvsw_fe_iv = feols(y1 ~ mvsw(x1, x2) | mvsw(species, fe2) | x3 ~ x4, base)
+
+test(length(est_mvsw), 4)
+test(length(as.list(est_mvsw_fe)), 16)
+test(length(as.list(est_mvsw_fe_iv)), 16)
 
 
 ####
@@ -1839,11 +1944,29 @@ test(coef(o1), coef(o2))
 test(feols(y ~ x1 + offset(x2), base, offset = ~x3), "err")
 
 
+####
+#### Only Coef ####
+####
+
+chunk("only.coef")
 
 
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+base$x4 = base$x1 + 5
 
+m = feols(y ~ x1 + x2 + x4, base, only.coef = TRUE)
+test(length(m), 4)
+test(sum(is.na(m)), 1)
 
+m = fepois(y ~ x1 + x2 + x4, base, only.coef = TRUE)
+test(length(m), 4)
+test(sum(is.na(m)), 1)
 
+m = femlm(y ~ x1 + x2, base, only.coef = TRUE)
+test(length(m), 3)
+test(sum(is.na(m)), 0)
+
+test(feols(y ~ sw(x1, x2), base, only.coef = TRUE), "err")
 
 
 

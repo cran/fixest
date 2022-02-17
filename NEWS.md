@@ -1,4 +1,207 @@
 
+# fixest 0.10.2
+
+## Bug fixes
+
+  - fix bug in stepwise estimations when two (stepwised) explanatory variables have exactly the same NAs values.
+
+  - fix display bug regarding factors in `etable` when `dict` was present.
+  
+  - fix bug `tablefoot.value` not working any more (reported by @resulumit [#224](https://github.com/lrberge/fixest/issues/224)).
+  
+  - fix possible environment problem when estimating non linear functions outside of the global environment.
+  
+  - fix bug in the stepwise functions `sw` and `csw` when they contained only one variable.
+  
+  - fix bug in `etable` preventing automatic headers to be displayed.
+  
+  - fix bug in `n_unik` preventing the auto completion of variable names.
+  
+  - fix bug in `fitstat` for the KPR statistic (reported by @etiennebacher [#161](https://github.com/lrberge/fixest/issues/161)).
+  
+  - fix bug in `i` when two factor variables were interacted and one specific value of one variable was to be set as a reference.
+  
+  - fix bug in `model.matrix` when no variable was used in the estimation (reported by @kylebutts [#229](https://github.com/lrberge/fixest/issues/229)).
+  
+  - `model.matrix` now returns the variables in the same order as in the estimation -- a discrepancy could happen in stepwise estimations with interactions in which the interactions were put *before* fixed covariates (related to @sergiu-burlacu [#231](https://github.com/lrberge/fixest/issues/231)).
+  
+  - fix bugs in `feglm.fit` prevented the VCOV to be computed (reported by @etiennebacher and @edrubin [#237](https://github.com/lrberge/fixest/issues/237))
+  
+  - fix bug in `predict` with variables created with `i()` leading to a prediction even for values not included in the original estimation (reported by @vincentarelbundock [#235](https://github.com/lrberge/fixest/issues/235)).
+  
+  - fix bug in multiple estimations when the data contains weights and there are missing values in the y's or X's (reported by @sahilchinoy [#263](https://github.com/lrberge/fixest/issues/263)).
+  
+  - fix bug multiverse stepwise when the estimation contains fixed-effects or IVs (reported by @resulumit [#260](https://github.com/lrberge/fixest/issues/260)).
+  
+  - fix bug in the startup message trigger.
+  
+  - increase the robustness of the code leading to the startup message (reported by @flycattt [#262](https://github.com/lrberge/fixest/issues/262)).
+  
+  - improve the robustness of the algorithm parsing the fixed-effects (linked to issue [#253](https://github.com/lrberge/fixest/issues/253)).
+  
+  - fix minor bug in the Cragg-Donald statistic.
+  
+  - fix peculiar problem on load when directories names end with ".R" (thanks to @kyleam [#271](https://github.com/lrberge/fixest/issues/271)).
+  
+  - remove remaining large items from GLM estimations with `lean = TRUE`.
+  
+  - fix bug in removing the singletons from several fixed-effects (reported by @johannesbubeck [#244](https://github.com/lrberge/fixest/issues/244)).
+  
+  - in rep.fixest: replace argument cluster with argument vcov to enable the use of any VCOV (related to [#258](https://github.com/lrberge/fixest/issues/258) by @ShunsukeMatsuno).
+  
+  - fix bug in predict, which automatically discarded NA values (reported by @ColinTB [#273](https://github.com/lrberge/fixest/issues/273)).
+  
+## etable
+
+#### New arguments
+
+ - new argument `view` to display the latex table in the viewer pane (suggestion by Or Avishay-Rizi [#227](https://github.com/lrberge/fixest/issues/227)). You need to a) have a working distribution of pdflatex, imagemagick and ghostscript, or b) have the R packages pdftools and tinytex installed, for this feature to work.
+ 
+ - new argument `view.cache` in `setFixest_etable`: whether to cache the PNGs generated.
+ 
+ - new argument `export` to export the Latex table in PNG to a file.
+ 
+ - new (experimental) argument `markdown`: Latex tables can be automatically integrated in the non-Latex markdown document in PNG format.
+ 
+ - new argument `div.class`. Linked to the `markdown` argument. In Rmarkdown documents, the table in PNG format is embedded in a `<div>` container. The class of the div is `div.class`, which is by default `"etable"`.
+ 
+ - new argument `tpt` to nest the table in a `threeparttable` environment. Notes are then nested into the `tablenotes` environment.
+ 
+ - in `style.tex`: new argument `notes.tpt.intro` to insert code right after the `tablenotes` environment and before any note (useful to set the font size of notes globally for instance).
+ 
+ - new argument `arraystretch` to set the height of the table rows.
+ 
+ - new argument `fontsize` which applies Latex font sizes to the table.
+ 
+ - new argument `adjustbox`: `adjustbox = TRUE` nests the tabular into an `adjustbox` environment with `width = \\textwidth, center` as default option. Use `adjustbox = x` with `x` a number giving the text-width. Use `adjustbox = "x th"` with `x` a number giving the text-height. Finally you can use a character string, as in `adjustbox = "my options"`, that will be passed verbatim as a an `adjustbox` option.
+ 
+ - new argument `highlight` to highlight the coefficients with a frame or by changing the row/cell color.
+ 
+ - new argument `coef.style` to apply an arbitrary style to one or several coefficients.
+ 
+ - in `style.tex`: new argument `rules_width` to easily set the width of the `booktabs` rules.
+ 
+ - in `style.tex`: new argument `caption.after` to insert code right after the caption.
+ 
+ - in `style.tex`: new argument `no_border` to remove the borders on the sides of the table.
+
+#### New features
+
+ - the quality of the tex output has been substantially improved.
+ 
+ - `signif.code` now replaces `signifCode` (retro compatibility ensured).
+ 
+ - `signifCode` is removed from `setFixest_etable`, and `signif.code` is added to both `style.tex` and `style.df` so that each style can have its own significance code defined globally.
+ 
+ - the object returned by `etable` are now of class `etable_tex` (when `tex = TRUE`) or `etable_df`, both types having their own printing method.
+  
+ - the significance codes are now displayed under the table when the output is a `data.frame`.
+ 
+ - in `headers`/`extralines`: `cmidrule` does not show up for empty column names any more.
+ 
+ - new markup: markdown-style markup (e.g. `**text**`) can be used to put text in italic/bold in almost anything in the table.
+ 
+ - `notes` can be set in the dictionary: useful for notes (like source for example) that gets repeated across tables.
+ 
+ - `line.top` and `line.bottom` now admit the values `simple` and `double`. The argument `line.bottom` now affects the "effective" end of table, irrespective of the value of `tablefoot`. This is more in line with intuition.
+ 
+ - improve the use of `tabularx`.
+ 
+ - automatic support `makecell`: any new lines found in names within the table will be translated with `makecell`. For example: `"The \n long \n varname"` is automatically translated into `\makecell{The \\ long \\ varname}`.
+ 
+## dsb
+
+ - completely new function `dsb()` to manipulate strings. Applies many low level string operations very easily. The syntax may be a bit disturbing at first, but, unlike French grammar, there's some logic behind!
+ 
+ - there are over 30 basic string operations available! Do complex string manipulations in a single call!
+
+```R
+# At first sight, it's impossible to understand what's going on.
+# But I assure you, it's pretty logical! 
+# Type dsb("--help") to get some help.
+
+dollar = 6
+reason = "glory"
+dsb("Why do you develop packages? For .[`dollar`*c!$]?",
+    "For money? No... for .[U,''s, c?reason]!", sep = "\n")
+#> Why do you develop packages? For $$$$$$?
+#> For money? No... for G L O R Y!
+```
+
+ - the dot square bracket operator in formulas now calls `dsb` when the calls are nested:
+```R
+xpd(~ sw(.[, "disp:.[/mpg, cyl]"]))
+#> ~sw(disp:mpg, disp:cyl)
+```
+
+## New argument in all estimations
+
+ - new argument `only.coef` in all estimation. If `TRUE`, then only the estimated coefficients are returned, which can be useful for MC experiments.
+ 
+## New functions
+
+- new function `est_env` to estimate a model from a `fixest` environment. Mostly useful to cut overheads in simulations.
+```R
+# First we get the environment (the estimation is not performed!)
+env = feols(mpg ~ disp + drat, mtcars, only.env = TRUE)
+
+# Then we estimate: we get the reult from feols(mpg ~ disp + drat, mtcars)
+
+est_env(env)
+#> OLS estimation, Dep. Var.: mpg
+#> Observations: 32 
+#> Standard-errors: IID 
+#>              Estimate Std. Error  t value   Pr(>|t|)    
+#> (Intercept) 21.844880   6.747971  3.23725 3.0167e-03 ** 
+#> disp        -0.035694   0.006653 -5.36535 9.1914e-06 ***
+#> drat         1.802027   1.542091  1.16856 2.5210e-01    
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> RMSE: 3.07661   Adj. R2: 0.712458
+
+# Why doing that? You can modify the env w/t incurring overheads
+
+assign("weights.value", mtcars$wt, env)
+# New estimation with weights
+est_env(env)
+#> OLS estimation, Dep. Var.: mpg
+#> Observations: 32 
+#> Standard-errors: IID 
+#>              Estimate Std. Error  t value   Pr(>|t|)    
+#> (Intercept) 21.967576   6.320006  3.47588 1.6241e-03 ** 
+#> disp        -0.032922   0.005884 -5.59478 4.8664e-06 ***
+#> drat         1.505517   1.470671  1.02369 3.1444e-01    
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> RMSE: 5.08781   Adj. R2: 0.709392
+```
+
+- new function `ref` which allows to re-factor variables on-the-fly. This function always returns a factor and relocates the values given in the argument as the first factor levels. It also allows to bin values, similarly to the function `bin`:
+```R
+# We want to place 5 in the first place
+ref(1:5, 5)
+#> [1] 1 2 3 4 5
+#> Levels: 5 1 2 3 4
+
+# You can also bin at the same time
+ref(1:5, .("4:5" = 4:5))
+#> [1] 1   2   3   4:5 4:5
+#> Levels: 4:5 1 2 3
+```
+
+ 
+## Other
+
+ - `bin`: `cut::` now ignores white spaces, so that `cut:: q1 ] q3 [` works appropriately.
+ 
+ - speed of stepwise estimations (using `sw` [not `csw`]) has been improved.
+ 
+ - recursive formula macro definitions are allowed (feature request by @turbanisch [#234](https://github.com/lrberge/fixest/issues/234)).
+ 
+ - the startup message does not pop in Rmarkdown documents any more.
+ 
+ - function `sample_df` gains the argument `previous` which recovers the previous draw.
+
 # fixest 0.10.1
 
 ## Bug fixes
@@ -24,44 +227,6 @@
  - fix bug `plot.fixef` not working for `fepois` (reported by @statzhero [#213](https://github.com/lrberge/fixest/issues/213)).
  
  - fix error message when the (wrong) argument `X` is used in `feols`.
- 
-## New features
-
- - when computing Newey-West standard-errors for time series, the bandwidth is now selected thanks to the [bwNeweyWest](https://sandwich.r-forge.r-project.org/reference/NeweyWest.html) function from the [sandwich](https://sandwich.r-forge.r-project.org/index.html) package. This function implements the method described in Newey and West 1994.
- 
- - add `type = "se_long"` to `summary.fixest_multi` which yields all coefficients and SEs for all estimations in a "long" format.
- 
- - only in `fixest` estimations, using a "naked" dot square bracket variable in the left-hand-side includes them as multiple left hand sides. Regular expressions can also be used in the LHS.
-```R
-base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
-y = c("y", "x1")
-feols(.[y] ~ x2, base)
-#> Standard-errors: IID 
-#> Dep. var.: y
-#>             Estimate Std. Error t value  Pr(>|t|)    
-#> (Intercept) 4.306603   0.078389 54.9389 < 2.2e-16 ***
-#> x2          0.408922   0.018891 21.6460 < 2.2e-16 ***
-#> ---
-#> Dep. var.: x1
-#>              Estimate Std. Error  t value   Pr(>|t|)    
-#> (Intercept)  3.454874   0.076095 45.40188  < 2.2e-16 ***
-#> x2          -0.105785   0.018339 -5.76845 4.5133e-08 ***
-
-
-etable(feols(..("x") ~ y + i(species), base))
-#>                                  model 1            model 2            model 3
-#> Dependent Var.:                       x1                 x2                 x3
-#>                                                                               
-#> (Intercept)            1.677*** (0.2354) -1.702*** (0.2301) -0.4794** (0.1557)
-#> y                     0.3499*** (0.0463) 0.6321*** (0.0453) 0.1449*** (0.0306)
-#> species = versicolor -0.9834*** (0.0721)  2.210*** (0.0705) 0.9452*** (0.0477)
-#> species = virginica   -1.008*** (0.0933)  3.090*** (0.0912)  1.551*** (0.0617)
-#> ____________________ ___________________ __________________ __________________
-#> S.E. type                            IID                IID                IID
-#> Observations                         150                150                150
-#> R2                               0.56925            0.97489            0.93833
-#> Adj. R2                          0.56040            0.97438            0.93706
-```
  
 ## Dot square bracket operator
 
@@ -184,13 +349,53 @@ Although a bit unrelated to the purpose of this package, these functions are so 
  
  - `sample_df`: simple function to extract random lines from a `data.frame`.
  
+## Other new features
+
+ - when computing Newey-West standard-errors for time series, the bandwidth is now selected thanks to the [bwNeweyWest](https://sandwich.r-forge.r-project.org/reference/NeweyWest.html) function from the [sandwich](https://sandwich.r-forge.r-project.org/index.html) package. This function implements the method described in Newey and West 1994.
+ 
+ - add `type = "se_long"` to `summary.fixest_multi` which yields all coefficients and SEs for all estimations in a "long" format.
+ 
+ - only in `fixest` estimations, using a "naked" dot square bracket variable in the left-hand-side includes them as multiple left hand sides. Regular expressions can also be used in the LHS.
+```R
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+y = c("y", "x1")
+feols(.[y] ~ x2, base)
+#> Standard-errors: IID 
+#> Dep. var.: y
+#>             Estimate Std. Error t value  Pr(>|t|)    
+#> (Intercept) 4.306603   0.078389 54.9389 < 2.2e-16 ***
+#> x2          0.408922   0.018891 21.6460 < 2.2e-16 ***
+#> ---
+#> Dep. var.: x1
+#>              Estimate Std. Error  t value   Pr(>|t|)    
+#> (Intercept)  3.454874   0.076095 45.40188  < 2.2e-16 ***
+#> x2          -0.105785   0.018339 -5.76845 4.5133e-08 ***
+
+
+etable(feols(..("x") ~ y + i(species), base))
+#>                                  model 1            model 2            model 3
+#> Dependent Var.:                       x1                 x2                 x3
+#>                                                                               
+#> (Intercept)            1.677*** (0.2354) -1.702*** (0.2301) -0.4794** (0.1557)
+#> y                     0.3499*** (0.0463) 0.6321*** (0.0453) 0.1449*** (0.0306)
+#> species = versicolor -0.9834*** (0.0721)  2.210*** (0.0705) 0.9452*** (0.0477)
+#> species = virginica   -1.008*** (0.0933)  3.090*** (0.0912)  1.551*** (0.0617)
+#> ____________________ ___________________ __________________ __________________
+#> S.E. type                            IID                IID                IID
+#> Observations                         150                150                150
+#> R2                               0.56925            0.97489            0.93833
+#> Adj. R2                          0.56040            0.97438            0.93706
+```
+ 
 ## Other
 
  - improve error messages when `subset` does not select any element.
  
+ - in `xpd` and `fixest` estimations, variables can be "grepped" from the data set with `regex("regex")`.
+ 
  - add inheritance of the default style in `iplot` when the style is set globally with `setFixest_coefplot`.
  
- - improve error messages in general by prompting additional error calls.
+ - improve error messages in general by prompting additional error calls (when appropriate).
  
  - the dictionaries now ignore white spaces in coefficient names (thanks to Caleb Kwon).
  
