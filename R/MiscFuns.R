@@ -66,8 +66,10 @@
 print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 
     # checking the arguments
-    validate_dots(suggest_args = c("n", "type", "se", "cluster"),
-                  valid_args = c("se", "cluster", "ssc", "forceCovariance", "keepBounded"))
+    if(is_user_level_call()){
+        validate_dots(suggest_args = c("n", "type", "vcov"),
+                      valid_args = c("vcov", "se", "cluster", "ssc", "forceCovariance", "keepBounded"))
+    }
 
     # The objects from the estimation and the summary are identical, except regarding the vcov
 	fromSummary = isTRUE(x$summary)
@@ -459,8 +461,7 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
 	}
 
 	# Checking arguments in ...
-	if(!any(c("fromPrint", "iv", "summary_flags") %in% names(mc))){
-	    # condition means NOT internal call => thus client call
+	if(is_user_level_call()){
 	    if(!is_function_in_it(vcov)){
 	        validate_dots(suggest_args = c("se", "cluster", "ssc"), valid_args = "dof")
 	    }
@@ -929,11 +930,13 @@ se = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order
 #' summary(fe_trade)
 #'
 #'
-summary.fixest.fixef = function(object, n=5, ...){
+summary.fixest.fixef = function(object, n = 5, ...){
 	# This function shows some generic information on the fixed-effect coefficients
 
     # checking arguments in dots
-    validate_dots(suggest_args = "n")
+    if(is_user_level_call()){
+        validate_dots(suggest_args = "n")
+    }
 
 	Q = length(object)
 	fixef_names = names(object)
@@ -1061,7 +1064,9 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthrea
     check_arg(notes, sorted, "logical scalar")
 
     # Checking the arguments
-    validate_dots(valid_args = "fixef.tol")
+    if(is_user_level_call()){
+        validate_dots()
+    }
 
     check_value(fixef.tol, "numeric scalar GT{0} LT{1}")
     check_value(fixef.iter, "strict integer scalar GT{0}")
@@ -1090,6 +1095,7 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthrea
 	id_dummies_vect = list()
 	for(i in 1:Q) id_dummies_vect[[i]] = as.vector(fixef_id[[i]])
 
+	is_ref_approx = FALSE
 	isSlope = FALSE
 	if(!is.null(object$fixef_terms)){
 	    isSlope = TRUE
@@ -1256,16 +1262,56 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthrea
 
 		fixef_values = cpp_get_fe_gnl(Q, N, S, dumMat, nbCluster, orderCluster)
 
+		# The algorithm is fast but may fail on some instance. We need to check
+		if(any(fixef_values[[Q + 1]] > 1) && Q >= 3){
+		    # we re-compute the "sumFE"
+		    sum_FE = fixef_values[[1]][1 + dumMat[, 1]]
+		    for(i in 2:Q){
+		        sum_FE = sum_FE + fixef_values[[i]][1 + dumMat[, i]]
+		    }
+
+		    if(max(abs(sum_FE - S)) > 1e-1){
+		        # divergence => we need to correct
+		        # we recompute the FEs
+
+		        is_ref_approx = TRUE
+
+		        fixef_sizes = as.integer(object$fixef_sizes)
+		        new_order = order(object$fixef_sizes, decreasing = TRUE)
+		        fixef_sizes = fixef_sizes[new_order]
+
+                fe_id_list = object$fixef_id[new_order]
+		        table_id_I = as.integer(unlist(lapply(fe_id_list, table), use.names = FALSE))
+
+		        slope_flag = rep(0L, Q)
+		        slope_variables = list()
+
+		        S_demean = cpp_demean(y = S, X_raw = 0, r_weights = 0, iterMax = as.integer(fixef.iter),
+		                              diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
+		                              fe_id_list = fe_id_list, table_id_I = table_id_I,
+		                              slope_flag_Q = slope_flag, slope_vars_list = slope_variables,
+		                              r_init = 0, nthreads = nthreads, save_fixef = TRUE)
+
+		        fixef_coef = S_demean$fixef_coef
+
+		        end = cumsum(fixef_sizes)
+		        start = c(1, end + 1)
+		        for(i in 1:Q){
+		            fixef_values[[new_order[i]]] = fixef_coef[start[i]:end[i]]
+		        }
+		    }
+		}
+
 		# the information on the references
-		nb_ref = fixef_values[[Q+1]]
-		fixef_values[[Q+1]] = NULL
+		nb_ref = fixef_values[[Q + 1]]
+		fixef_values[[Q + 1]] = NULL
 	}
 
 	# now saving & adding information
 	all_clust = list()
 	Q_all = ifelse(isSlope, length(fixef_terms), Q)
 	for(i in 1:Q_all){
-	    # We put it inthe right order, if requested
+	    # We put it in the right order, if requested
 	    fn = attr(fixef_id[[i]], "fixef_names")
 
 	    if(sorted){
@@ -1294,7 +1340,12 @@ fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthrea
 
 		# warning if unbalanced
 		if(notes && sum(nb_ref[!slope_flag]) > Q-1){
-			message("NOTE: The fixed-effects are not regular, they cannot be straightforwardly interpreted.")
+		    if(is_ref_approx){
+		        message("NOTE: The fixed-effects are not regular, they cannot be straightforwardly interpreted. The number of references is only approximate.")
+		    } else {
+		        message("NOTE: The fixed-effects are not regular, they cannot be straightforwardly interpreted.")
+		    }
+
 		}
 	}
 
@@ -1369,7 +1420,9 @@ NULL
 plot.fixest.fixef = function(x, n = 5, ...){
 
     # Checking the arguments
-    validate_dots(suggest_args = "n")
+    if(is_user_level_call()){
+        validate_dots(suggest_args = "n")
+    }
 
 	Q = length(x)
 
@@ -1922,14 +1975,14 @@ collinearity = function(x, verbose){
 #' This function shows the means and standard-deviations of several variables conditional on whether they are from the treated or the control group. The groups can further be split according to a pre/post variable. Results can be seamlessly be exported to Latex.
 #'
 #'
-#' @param fml Either a formula of the type \code{var1 + ... + var[N] ~ treat} or \code{var1 + ... + var[N] ~ treat | post}. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: \code{. ~ treat}.
+#' @param fml Either a formula of the type \code{var1 + ... + varN ~ treat} or \code{var1 + ... + varN ~ treat | post}. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: \code{. ~ treat}.
 #' @param base A data base containing all the variables in the formula \code{fml}.
 #' @param treat_var Only if argument \code{fml} is *not* a formula. The vector identifying the treated and the control observations (the vector can be of any type but must contain only two possible values). Must be of the same length as the data.
 #' @param post_var Only if argument \code{fml} is *not* a formula. The vector identifying the periods (pre/post) of the observations (the vector can be of any type but must contain only two possible values). The first value (in the sorted sense) of the vector is taken as the pre period. Must be of the same length as the data.
 #' @param treat_first Which value of the 'treatment' vector should appear on the left? By default the max value appears first (e.g. if the treatment variable is a 0/1 vector, 1 appears first).
 #' @param tex Should the result be displayed in Latex? Default is \code{FALSE}. Automatically set to \code{TRUE} if the table is to be saved in a file using the argument \code{file}.
-#' @param treat_dict A character vector of length two. What are the names of the treated and the control? This should be a dictionnary: e.g. \code{c("1"="Treated", "0" = "Control")}.
-#' @param dict A named character vector. A dictionnary between the variables names and an alias. For instance \code{dict=c("x"="Inflation Rate")} would replace the variable name \code{x} by \dQuote{Inflation Rate}.
+#' @param treat_dict A character vector of length two. What are the names of the treated and the control? This should be a dictionary: e.g. \code{c("1"="Treated", "0" = "Control")}.
+#' @param dict A named character vector. A dictionary between the variables names and an alias. For instance \code{dict=c("x"="Inflation Rate")} would replace the variable name \code{x} by \dQuote{Inflation Rate}.
 #' @param file A file path. If given, the table is written in Latex into this file.
 #' @param replace Default is \code{TRUE}, which means that when the table is exported, the existing file is not erased.
 #' @param title Character string giving the Latex title of the table. (Only if exported.)
@@ -1971,7 +2024,10 @@ collinearity = function(x, verbose){
 #' did_means(.~treat|post, base_did, indiv = "id")
 #'
 #'
-did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, dict = getFixest_dict(), file, replace = FALSE, title, label, raw = FALSE, indiv, treat_first, prepostnames = c("Before", "After"), diff.inv = FALSE){
+did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
+                     dict = getFixest_dict(), file, replace = FALSE, title,
+                     label, raw = FALSE, indiv, treat_first, prepostnames = c("Before", "After"),
+                     diff.inv = FALSE){
     # x is a data.frame
     # treat_vector is a list of IDs
     # treat_first: the treated-value to appear first
@@ -2042,7 +2098,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict, di
 
         # Creation of x and the condition
         if(!length(fml_in) == 3){
-            stop("The formula must be of the type 'var1 + ... + var[N] ~ treat' or 'var1 + ... + var[N] ~ treat | post'.")
+            stop("The formula must be of the type 'var1 + ... + varN ~ treat' or 'var1 + ... + varN ~ treat | post'.")
         }
 
         fml_parts = fml_split(fml_in)
@@ -2564,6 +2620,7 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
     # t0 = proc.time()
 
     validate_dots(valid_args = c("f2", "f_name", "ref_special", "sparse"))
+
     dots = list(...)
     is_sparse = isTRUE(dots$sparse)
 
@@ -4481,7 +4538,9 @@ check_conv_feols = function(x){
 summary.fixest_check_conv = function(object, type = "short", ...){
 
     check_arg_plus(type, "match(short, detail)")
-    validate_dots(suggest_args = "type")
+    if(is_user_level_call()){
+        validate_dots(suggest_args = "type")
+    }
 
     if(type == "short"){
         info_max_abs = lapply(object, function(x) sapply(x, function(y) max(abs(y))))
@@ -5570,7 +5629,9 @@ rep.fixest = function(x, times = 1, each = 1, vcov, ...){
     check_arg(each, "integer scalar GE{1} | logical scalar")
     check_arg(vcov, "class(list)")
 
-    validate_dots(suggest_args = c("times", "each"), stop = TRUE)
+    if(is_user_level_call()){
+        validate_dots(suggest_args = c("times", "each"), stop = TRUE)
+    }
 
     # Checking the arguments
     IS_LIST = FALSE
@@ -7937,7 +7998,6 @@ fixest_CI_factor = function(x, level, vcov){
 }
 
 
-
 #### ................. ####
 #### Small Utilities ####
 ####
@@ -9321,6 +9381,32 @@ eval_dot = function(x, up = 1){
 }
 
 
+is_user_level_call = function(){
+    length(sys.calls()) <= 2
+}
+
+
+is_calling_fun = function(pattern){
+    sc_all = sys.calls()
+    n_sc = length(sc_all)
+    if(n_sc > 2){
+
+        if(grepl(".fixest", sc_all[[n_sc - 1]][[1]], fixed = TRUE)){
+            if(n_sc == 3){
+                return(FALSE)
+            }
+
+            sc = sc_all[[n_sc - 3]]
+        } else {
+            sc = sc_all[[n_sc - 2]]
+        }
+
+        return(grepl(pattern, as.character(sc[[1]])))
+    }
+
+    FALSE
+}
+
 
 #### ................. ####
 #### Additional Methods ####
@@ -9585,6 +9671,22 @@ coef.fixest = coefficients.fixest = function(object, keep, drop, order, agg = TR
         res = res[-length(res)]
     }
 
+
+    # deltaMethod tweak
+    if(is_calling_fun("deltaMethod")){
+        sysOrigin = sys.parent()
+        mc_DM = match.call(definition = sys.function(sysOrigin), call = sys.call(sysOrigin))
+
+        if("parameterNames" %in% names(mc_DM)){
+            PN = eval(mc_DM$parameterNames, parent.frame())
+
+            check_value(PN, "character vector no na len(data)", .data = res,
+                        .arg_name = "parameterNames", .up = 1)
+
+            names(res) = PN
+        }
+    }
+
     res
 }
 
@@ -9640,7 +9742,9 @@ coefficients.fixest <- coef.fixest
 fitted.fixest = fitted.values.fixest = function(object, type = c("response", "link"), na.rm = TRUE, ...){
 
     # Checking the arguments
-    validate_dots(suggest_args = "type")
+    if(is_user_level_call()){
+        validate_dots(suggest_args = "type")
+    }
 
 	type = match.arg(type)
 
@@ -9924,7 +10028,9 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
                           vcov = NULL, ssc = NULL, ...){
 
     # Checking the arguments
-    validate_dots(suggest_args = c("newdata", "type"))
+    if(is_user_level_call()){
+        validate_dots(suggest_args = c("newdata", "type"))
+    }
 
 	# Controls
 	check_arg_plus(type, sample, "match")
@@ -10398,42 +10504,44 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 confint.fixest = function(object, parm, level = 0.95, vcov, se, cluster, ssc = NULL, ...){
 
     # Checking the arguments
-    validate_dots(suggest_args = c("parm", "level", "se", "cluster"),
-                  valid_args = c("forceCovariance", "keepBounded"))
+    if(is_user_level_call()){
+        validate_dots(suggest_args = c("parm", "level", "se", "cluster"),
+                      valid_args = c("forceCovariance", "keepBounded"))
+    }
 
 	# Control
 	if(!is.numeric(level) || !length(level) == 1 || level >= 1 || level <= .50){
 		stop("The argument 'level' must be a numeric scalar greater than 0.50 and strictly lower than 1.")
 	}
 
-	# the parameters for which we should compute the confint
-	all_params = names(object$coefficients)
-
-	if(missing(parm)){
-		parm_use = all_params
-	} else if(is.numeric(parm)){
-		if(any(parm %% 1 != 0)){
-			stop("If the argument 'parm' is numeric, it must be integers.")
-		}
-
-		parm_use = unique(na.omit(all_params[parm]))
-		if(length(parm_use) == 0){
-			stop("There are ", length(all_params), " coefficients, the argument 'parm' does not correspond to any of them.")
-		}
-	} else if(is.character(parm)){
-		parm_pblm = setdiff(parm, all_params)
-		if(length(parm_pblm) > 0){
-			stop("some parameters of 'parm' have no estimated coefficient: ", paste0(parm_pblm, collapse=", "), ".")
-		}
-
-		parm_use = intersect(parm, all_params)
-	}
-
 	# The proper SE
 	sum_object = summary(object, vcov = vcov, se = se, cluster = cluster, ssc = ssc, ...)
 
-	se_all = sum_object$se
-	coef_all = object$coefficients
+	se_all = sum_object$coeftable[, 2]
+	coef_all = sum_object$coeftable[, 1]
+
+	# the parameters for which we should compute the confint
+	all_params = names(coef_all)
+
+	if(missing(parm)){
+	    parm_use = all_params
+	} else if(is.numeric(parm)){
+	    if(any(parm %% 1 != 0)){
+	        stop("If the argument 'parm' is numeric, it must be integers.")
+	    }
+
+	    parm_use = unique(na.omit(all_params[parm]))
+	    if(length(parm_use) == 0){
+	        stop("There are ", length(all_params), " coefficients, the argument 'parm' does not correspond to any of them.")
+	    }
+	} else if(is.character(parm)){
+	    parm_pblm = setdiff(parm, all_params)
+	    if(length(parm_pblm) > 0){
+	        stop("some parameters of 'parm' have no estimated coefficient: ", paste0(parm_pblm, collapse=", "), ".")
+	    }
+
+	    parm_use = intersect(parm, all_params)
+	}
 
 	# multiplicative factor
 	fact = fixest_CI_factor(object, level, sum_object$cov.scaled)
@@ -10703,7 +10811,9 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 	# we add the clusters in the formula if needed
 
     # Checking the arguments
-    validate_dots(suggest_args = "type")
+    if(is_user_level_call()){
+        validate_dots(suggest_args = "type")
+    }
 
     if(isTRUE(x$is_fit)){
         stop("formula method not available for fixest estimations obtained from fit methods.")
@@ -10792,7 +10902,9 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     # if fixef => return a DF
 
     # Checking the arguments
-    validate_dots(suggest_args = c("data", "type"))
+    if(is_user_level_call()){
+        validate_dots(suggest_args = c("data", "type"))
+    }
 
     # We allow type to be used in the location of data if data is missing
     if(!missing(data) && missing(type)){

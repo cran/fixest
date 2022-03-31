@@ -2769,7 +2769,7 @@ feglm.fit = function(y, X, fixef_df, family = "gaussian", vcov, offset, split,
 
         if(any(is_excluded)){
             # There should be no remaining collinearity
-            warning_msg = paste(warning_msg, "Residual collinearity was found after the weighted-OLS stage. The covariance is not defined. (This should not happen. If possible, could you send a replicable example to fixest's author? He's curious about when that actually happen.)")
+            warning_msg = paste(warning_msg, "Residual collinearity was found after the weighted-OLS stage. The covariance is not defined. (This should not happen. If possible, could you send a replicable example to fixest's author? He's curious about when that actually happens.)")
             var = matrix(NA, length(is_excluded), length(is_excluded))
         }
         res$cov.iid = var
@@ -3913,8 +3913,8 @@ format_error_msg = function(x, origin){
 
     x = gsub("\n+$", "", x)
 
-    if(grepl("^Error (in|:|: in) (fe|fixest|fun)[^\n]+\n", x)){
-        res = gsub("^Error (in|:|: in) (fe|fixest|fun)[^\n]+\n *(.+)", "\\3", x)
+    if(grepl("^Error (in|:|: in) (fe|fixest|fun|fml_split)[^\n]+\n", x)){
+        res = gsub("^Error (in|:|: in) (fe|fixest|fun|fml_split)[^\n]+\n *(.+)", "\\3", x)
     } else if(grepl("[Oo]bject '.+' not found", x) || grepl("memory|cannot allocate", x)) {
         res = x
     } else {

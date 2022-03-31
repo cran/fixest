@@ -19,13 +19,10 @@ summary(gravity, vcov = "twoway", ssc = ssc(adj = FALSE, cluster.adj = FALSE))
 
 ## ---- echo = FALSE------------------------------------------------------------
 is_plm = requireNamespace("plm", quietly = TRUE)
-is_sandwich = requireNamespace("sandwich", quietly = TRUE)
-
-is_plm = is_plm || is_swandwich
 
 if(!is_plm){
     knitr::opts_chunk$set(eval = FALSE)
-    cat("Evaluation of the next chunks requires 'plm' and 'sandwich'. Problem: One of these packages is missing.")
+    cat("Evaluation of the next chunks requires 'plm' which is not installed.")
 } else {
     knitr::opts_chunk$set(eval = TRUE)
 }
@@ -122,7 +119,7 @@ if(!is_lfe){
 }
 
 ## ---- eval = is_lfe, include = FALSE------------------------------------------
-# avoids ugly startup messages popping + does not require the us of the not very elegant suppressPackageStartupMessages
+# avoids ugly startup messages popping + does not require the use of the not very elegant suppressPackageStartupMessages
 library(lfe)
 
 ## ---- eval = is_lfe && is_plm, warning = FALSE--------------------------------
