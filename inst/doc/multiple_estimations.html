@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2022-03-31" />
+<meta name="date" content="2022-10-19" />
 
 <title>Multiple estimations</title>
 
@@ -309,13 +309,20 @@ code span.wa { color: #008000; font-weight: bold; } /* Warning */
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -438,7 +445,7 @@ pre code {
 
 <h1 class="title toc-ignore">Multiple estimations</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2022-03-31</h4>
+<h4 class="date">2022-10-19</h4>
 
 </div>
 
@@ -465,72 +472,72 @@ performed 32 estimations: eight different functional forms on four
 different samples.</p>
 <p>The previous code leads to the following results:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(res_multi, <span class="st">&quot;compact&quot;</span>, <span class="at">se =</span> <span class="st">&quot;hetero&quot;</span>)</span></code></pre></div>
-<pre><code>##         sample lhs   fixef               rhs      (Intercept)
-## 1  Full sample  y1 1       x1 + x2           4.19*** (0.104) 
-## 2  Full sample  y1 1       x1 + x2 + I(x2^2) 4.27*** (0.101) 
-## 3  Full sample  y1 species x1 + x2                           
-## 4  Full sample  y1 species x1 + x2 + I(x2^2)                 
-## 5  Full sample  y2 1       x1 + x2           3.59*** (0.103) 
-## 6  Full sample  y2 1       x1 + x2 + I(x2^2) 3.68*** (0.0969)
-## 7  Full sample  y2 species x1 + x2                           
-## 8  Full sample  y2 species x1 + x2 + I(x2^2)                 
-## 9  setosa       y1 1       x1 + x2           4.25*** (0.474) 
-## 10 setosa       y1 1       x1 + x2 + I(x2^2)    4*** (0.504) 
-## 11 setosa       y1 species x1 + x2                           
-## 12 setosa       y1 species x1 + x2 + I(x2^2)                 
-## 13 setosa       y2 1       x1 + x2           2.89*** (0.416) 
-## 14 setosa       y2 1       x1 + x2 + I(x2^2) 2.82*** (0.423) 
-## 15 setosa       y2 species x1 + x2                           
-## 16 setosa       y2 species x1 + x2 + I(x2^2)                 
-## 17 versicolor   y1 1       x1 + x2           2.38*** (0.423) 
-## 18 versicolor   y1 1       x1 + x2 + I(x2^2)   0.323 (1.44)  
-## 19 versicolor   y1 species x1 + x2                           
-## 20 versicolor   y1 species x1 + x2 + I(x2^2)                 
-## 21 versicolor   y2 1       x1 + x2           1.25*** (0.275) 
-## 22 versicolor   y2 1       x1 + x2 + I(x2^2)   0.097 (1.01)  
-## 23 versicolor   y2 species x1 + x2                           
-## 24 versicolor   y2 species x1 + x2 + I(x2^2)                 
-## 25 virginica    y1 1       x1 + x2             1.05. (0.539) 
-## 26 virginica    y1 1       x1 + x2 + I(x2^2)   -2.39 (2.04)  
-## 27 virginica    y1 species x1 + x2                           
-## 28 virginica    y1 species x1 + x2 + I(x2^2)                 
-## 29 virginica    y2 1       x1 + x2             1.06. (0.572) 
-## 30 virginica    y2 1       x1 + x2 + I(x2^2)     1.1 (1.76)  
-## 31 virginica    y2 species x1 + x2                           
-## 32 virginica    y2 species x1 + x2 + I(x2^2)                 
-##                    x1               x2           I(x2^2)
-## 1   0.542*** (0.0761)   -0.32. (0.17)                   
-## 2   0.719*** (0.0815) -1.52*** (0.307) 0.348*** (0.0748)
-## 3   0.906*** (0.0759)   -0.006 (0.163)                  
-## 4     0.9*** (0.0767)     0.29 (0.408)  -0.0879 (0.117) 
-## 5  -0.257*** (0.0664)   0.364* (0.142)                  
-## 6    -0.0301 (0.0778) -1.18*** (0.313) 0.446*** (0.0737)
-## 7     0.155* (0.0735) 0.623*** (0.114)                  
-## 8     0.148. (0.0755)   0.951* (0.472)  -0.0973 (0.125) 
-## 9      0.399 (0.325)    0.712. (0.418)                  
-## 10     0.405 (0.325)     2.51. (1.47)     -2.91 (2.1)   
-## 11     0.399 (0.325)    0.712. (0.418)                  
-## 12     0.405 (0.325)     2.51. (1.47)     -2.91 (2.1)   
-## 13     0.247 (0.305)     0.702 (0.56)                   
-## 14     0.248 (0.304)      1.27 (2.39)    -0.911 (3.28)  
-## 15     0.247 (0.305)     0.702 (0.56)                   
-## 16     0.248 (0.304)      1.27 (2.39)    -0.911 (3.28)  
-## 17  0.934*** (0.166)     -0.32 (0.364)                  
-## 18  0.901*** (0.164)      3.01 (2.31)     -1.24 (0.841) 
-## 19  0.934*** (0.166)     -0.32 (0.364)                  
-## 20  0.901*** (0.164)      3.01 (2.31)     -1.24 (0.841) 
-## 21    0.0669 (0.0949) 0.929*** (0.244)                  
-## 22     0.048 (0.0993)     2.8. (1.65)    -0.695 (0.583) 
-## 23    0.0669 (0.0949) 0.929*** (0.244)                  
-## 24     0.048 (0.0993)     2.8. (1.65)    -0.695 (0.583) 
-## 25  0.995*** (0.0898)  0.00706 (0.205)                  
-## 26  0.994*** (0.0881)     3.5. (2.09)     -0.87 (0.519) 
-## 27  0.995*** (0.0898)  0.00706 (0.205)                  
-## 28  0.994*** (0.0881)     3.5. (2.09)     -0.87 (0.519) 
-## 29     0.149 (0.107)  0.535*** (0.122)                  
-## 30     0.149 (0.108)     0.503 (1.56)   0.00798 (0.388) 
-## 31     0.149 (0.107)  0.535*** (0.122)                  
-## 32     0.149 (0.108)     0.503 (1.56)   0.00798 (0.388)</code></pre>
+<pre><code>##         sample   fixef lhs               rhs     (Intercept)                x1
+## 1  Full sample 1        y1 x1 + x2           4.19*** (0.104)  0.542*** (0.076)
+## 2  Full sample 1        y1 x1 + x2 + I(x2^2) 4.27*** (0.101)  0.719*** (0.082)
+## 3  Full sample 1        y2 x1 + x2           3.59*** (0.103) -0.257*** (0.066)
+## 4  Full sample 1        y2 x1 + x2 + I(x2^2) 3.68*** (0.097)    -0.030 (0.078)
+## 5  Full sample species  y1 x1 + x2                            0.906*** (0.076)
+## 6  Full sample species  y1 x1 + x2 + I(x2^2)                  0.900*** (0.077)
+## 7  Full sample species  y2 x1 + x2                              0.155* (0.073)
+## 8  Full sample species  y2 x1 + x2 + I(x2^2)                    0.148. (0.075)
+## 9  setosa      1        y1 x1 + x2           4.25*** (0.474)     0.399 (0.325)
+## 10 setosa      1        y1 x1 + x2 + I(x2^2) 4.00*** (0.504)     0.405 (0.325)
+## 11 setosa      1        y2 x1 + x2           2.89*** (0.416)     0.247 (0.305)
+## 12 setosa      1        y2 x1 + x2 + I(x2^2) 2.82*** (0.423)     0.248 (0.304)
+## 13 setosa      species  y1 x1 + x2                               0.399 (0.325)
+## 14 setosa      species  y1 x1 + x2 + I(x2^2)                     0.405 (0.325)
+## 15 setosa      species  y2 x1 + x2                               0.247 (0.305)
+## 16 setosa      species  y2 x1 + x2 + I(x2^2)                     0.248 (0.304)
+## 17 versicolor  1        y1 x1 + x2           2.38*** (0.423)  0.934*** (0.166)
+## 18 versicolor  1        y1 x1 + x2 + I(x2^2)   0.323 (1.44)   0.901*** (0.164)
+## 19 versicolor  1        y2 x1 + x2           1.25*** (0.275)     0.067 (0.095)
+## 20 versicolor  1        y2 x1 + x2 + I(x2^2)   0.097 (1.01)      0.048 (0.099)
+## 21 versicolor  species  y1 x1 + x2                            0.934*** (0.166)
+## 22 versicolor  species  y1 x1 + x2 + I(x2^2)                  0.901*** (0.164)
+## 23 versicolor  species  y2 x1 + x2                               0.067 (0.095)
+## 24 versicolor  species  y2 x1 + x2 + I(x2^2)                     0.048 (0.099)
+## 25 virginica   1        y1 x1 + x2             1.05. (0.539)  0.995*** (0.090)
+## 26 virginica   1        y1 x1 + x2 + I(x2^2)   -2.39 (2.04)   0.994*** (0.088)
+## 27 virginica   1        y2 x1 + x2             1.06. (0.572)     0.149 (0.107)
+## 28 virginica   1        y2 x1 + x2 + I(x2^2)    1.10 (1.76)      0.149 (0.108)
+## 29 virginica   species  y1 x1 + x2                            0.995*** (0.090)
+## 30 virginica   species  y1 x1 + x2 + I(x2^2)                  0.994*** (0.088)
+## 31 virginica   species  y2 x1 + x2                               0.149 (0.107)
+## 32 virginica   species  y2 x1 + x2 + I(x2^2)                     0.149 (0.108)
+##                  x2          I(x2^2)
+## 1   -0.320. (0.170)                 
+## 2  -1.52*** (0.307) 0.348*** (0.075)
+## 3    0.364* (0.142)                 
+## 4  -1.18*** (0.313) 0.446*** (0.074)
+## 5    -0.006 (0.163)                 
+## 6     0.290 (0.408)   -0.088 (0.117)
+## 7  0.623*** (0.114)                 
+## 8    0.951* (0.472)   -0.097 (0.125)
+## 9    0.712. (0.418)                 
+## 10    2.51. (1.47)     -2.91 (2.10) 
+## 11    0.702 (0.560)                 
+## 12     1.27 (2.39)    -0.911 (3.28) 
+## 13   0.712. (0.418)                 
+## 14    2.51. (1.47)     -2.91 (2.10) 
+## 15    0.702 (0.560)                 
+## 16     1.27 (2.39)    -0.911 (3.28) 
+## 17   -0.320 (0.364)                 
+## 18     3.01 (2.31)     -1.24 (0.841)
+## 19 0.929*** (0.244)                 
+## 20    2.80. (1.65)    -0.695 (0.583)
+## 21   -0.320 (0.364)                 
+## 22     3.01 (2.31)     -1.24 (0.841)
+## 23 0.929*** (0.244)                 
+## 24    2.80. (1.65)    -0.695 (0.583)
+## 25    0.007 (0.205)                 
+## 26    3.50. (2.09)    -0.870 (0.519)
+## 27 0.535*** (0.122)                 
+## 28    0.503 (1.56)     0.008 (0.388)
+## 29    0.007 (0.205)                 
+## 30    3.50. (2.09)    -0.870 (0.519)
+## 31 0.535*** (0.122)                 
+## 32    0.503 (1.56)     0.008 (0.388)</code></pre>
 <p>This vignette now details how to perform multiple estimations for
 multiple: LHSs, RHSs, fixed-effects, or samples. It then comes to
 describe the various methods to access the results.</p>
@@ -542,10 +549,10 @@ describe the various methods to access the results.</p>
 <p>To perform an estimation on multiple LHS, simply wrap the different
 LHS in <code>c()</code>:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(<span class="fu">feols</span>(<span class="fu">c</span>(y1, y2) <span class="sc">~</span> x1 <span class="sc">+</span> x2, base))</span></code></pre></div>
-<pre><code>##                            model 1             model 2
+<pre><code>##                 feols(c(y1, y2)..1 feols(c(y1, y2) ..2
 ## Dependent Var.:                 y1                  y2
 ##                                                       
-## (Intercept)      4.191*** (0.0970)   3.587*** (0.0937)
+## Constant         4.191*** (0.0970)   3.587*** (0.0937)
 ## x1              0.5418*** (0.0693) -0.2571*** (0.0669)
 ## x2               -0.3196* (0.1605)    0.3640* (0.1550)
 ## _______________ __________________ ___________________
@@ -592,10 +599,10 @@ fixed-effects part of the formula. Note that at most one stepwise
 function can be applied per part.</p>
 <p>Here is an example:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(<span class="fu">feols</span>(y1 <span class="sc">~</span> <span class="fu">csw</span>(x1, x2) <span class="sc">|</span> <span class="fu">sw0</span>(species), base, <span class="at">cluster =</span> <span class="sc">~</span>species))</span></code></pre></div>
-<pre><code>##                           model 1          model 2           model 3
+<pre><code>##                 feols(y1 ~ csw..1 feols(y1 ~ cs..2 feols(y1 ~ csw..3
 ## Dependent Var.:                y1               y1                y1
 ##                                                                     
-## (Intercept)      4.307** (0.1917) 4.191** (0.2443)                  
+## Constant         4.307** (0.1917) 4.191** (0.2443)                  
 ## x1              0.4089** (0.0401) 0.5418* (0.1115) 0.9046** (0.0758)
 ## x2                                -0.3196 (0.1707)                  
 ## Fixed-Effects:  ----------------- ---------------- -----------------
@@ -606,10 +613,10 @@ function can be applied per part.</p>
 ## R2                        0.75995          0.76626           0.83672
 ## Within R2                      --               --           0.57178
 ## 
-##                           model 4
+##                 feols(y1 ~ csw..4
 ## Dependent Var.:                y1
 ##                                  
-## (Intercept)                      
+## Constant                         
 ## x1              0.9059** (0.0814)
 ## x2               -0.0060 (0.1260)
 ## Fixed-Effects:  -----------------
@@ -634,11 +641,11 @@ and an estimation will be performed for each sub-sample defined by each
 level of this variable. The argument <code>fsplit</code> is identical
 but first adds the full sample.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(<span class="fu">feols</span>(y1 <span class="sc">~</span> x1 <span class="sc">+</span> x2, base, <span class="at">fsplit =</span> <span class="sc">~</span>species))</span></code></pre></div>
-<pre><code>##                             model 1           model 2            model 3
+<pre><code>##                  feols(y1 ~ x1 +..1 feols(y1 ~ x1 ..2 feols(y1 ~ x1 +..3
 ## Sample (species)        Full sample            setosa         versicolor
 ## Dependent Var.:                  y1                y1                 y1
 ##                                                                         
-## (Intercept)       4.191*** (0.0970) 4.248*** (0.4114)  2.381*** (0.4493)
+## Constant          4.191*** (0.0970) 4.248*** (0.4114)  2.381*** (0.4493)
 ## x1               0.5418*** (0.0693)   0.3990 (0.2958) 0.9342*** (0.1693)
 ## x2                -0.3196* (0.1605)   0.7121 (0.4874)   -0.3200 (0.4024)
 ## ________________ __________________ _________________ __________________
@@ -647,11 +654,11 @@ but first adds the full sample.</p>
 ## R2                          0.76626           0.11173            0.57432
 ## Adj. R2                     0.76308           0.07393            0.55620
 ## 
-##                             model 4
+##                  feols(y1 ~ x1 +..4
 ## Sample (species)          virginica
 ## Dependent Var.:                  y1
 ##                                    
-## (Intercept)         1.052* (0.5139)
+## Constant            1.052* (0.5139)
 ## x1               0.9946*** (0.0893)
 ## x2                  0.0071 (0.1795)
 ## ________________ __________________
@@ -710,11 +717,11 @@ Then the sample and the LHS will follow.</p>
 <p>This subsetting can then be used to easily obtain the appropriate set
 of results and ordering:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(res_multi[<span class="at">lhs =</span> <span class="dv">1</span>, <span class="at">fixef =</span> <span class="dv">1</span>, <span class="at">rhs =</span> <span class="cn">TRUE</span>, <span class="at">sample =</span> <span class="sc">-</span><span class="dv">1</span>])</span></code></pre></div>
-<pre><code>##                            model 1            model 2            model 3
+<pre><code>##                  res_multi[lhs ..1 res_multi[lhs =..2 res_multi[lhs =..3
 ## Sample (species)            setosa         versicolor          virginica
 ## Dependent Var.:                 y1                 y1                 y1
 ##                                                                         
-## (Intercept)      4.248*** (0.4114)  2.381*** (0.4493)    1.052* (0.5139)
+## Constant         4.248*** (0.4114)  2.381*** (0.4493)    1.052* (0.5139)
 ## x1                 0.3990 (0.2958) 0.9342*** (0.1693) 0.9946*** (0.0893)
 ## x2                 0.7121 (0.4874)   -0.3200 (0.4024)    0.0071 (0.1795)
 ## x2 square                                                               
@@ -724,11 +731,11 @@ of results and ordering:</p>
 ## R2                         0.11173            0.57432            0.74689
 ## Adj. R2                    0.07393            0.55620            0.73612
 ## 
-##                            model 4            model 5            model 6
+##                  res_multi[lhs ..4 res_multi[lhs =..5 res_multi[lhs =..6
 ## Sample (species)            setosa         versicolor          virginica
 ## Dependent Var.:                 y1                 y1                 y1
 ##                                                                         
-## (Intercept)      4.004*** (0.4892)     0.3234 (1.791)     -2.393 (2.173)
+## Constant         4.004*** (0.4892)     0.3234 (1.791)     -2.393 (2.173)
 ## x1                 0.4048 (0.2963) 0.9006*** (0.1710) 0.9939*** (0.0878)
 ## x2                   2.511 (2.011)      3.015 (2.839)      3.504 (2.153)
 ## x2 square           -2.913 (3.157)     -1.236 (1.042)   -0.8703 (0.5340)

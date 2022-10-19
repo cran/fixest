@@ -1,1461 +1,18 @@
+#----------------------------------------------#
+# Author: Laurent Berge
+# Date creation: Sat Apr 23 15:35:53 2022
+# ~: A few user-level + many internal funs
+#----------------------------------------------#
 
-#' A print facility for \code{fixest} objects.
-#'
-#' This function is very similar to usual \code{summary} functions as it provides the table of coefficients along with other information on the fit of the estimation. The type of output can be customized by the user (using function \code{setFixest_print}).
-#'
-#' @method print fixest
-#'
-#' @param x A \code{fixest} object. Obtained using the methods \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#' @param n Integer, number of coefficients to display. By default, only the first 8 coefficients are displayed if \code{x} does not come from \code{\link[fixest]{summary.fixest}}.
-#' @param type Either \code{"table"} (default) to display the coefficients table or \code{"coef"} to display only the coefficients.
-#' @param fitstat A formula or a character vector representing which fit statistic to display. The types must be valid types of the function \code{\link[fixest]{fitstat}}. The default fit statistics depend on the type of estimation (OLS, GLM, IV, with/without fixed-effect). Providing the argument \code{fitstat} overrides the default fit statistics, you can however use the point "." to summon them back. Ex 1: \code{fitstat = ~ . + ll} adds the log-likelihood to the default values. Ex 2: \code{fitstat = ~ ll + pr2} only displays the log-likelihood and the pseudo-R2.
-#' @param ... Other arguments to be passed to \code{\link[fixest]{vcov.fixest}}.
-#'
-#' @details
-#'  It is possible to set the default values for the arguments \code{type} and \code{fitstat} by using the function \code{setFixest_print}.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, \code{\link[fixest]{fixef.fixest}} to extract the fixed-effects coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # Load trade data
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade
-#' #   => we account for 3 fixed-effects (FEs)
-#' est_pois = fepois(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
-#'
-#' # displaying the results
-#' #  (by default SEs are clustered if FEs are used)
-#' print(est_pois)
-#'
-#' # By default the coefficient table is displayed.
-#' #  If the user wished to display only the coefficents, use option type:
-#' print(est_pois, type = "coef")
-#'
-#' # To permanently display coef. only, use setFixest_print:
-#' setFixest_print(type = "coef")
-#' est_pois
-#' # back to default:
-#' setFixest_print(type = "table")
-#'
-#' #
-#' # fitstat
-#' #
-#'
-#' # We modify which fit statistic to display
-#' print(est_pois, fitstat = ~ . + lr)
-#'
-#' # We add the LR test to the default (represented by the ".")
-#'
-#' # to show only the LR stat:
-#' print(est_pois, fitstat = ~ . + lr.stat)
-#'
-#' # To modify the defaults:
-#' setFixest_print(fitstat = ~ . + lr.stat + rmse)
-#' est_pois
-#'
-#' # Back to default (NULL == default)
-#' setFixest_print(fitstat = NULL)
-#'
-#'
-print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
-
-    # checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = c("n", "type", "vcov"),
-                      valid_args = c("vcov", "se", "cluster", "ssc", "forceCovariance", "keepBounded"))
-    }
-
-    # The objects from the estimation and the summary are identical, except regarding the vcov
-	fromSummary = isTRUE(x$summary)
-
-	if(!missnull(fitstat)){
-	    fitstat = fitstat_validate(fitstat, TRUE)
-	}
-
-	# User options
-	set_defaults("fixest_print")
-
-	# if NOT from summary, we consider the argument 'type'
-	if(!fromSummary){
-	    # checking argument type
-	    check_arg_plus(type, "match(coef, table)")
-
-	    if(type == "coef"){
-	        print(coef(x))
-	        return(invisible())
-	    }
-	}
-
-	isNegbin = x$method == "fenegbin" || (x$method %in% c("femlm", "feNmlm") && x$family=="negbin")
-
-	x = summary(x, fromPrint = TRUE, ...)
-
-	check_arg(n, "integer scalar GE{1}")
-
-	msgRemaining = ""
-	nb_coef = length(coef(x)) - isNegbin
-	if(missing(n) && is.null(x$n_print)){
-		if(fromSummary && !isTRUE(x$summary_from_fit)){
-			n = Inf
-		} else {
-			if(nb_coef <= 10){
-				n = 10
-			} else {
-				n = 8
-				msgRemaining = paste0("... ", nb_coef - n, " coefficients remaining (display them with summary() or use argument n)\n")
-			}
-		}
-
-	} else {
-	    if(!is.null(x$n_print)) n = x$n_print
-
-	    if(n < nb_coef){
-	        msgRemaining = paste0("... ", nb_coef - n, " coefficients remaining\n")
-	    }
-	}
-
-	# We also add the collinearity message
-	collinearity_msg = ""
-	if(!is.null(x$collin.var)){
-	    n_collin = length(x$collin.var)
-	    collinearity_msg = paste0("... ", n_collin, " variable", plural(n_collin, "s.was"), " removed because of collinearity (", enumerate_items(x$collin.var, nmax = 3), ifelse(n_collin > 3, " [full set in $collin.var]", ""), ")\n")
-	    if(isTRUE(x$iv) && any(grepl("^fit_", x$collin.var))){
-	        if(!any(grepl("^fit_", names(x$coefficients)))){
-	            iv_msg = "NOTE: all endogenous regressors were removed.\n"
-	        } else {
-	            n_rm = sum(grepl("^fit_", x$collin.var))
-	            iv_msg = paste0("Important note: ", n_letter(n_rm), " endogenous regressor", plural(n_rm, "s.was"), " removed => IV estimation not valid.\n")
-	        }
-
-	        collinearity_msg = paste0(collinearity_msg, iv_msg)
-	    }
-	}
-
-	if(isFALSE(x$convStatus)){
-	    last_warn = getOption("fixest_last_warning")
-	    if(is.null(last_warn) || (proc.time() - last_warn)[3] > 1){
-	        if(x$method %in% c("femlm", "feNmlm", "fenegbin")){
-	            warning("The optimization algorithm did not converge, the results are not reliable. (", x$message, ")", call. = FALSE)
-	        } else if(x$method_type == "feols"){
-	            warning("The demeaning algorithm did not converge, the results are not reliable. (", x$message, ")", call. = FALSE)
-	        } else {
-	            warning("The GLM algorithm did not converge, the results are not reliable. (", x$message, ")", call. = FALSE)
-	        }
-	    }
-
-	}
-
-	coeftable = x$coeftable
-
-	# The type of SE
-	se.type = attr(coeftable, "type")
-	if(is.null(se.type)) se.type = "Custom"
-
-	if(x$method_type %in% c("femlm", "feNmlm")){
-		family_format = c(poisson="Poisson", negbin="Negative Binomial", logit="Logit", gaussian="Gaussian")
-		msg = ifelse(is.null(x$call$NL.fml), "", "Non-linear ")
-		half_line = paste0(msg, "ML estimation, family = ", family_format[x$family])
-	} else if(x$method %in% c("feglm", "feglm.fit")) {
-		fam_call = x$call$family
-		if(is.null(names(fam_call))){
-			half_line = paste0("GLM estimation, family = ", x$family$family)
-		} else {
-			half_line = paste0("GLM estimation, family = ", deparse_long(fam_call))
-		}
-	} else if(x$method == "fepois") {
-	    half_line = "Poisson estimation"
-	} else if(x$method == "fenegbin") {
-	    half_line = "Negative Binomial ML estimation"
-	} else {
-		half_line = "OLS estimation"
-	}
-
-	if(isTRUE(x$iv)){
-	    glue = function(...) paste(..., collapse = ", ")
-	    first_line = paste0("TSLS estimation, Dep. Var.: ", as.character(x$fml)[[2]], ", Endo.: ", glue(get_vars(x$iv_endo_fml)), ", Instr.: ", glue(x$iv_inst_names), "\n")
-	    second_line = paste0(ifunit(x$iv_stage, "First", "Second"), " stage: Dep. Var.: ", as.character(x$fml)[[2]], "\n")
-	    cat(first_line, second_line, sep = "")
-	} else {
-	    cat(half_line, ", Dep. Var.: ", as.character(x$fml)[[2]], "\n", sep="")
-	}
-
-
-	cat("Observations:", addCommas(x$nobs), "\n")
-	if(!is.null(x$fixef_terms)){
-	    terms_full = extract_fe_slope(x$fixef_terms)
-	    fixef_vars = terms_full$fixef_vars
-
-	    if(length(fixef_vars) > 0){
-	        cat("Fixed-effects: ", paste0(fixef_vars, ": ", addCommas(x$fixef_sizes[fixef_vars]), collapse=",  "), "\n", sep = "")
-	    }
-
-	    cat("Varying slopes: ", paste0(terms_full$slope_vars, " (", terms_full$slope_fe, ": ", addCommas(x$fixef_sizes[terms_full$slope_fe]), ")", collapse = ",  "), "\n", sep = "")
-
-	} else {
-	    if(!is.null(x$fixef_sizes)) cat("Fixed-effects: ", paste0(x$fixef_vars, ": ", addCommas(x$fixef_sizes), collapse = ",  "), "\n", sep = "")
-	}
-
-
-	if(is.null(x$onlyFixef)){
-
-		cat("Standard-errors:", se.type, "\n")
-
-	    last_line = paste0(msgRemaining, collinearity_msg)
-
-		# The matrix of coefficients
-		if(isNegbin){
-			if(nrow(coeftable) == 2){
-				new_table = coeftable[1, , drop = FALSE]
-			} else {
-				new_table = coeftable[-nrow(coeftable), ]
-			}
-
-		    print_coeftable(head(new_table, n), lastLine = last_line)
-
-			theta = coeftable[".theta", 1]
-			noDispInfo = ifelse(theta > 1000, "(theta >> 0, no sign of overdispersion, you may consider a Poisson model)", "")
-			cat("Over-dispersion parameter: theta =", theta, noDispInfo, "\n")
-		} else {
-			print_coeftable(head(coeftable, n), lastLine = last_line)
-		}
-	}
-
-	if(isTRUE(x$NA_model)){
-	    return(invisible())
-	}
-
-	if(!is.null(fitstat) && identical(fitstat, NA)){
-	    # No fitstat
-
-	} else {
-
-	    if(is.null(fitstat) || "." %in% fitstat){
-	        if(x$method_type == "feols"){
-	            default_fit = c("rmse", "ar2")
-
-	            if(!is.null(x$fixef_sizes) && is.null(x$onlyFixef)){
-	                default_fit = c(default_fit, "wr2")
-	            }
-
-	            if(isTRUE(x$iv)){
-	                default_fit = c(default_fit, "ivf1", "wh", "sargan")
-	            }
-
-	        } else {
-	            default_fit = c("ll", "apr2", "bic", "cor2")
-	        }
-
-	        if("." %in% fitstat){
-	            fitstat = setdiff(c(default_fit, fitstat), ".")
-	        } else {
-	            fitstat = default_fit
-	        }
-	    }
-
-	    print(fitstat(x, fitstat), na.rm = TRUE, group.solo = TRUE)
-	}
-
-	if(isFALSE(x$convStatus)){
-	    iter_format = x$iterations
-	    if(length(iter_format)== 1){
-	        iter_format = paste0("lhs: ", iter_format)
-	    } else {
-	        n_iter = length(iter_format)
-	        iter_format = paste0("lhs: ", iter_format[n_iter], ", rhs: ", paste0(head(iter_format, min(n_iter - 1, n)), collapse = ", "))
-	    }
-		cat("# Evaluations:", iter_format, "--", x$message, "\n")
-	}
-
-}
-
-##
-
-#' Summary of a \code{fixest} object. Computes different types of standard errors.
-#'
-#' This function is similar to \code{print.fixest}. It provides the table of coefficients along with other information on the fit of the estimation. It can compute different types of standard errors. The new variance covariance matrix is an object returned.
-#'
-#' @inheritParams feNmlm
-#' @inheritParams aggregate.fixest
-#'
-#' @method summary fixest
-#' @param vcov Versatile argument to specify the VCOV. In general, it is either a character scalar equal to a VCOV type, either a formula of the form: \code{vcov_type ~ variables}. The VCOV types implemented are: "iid", "hetero" (or "HC1"), "cluster", "twoway", "NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley". It also accepts object from \code{\link[fixest]{vcov_cluster}}, \code{\link[fixest:vcov_hac]{vcov_NW}}, \code{\link[fixest:vcov_hac]{NW}}, \code{\link[fixest:vcov_hac]{vcov_DK}}, \code{\link[fixest:vcov_hac]{DK}}, \code{\link[fixest]{vcov_conley}} and \code{\link[fixest:vcov_conley]{conley}}. It also accepts covariance matrices computed externally. Finally it accepts functions to compute the covariances. See the `vcov` documentation in the \href{https://lrberge.github.io/fixest/articles/fixest_walkthrough.html#the-vcov-argument-1}{vignette}.
-#' @param se Character scalar. Which kind of standard error should be computed: \dQuote{standard}, \dQuote{hetero}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are clusters in the estimation: \code{se = "cluster"}, otherwise \code{se = "iid"}. Note that this argument is deprecated, you should use \code{vcov} instead.
-#' @param cluster Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1", "var2")]}, \code{cluster = c("var1", "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as fixed-effects in the estimation, you can leave it blank with \code{vcov = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] fixed-effect). You can interact two variables using \code{^} with the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"}.
-#' @param stage Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1} and there are multiple endogenous regressors or if \code{stage} is of length 2, then an object of class \code{fixest_multi} is returned.
-#' @param object A \code{fixest} object. Obtained using the functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#' @param ssc An object of class \code{ssc.type} obtained with the function \code{\link[fixest]{ssc}}. Represents how the degree of freedom correction should be done.You must use the function \code{\link[fixest]{ssc}} for this argument. The arguments and defaults of the function \code{\link[fixest]{ssc}} are: \code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"}, \code{t.df = "min"}, \code{fixef.force_exact=FALSE)}. See the help of the function \code{\link[fixest]{ssc}} for details.
-#' @param .vcov A user provided covariance matrix or a function computing this matrix. If a matrix, it must be a square matrix of the same number of rows as the number of variables estimated. If a function, it must return the previously mentioned matrix.
-#' @param lean Logical, default is \code{FALSE}. Used to reduce the (memory) size of the summary object. If \code{TRUE}, then all objects of length N (the number of observations) are removed from the result. Note that some \code{fixest} methods may consequently not work when applied to the summary.
-#' @param forceCovariance (Advanced users.) Logical, default is \code{FALSE}. In the peculiar case where the obtained Hessian is not invertible (usually because of collinearity of some variables), use this option to force the covariance matrix, by using a generalized inverse of the Hessian. This can be useful to spot where possible problems come from.
-#' @param keepBounded (Advanced users -- \code{feNmlm} with non-linear part and bounded coefficients only.) Logical, default is \code{FALSE}. If \code{TRUE}, then the bounded coefficients (if any) are treated as unrestricted coefficients and their S.E. is computed (otherwise it is not).
-#' @param n Integer, default is 1000. Number of coefficients to display when the print method is used.
-#' @param ... Only used if the argument \code{.vocv} is provided and is a function: extra arguments to be passed to that function.
-#'
-#' @section Compatibility with \pkg{sandwich} package:
-#' The VCOVs from \code{sandwich} can be used with \code{feols}, \code{feglm} and \code{fepois} estimations. If you want to have a \code{sandwich} VCOV when using \code{summary.fixest}, you can use the argument \code{vcov} to specify the VCOV function to use (see examples).
-#' Note that if you do so and you use a formula in the \code{cluster} argument, an innocuous warning can pop up if you used several non-numeric fixed-effects in the estimation (this is due to the function \code{\link[stats]{expand.model.frame}} used in \code{sandwich}).
-#'
-#' @return
-#' It returns a \code{fixest} object with:
-#' \item{cov.scaled}{The new variance-covariance matrix (computed according to the argument \code{se}).}
-#' \item{se}{The new standard-errors (computed according to the argument \code{se}).}
-#' \item{coeftable}{The table of coefficients with the new standard errors.}
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{fixef.fixest}} to extract the fixed-effects coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # Load trade data
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade (with 3 fixed-effects)
-#' est_pois = fepois(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
-#'
-#' # Comparing different types of standard errors
-#' sum_standard = summary(est_pois, vcov = "iid")
-#' sum_hetero   = summary(est_pois, vcov = "hetero")
-#' sum_oneway   = summary(est_pois, vcov = "cluster")
-#' sum_twoway   = summary(est_pois, vcov = "twoway")
-#'
-#' etable(sum_standard, sum_hetero, sum_oneway, sum_twoway)
-#'
-#' # Alternative ways to cluster the SE:
-#' summary(est_pois, vcov = cluster ~ Product + Origin)
-#' summary(est_pois, vcov = ~Product + Origin)
-#' summary(est_pois, cluster = ~Product + Origin)
-#'
-#' # You can interact the clustering variables "live" using the var1 ^ var2 syntax.#'
-#' summary(est_pois, vcov = ~Destination^Product)
-#'
-#' #
-#' # Newey-West and Driscoll-Kraay SEs
-#' #
-#'
-#' data(base_did)
-#' # Simple estimation on a panel
-#' est = feols(y ~ x1, base_did)
-#'
-#' # --
-#' # Newey-West
-#' # Use the syntax NW ~ unit + time
-#' summary(est, NW ~ id + period)
-#'
-#' # Now take a lag of 3:
-#' summary(est, NW(3) ~ id + period)
-#'
-#' # --
-#' # Driscoll-Kraay
-#' # Use the syntax DK ~ time
-#' summary(est, DK ~ period)
-#'
-#' # Now take a lag of 3:
-#' summary(est, DK(3) ~ period)
-#'
-#' #--
-#' # Implicit deductions
-#' # When the estimation is done with a panel.id, you don't need to
-#' # specify these values.
-#'
-#' est_panel = feols(y ~ x1, base_did, panel.id = ~id + period)
-#'
-#' # Both methods, NM and DK, now work automatically
-#' summary(est_panel, "NW")
-#' summary(est_panel, "DK")
-#'
-#' #
-#' # VCOVs robust to spatial correlation
-#' #
-#'
-#' data(quakes)
-#' est_geo = feols(depth ~ mag, quakes)
-#'
-#' # --
-#' # Conley
-#' # Use the syntax: conley(cutoff) ~ lat + lon
-#' # with lat/lon the latitude/longitude variable names in the data set
-#' summary(est_geo, conley(100) ~ lat + long)
-#'
-#' # Change the cutoff, and how the distance is computed
-#' summary(est_geo, conley(200, distance = "spherical") ~ lat + long)
-#'
-#' # --
-#' # Implicit deduction
-#' # By default the latitude and longitude are directly fetched in the data based
-#' # on pattern matching. So you don't have to specify them.
-#' # Further an automatic cutoff is computed by default.
-#'
-#' # The following works
-#' summary(est_geo, "conley")
-#'
-#'
-#'
-#' #
-#' # Compatibility with sandwich
-#' #
-#'
-#' # You can use the VOCVs from sandwich by using the argument .vcov:
-#' library(sandwich)
-#' summary(est_pois, .vcov = vcovCL, cluster = trade[, c("Destination", "Product")])
-#'
-#'
-summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov = NULL,
-                          stage = NULL, lean = FALSE, agg = NULL, forceCovariance = FALSE,
-                          se = NULL, keepBounded = FALSE, n = 1000,
-                          nthreads = getFixest_nthreads(), ...){
-
-	# computes the clustered SEs and returns the modified vcov and coeftable
-    # NOTA: if the object is already a summary
-
-	if(isTRUE(object$onlyFixef) || isTRUE(object$NA_model)){
-		# means that the estimation is done without variables
-		return(object)
-	}
-
-    mc = match.call()
-
-	dots = list(...)
-
-	check_arg(n, "integer scalar GE{1}")
-	if(!missing(n)){
-	    object$n_print = n
-	}
-
-	# we need this to save the summary flags
-	# All three arguments se+cluster+.vcov are formatted into a valid vcov arg.
-	vcov_in = vcov = oldargs_to_vcov(se, cluster, vcov, .vcov)
-
-	check_arg(lean, "logical scalar")
-	check_arg(stage, "NULL integer vector no na len(,2) GE{1} LE{2}")
-
-	skip_vcov = FALSE
-	if(isTRUE(object$summary)){
-
-	    if("fromPrint" %in% names(dots)){
-	        # From print
-	        return(object)
-
-	    } else if(is.null(vcov) && is.null(ssc)){
-	        # We return directly the object ONLY if not any other argument has been passed
-
-	        skip_vcov = TRUE
-	        if(is.null(agg) && is.null(stage)){
-	            if(!lean || (lean && isTRUE(object$lean))){
-	                # No modification required
-	                object$summary_from_fit = FALSE
-	                return(object)
-	            }
-	        }
-	    }
-
-	    assign_flags(object$summary_flags, vcov = vcov, ssc = ssc, agg = agg)
-	}
-
-	# Checking arguments in ...
-	if(is_user_level_call()){
-	    if(!is_function_in_it(vcov)){
-	        validate_dots(suggest_args = c("se", "cluster", "ssc"), valid_args = "dof")
-	    }
-	}
-
-	if(is.null(stage)) stage = 2
-
-
-	# IV
-	if(isTRUE(object$iv) && !isTRUE(dots$iv)){
-	    stage = unique(stage)
-	    res = list()
-
-	    # if lean, we still compute the summary for the first stage,
-	    #  then we will inject it in the iv_first_stage object of the 2nd stage
-	    # => this is critical to get the right Wald stat (of the 1st stage),
-	    #  otherwise it won't be possible to get it.
-	    remove_stage_1 = FALSE
-	    if(lean && !1 %in% stage){
-	        remove_stage_1 = TRUE
-	        stage = 1:2
-	    }
-
-	    stage_names = c()
-
-	    for(s in seq_along(stage)){
-	        if(stage[s] == 1){
-                for(i in seq_along(object$iv_first_stage)){
-                    res[[length(res) + 1]] = summary(object$iv_first_stage[[i]],
-                                                     vcov = vcov, ssc = ssc, lean = lean,
-                                                     forceCovariance = forceCovariance,
-                                                     n = n, nthreads = nthreads, iv = TRUE)
-
-                    stage_names[length(stage_names) + 1] = paste0("First stage: ", names(object$iv_first_stage)[i])
-                }
-
-	        } else {
-	            # We keep the information on clustering => matters for wald tests of 1st stage
-	            my_res = summary(object, vcov = vcov, ssc = ssc, lean = lean,
-	                             forceCovariance = forceCovariance, n = n, nthreads = nthreads, iv = TRUE)
-
-	            res[[length(res) + 1]] = my_res
-	            stage_names[length(stage_names) + 1] = "Second stage"
-	        }
-	    }
-
-	    if(lean && 2 %in% stage){
-	        # we inject the summary of the first stage into the iv_first_stage
-	        qui_1st = which(grepl("^First", stage_names))
-	        qui_2nd = which(stage_names == "Second stage")
-
-	        tmp_1st = res[qui_1st]
-	        names(tmp_1st) = names(object$iv_first_stage)
-
-	        res[[qui_2nd]][["iv_first_stage"]] = tmp_1st
-	    }
-
-	    if(remove_stage_1){
-	        qui_2nd = which(stage_names == "Second stage")
-	        return(res[[qui_2nd]])
-	    }
-
-	    if(length(res) == 1){
-	        return(res[[1]])
-	    }
-
-	    index = list("iv" = length(res))
-	    all_names = list("iv" = stage_names)
-	    res_multi = setup_multi(index, all_names, res)
-	    attr(res_multi, "print_request") = "long"
-
-	    return(res_multi)
-	}
-
-
-	# The new VCOV
-	if(skip_vcov){
-	    vcov = object$cov.scaled
-
-	} else {
-	    vcov = vcov.fixest(object, vcov = vcov, ssc = ssc, forceCovariance = forceCovariance,
-	                       keepBounded = keepBounded, nthreads = nthreads,
-	                       attr = TRUE, se = se, cluster = cluster, ...)
-	}
-
-	# NOTA:
-	# I need to add se and cluster even if they're not needed only to ensure it
-	# works fine when vcov is a function and cluster/se are arguments
-
-	sd2 = diag(vcov)
-	sd2[sd2 < 0] = NA
-	se = sqrt(sd2)
-
-	# used to handle the case of bounded parameters
-	params = names(object$coefficients)
-	if(length(se) != length(params)){
-		se = se[params]
-	}
-	names(se) = params
-
-	# The coeftable is modified accordingly
-	coeftable = object$coeftable
-
-	# th z & p values
-	zvalue = object$coefficients/se
-	pvalue = fixest_pvalue(object, zvalue, vcov)
-
-	# update of se if bounded
-	se_format = se
-	isBounded = object$isBounded
-	if(!is.null(isBounded) && any(isBounded)){
-		if(!keepBounded){
-			se_format[!isBounded] = decimalFormat(se_format[!isBounded])
-			se_format[isBounded] = attr(isBounded, "type")
-		}
-	}
-
-	# modifs of the table
-	coeftable = cbind("Estimate" = object$coefficients, "Std. Error" = se_format,
-	                  "t value" = zvalue, "Pr(>|t|)" = pvalue)
-
-	attr(coeftable, "type") = attr(se, "type") = attr(vcov, "type")
-
-	object$cov.scaled = vcov
-	object$coeftable = coeftable
-	object$se = se
-
-	if(lean){
-	    var2clean = c("fixef_id", "residuals", "fitted.values", "scores", "sumFE",
-	                  "slope_variables_reordered", "y", "weights", "irls_weights",
-	                  "obs_selection", "iv_residuals", "fitted.values_demean",
-	                  "working_residuals", "linear.predictors")
-
-	    object[var2clean] = NULL
-
-	    object$lean = TRUE
-	}
-
-	object$summary = TRUE
-
-	# We save the arguments used to construct the summary
-	if("summary_flags" %in% names(dots)){
-	    # If here => this is a call from an estimation (=fit)
-	    object$summary_flags = dots$summary_flags
-	    object$summary_from_fit = TRUE
-	} else {
-	    # build_flags does not accept missing arguments
-	    if(missing(ssc)) ssc = NULL
-
-	    if(lean){
-
-	        size_KB = as.numeric(object.size(vcov)) / 8 / 1000
-
-	        if(size_KB > 100){
-	            # Here => means the user has manually provided a cluster => will be of size N at least
-	            # To respect lean = TRUE we keep no memory of this choice
-	            vcov_in = NULL
-	        }
-
-	    }
-
-	    object$summary_flags = build_flags(mc, vcov = vcov_in, ssc = ssc)
-	    object$summary_from_fit = NULL
-	}
-
-	# agg
-	if(!missnull(agg)){
-	    agg_result = aggregate(object, agg, full = TRUE, from_summary = TRUE)
-	    object$coeftable = agg_result$coeftable
-	    object$model_matrix_info = agg_result$model_matrix_info
-	    object$is_agg = TRUE
-	}
-
-	return(object)
-}
-
-
-#' @rdname summary.fixest
-summary.fixest_list = function(object, se, cluster, ssc = getFixest_ssc(), .vcov, stage = 2, lean = FALSE, n, ...){
-
-    dots = list(...)
-
-    res = list()
-    for(i in seq_along(object)){
-        my_res = summary(object[[i]], se = se, cluster = cluster, ssc = ssc, .vcov = .vcov, stage = stage, lean = lean, n = n)
-
-        # we unroll in case of IV
-        if("fixest_multi" %in% class(my_res)){
-            data = attr(my_res, "data")
-            for(j in seq_along(data)){
-                res[[length(res) + 1]] = data[[j]]
-            }
-        } else {
-            res[[length(res) + 1]] = my_res
-        }
-    }
-
-    # We return a simple list
-    class(res) = NULL
-
-    res
-}
-
-#' Obtain various statistics from an estimation
-#'
-#' Set of functions to directly extract some commonly used statistics, like the p-value or the table of coefficients, from estimations. This was first implemented for \code{fixest} estimations, but has some support for other models.
-#'
-#' @inheritParams etable
-#'
-#' @param object An estimation. For example obtained from \code{\link[fixest]{feols}}.
-#' @param se [Fixest specific.] Character scalar. Which kind of standard error should be computed: \dQuote{iid}, \dQuote{hetero}, \dQuote{cluster}, \dQuote{twoway}, \dQuote{threeway} or \dQuote{fourway}? By default if there are fixed-effects in the estimation: \code{se = "cluster"}, otherwise \code{se = "iid"}. Note that this argument is not needed if the argument \code{cluster} is present.
-#' @param cluster [Fixest specific.] Tells how to cluster the standard-errors (if clustering is requested). Can be either a list of vectors, a character vector of variable names, a formula or an integer vector. Assume we want to perform 2-way clustering over \code{var1} and \code{var2} contained in the data.frame \code{base} used for the estimation. All the following \code{cluster} arguments are valid and do the same thing: \code{cluster = base[, c("var1, "var2")]}, \code{cluster = c("var1, "var2")}, \code{cluster = ~var1+var2}. If the two variables were used as clusters in the estimation, you could further use \code{cluster = 1:2} or leave it blank with \code{se = "twoway"} (assuming \code{var1} [resp. \code{var2}] was the 1st [res. 2nd] cluster).
-#' @param ... Other arguments to be passed to \code{summary}.
-#'
-#' @details
-#' This set of functions is primarily constructed for \code{fixest} estimations. Although it can work for non-\code{fixest} estimations, support for exotic estimation procedures that do not report standardized coefficient tables is highly limited.
-#'
-#' @return
-#' Returns a table of coefficients, with in rows the variables and four columns: the estimate, the standard-error, the t-statistic and the p-value.
-#'
-#' @examples
-#'
-#' # Some data and estimation
-#' data(trade)
-#' est = fepois(Euros ~ log(dist_km) | Origin^Product + Year, trade)
-#'
-#' #
-#' # Coeftable/se/tstat/pvalue
-#' #
-#'
-#' # Default is clustering along Origin^Product
-#' coeftable(est)
-#' se(est)
-#' tstat(est)
-#' pvalue(est)
-#'
-#' # Now with two-way clustered standard-errors
-#' #  and using coeftable()
-#'
-#' coeftable(est, cluster = ~Origin + Product)
-#' se(est, cluster = ~Origin + Product)
-#' pvalue(est, cluster = ~Origin + Product)
-#' tstat(est, cluster = ~Origin + Product)
-#'
-#' # Or you can cluster only once:
-#' est_sum = summary(est, cluster = ~Origin + Product)
-#' coeftable(est_sum)
-#' se(est_sum)
-#' tstat(est_sum)
-#' pvalue(est_sum)
-#'
-#' # You can use the arguments keep, drop, order
-#' # to rearrange the results
-#'
-#' base = iris
-#' names(base) = c("y", "x1", "x2", "x3", "species")
-#'
-#' est_iv = feols(y ~ x1 | x2 ~ x3, base)
-#'
-#' tstat(est_iv, keep = "x1")
-#' coeftable(est_iv, keep = "x1|Int")
-#'
-#' coeftable(est_iv, order = "!Int")
-#'
-#'
-#'
-coeftable = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
-    # We don't explicitly refer to the other arguments
-
-    check_arg(keep, drop, order, "NULL character vector no na")
-
-    IS_FIXEST = "fixest" %in% class(object)
-    # IS_FIXEST_MULI = "fixest_multi" %in% class(object)
-    # IS_FIXEST_LIST = "fixest_multi" %in% class(object)
-
-    if(IS_FIXEST){
-        if(!isTRUE(object$summary) || !(all_missing(vcov, ssc, cluster) && ...length() > 0)){
-            object = summary(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
-        }
-    } else {
-        if(!any(grepl("summary", class(object)))){
-            # Known issue:
-            # - if vcov/.../order are also args of summary, that will be a problem
-
-            args = list(object = object)
-
-            if(...length() > 0){
-                args = append(args, list(...))
-            }
-
-            object = do.call("summary", args)
-        }
-    }
-
-    # Let's find out the coefficients table
-    if(IS_FIXEST){
-        res = object$coeftable
-    } else {
-        list_mat = object[sapply(object, is.matrix)]
-
-        ok = FALSE
-        for(i in seq_along(list_mat)){
-            mat = list_mat[[i]]
-            if(!is.null(colnames(mat)) && any(grepl("(?i)(estimate|value|Pr\\()", colnames(mat)))){
-                ok = TRUE
-                res = mat
-            }
-        }
-
-        if(ok == FALSE){
-            stop("Sorry, the coeffficients table could not be extracted.")
-        }
-
-    }
-
-    if(!missnull(keep) || !missnull(drop) || !missnull(order)){
-        r_names = rownames(res)
-        r_names = keep_apply(r_names, keep)
-        r_names = drop_apply(r_names, drop)
-        r_names = order_apply(r_names, order)
-
-        if(length(r_names) == 0){
-            return(NULL)
-        }
-
-        res = res[r_names, , drop = FALSE]
-    }
-
-    res
-}
-
-#' @describeIn coeftable Extracts the p-value of an estimation
-pvalue = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
-
-    check_arg(keep, drop, order, "NULL character vector no na")
-
-    mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
-
-    if(ncol(mat) != 4){
-        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
-    }
-
-    res = mat[, 4]
-    if(is.null(names(res))) {
-        names(res) = rownames(mat)
-    }
-
-    if(!missnull(keep) || !missnull(drop) || !missnull(order)){
-        r_names = names(res)
-        r_names = keep_apply(r_names, keep)
-        r_names = drop_apply(r_names, drop)
-        r_names = order_apply(r_names, order)
-
-        if(length(r_names) == 0){
-            return(numeric(0))
-        }
-
-        res = res[r_names]
-    }
-
-    res
-}
-
-#' @describeIn coeftable Extracts the t-statistics of an estimation
-tstat = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
-
-    check_arg(keep, drop, order, "NULL character vector no na")
-
-    mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
-
-    if(ncol(mat) != 4){
-        stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
-    }
-
-    res = mat[, 3]
-    if(is.null(names(res))) {
-        names(res) = rownames(mat)
-    }
-
-    if(!missnull(keep) || !missnull(drop) || !missnull(order)){
-        r_names = names(res)
-        r_names = keep_apply(r_names, keep)
-        r_names = drop_apply(r_names, drop)
-        r_names = order_apply(r_names, order)
-
-        if(length(r_names) == 0){
-            return(numeric(0))
-        }
-
-        res = res[r_names]
-    }
-
-    res
-}
-
-#' @describeIn coeftable Extracts the standard-error of an estimation
-se = function(object, vcov = NULL, ssc = NULL, cluster = NULL, keep, drop, order, ...){
-
-    check_arg(keep, drop, order, "NULL character vector no na")
-
-    if(is.matrix(object) && nrow(object) == ncol(object)){
-        # special case => object is a VCOV matrix and NOT an estimation
-        res = sqrt(diag(object))
-
-    } else {
-
-        mat = coeftable(object, vcov = vcov, ssc = ssc, cluster = cluster, ...)
-
-        if(ncol(mat) != 4){
-            stop("No appropriate coefficient table found (number of columns is ", ncol(mat), " instead of 4), sorry.")
-        }
-
-        res = mat[, 2]
-        if(is.null(names(res))) {
-            names(res) = rownames(mat)
-        }
-    }
-
-    if(!missnull(keep) || !missnull(drop) || !missnull(order)){
-        r_names = names(res)
-        r_names = keep_apply(r_names, keep)
-        r_names = drop_apply(r_names, drop)
-        r_names = order_apply(r_names, order)
-
-        if(length(r_names) == 0){
-            return(numeric(0))
-        }
-
-        res = res[r_names]
-    }
-
-    res
-}
-
-#' Summary method for fixed-effects coefficients
-#'
-#' This function summarizes the main characteristics of the fixed-effects coefficients. It shows the number of fixed-effects that have been set as references and the first elements of the fixed-effects.
-#'
-#' @method summary fixest.fixef
-#'
-#' @param object An object returned by the function \code{\link[fixest]{fixef.fixest}}.
-#' @param n Positive integer, defaults to 5. The \code{n} first fixed-effects for each fixed-effect dimension are reported.
-#' @param ... Not currently used.
-#'
-#' @return
-#' It prints the number of fixed-effect coefficients per fixed-effect dimension, as well as the number of fixed-effects used as references for each dimension, and the mean and variance of the fixed-effect coefficients. Finally, it reports the first 5 (arg. \code{n}) elements of each fixed-effect.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' \code{\link[fixest]{femlm}}, \code{\link[fixest]{fixef.fixest}}, \code{\link[fixest]{plot.fixest.fixef}}.
-#'
-#' @examples
-#'
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade
-#' # => we account for 3 fixed-effects effects
-#' est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
-#'
-#' # obtaining the fixed-effects coefficients
-#' fe_trade = fixef(est_pois)
-#'
-#' # printing some summary information on the fixed-effects coefficients:
-#' summary(fe_trade)
-#'
-#'
-summary.fixest.fixef = function(object, n = 5, ...){
-	# This function shows some generic information on the fixed-effect coefficients
-
-    # checking arguments in dots
-    if(is_user_level_call()){
-        validate_dots(suggest_args = "n")
-    }
-
-	Q = length(object)
-	fixef_names = names(object)
-	slope_flag = grepl("\\[", fixef_names)
-	fe = gsub("\\[.+", "", fixef_names)
-	slope = gsub(".+\\[|\\].+", "", fixef_names)
-
-	isSlope = any(slope_flag)
-	isFE = any(!slope_flag)
-	info = as.character(10*isFE + isSlope)
-
-	# we rework the names
-	fixef_names[slope_flag] = paste0(slope[slope_flag], " (slopes: ", fe[slope_flag], ")")
-
-	isRegular = TRUE
-	if(Q > 1){
-		nb_ref = attr(object, "references")
-		nb_per_cluster = sapply(object, length)
-		mean_per_cluster = sd_per_cluster = c()
-		for(i in 1:Q){
-			mean_per_cluster[i] = as.character(signif(mean(object[[i]]), 3))
-			sd_per_cluster[i] = as.character(signif(sd(object[[i]]), 3))
-		}
-		res = as.data.frame(rbind(nb_per_cluster, nb_ref, mean_per_cluster, sd_per_cluster))
-
-		row_1 = paste0("Number of ", switch(info, "11" = "fixed-effects/slopes", "10"="fixed-effects", "1"="slopes"))
-
-		rownames(res) = c(row_1, "Number of references", "Mean", "Standard-deviation")
-
-		colnames(res) = fixef_names
-
-		if(sum(nb_ref) > Q-1){
-			isRegular = FALSE
-		}
-	}
-
-	# The message
-
-	my_title = paste0(switch(info, "11" = "Fixed-effects/Slope", "10"="Fixed_effects", "1"="Slope"), " coefficients\n")
-	cat(my_title)
-	if(Q == 1){
-		x1 = object[[1]]
-		if(slope_flag){
-		    cat("Number of slope coefficients for variable ", slope, " (slope: ", fe, ") is ", length(x1), ".\n", sep = "")
-		} else {
-		    cat("Number of fixed-effects for variable ", fixef_names, " is ", length(x1), ".\n", sep = "")
-		}
-
-		cat("\tMean = ", signif(mean(x1), 3), "\tVariance = ", signif(var(x1), 3), "\n", sep = "")
-	} else {
-		print(res)
-	}
-
-	# We print the first 5 elements of each fixed-effect
-	cat("\nCOEFFICIENTS:\n")
-	for(i in 1:Q){
-		m = head(object[[i]], n)
-
-		m_char = as.data.frame(t(as.data.frame(c("", as.character(signif(m, 4))))))
-		names(m_char) = c(paste0(fixef_names[i], ":"), names(m))
-		rownames(m_char) = " "
-
-		n_cluster = length(object[[i]])
-		if(n_cluster > n){
-			m_char[["   "]] = paste0("... ", addCommas(n_cluster - n), " remaining")
-		}
-
-		print(m_char)
-		if(i != Q) cat("-----\n")
-	}
-
-}
-
-
-#' Extract the Fixed-Effects from a \code{fixest} estimation.
-#'
-#' This function retrieves the fixed effects from a \code{fixest} estimation. It is useful only when there are one or more fixed-effect dimensions.
-#'
-#' @inheritParams feNmlm
-#'
-#' @param object A \code{fixest} estimation (e.g. obtained using \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}).
-#' @param notes Logical. Whether to display a note when the fixed-effects coefficients are not regular.
-#' @param sorted Logical, default is \code{TRUE}. Whether to order the fixed-effects by their names. If \code{FALSE}, then the order used in the demeaning algorithm is used.
-#'
-#' @details
-#' If the fixed-effect coefficients not regular, then several reference points need to be set, leading to the coefficients to be NOT interpretable. If this is the case, then a warning is raised.
-#'
-#' @return
-#' A list containing the vectors of the fixed effects.
-#'
-#' If there is more than 1 fixed-effect, then the attribute \dQuote{references} is created. This is a vector of length the number of fixed-effects, each element contains the number of coefficients set as references. By construction, the elements of the first fixed-effect dimension are never set as references. In the presence of regular fixed-effects, there should be Q-1 references (with Q the number of fixed-effects).
-#'
-#' @seealso
-#' \code{\link[fixest]{plot.fixest.fixef}}. See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, \code{\link[fixest]{fixef.fixest}} to extract the fixed-effect coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
-#'
-#' @author
-#' Laurent Berge
-#'
-#'
-#' @examples
-#'
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade => we account for 3 fixed-effects
-#' est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
-#'
-#' # Obtaining the fixed-effects coefficients:
-#' fe_trade = fixef(est_pois)
-#'
-#' # The fixed-effects of the first fixed-effect dimension:
-#' head(fe_trade$Origin)
-#'
-#' # Summary information:
-#' summary(fe_trade)
-#'
-#' # Plotting them:
-#' plot(fe_trade)
-#'
-fixef.fixest = function(object, notes = getFixest_notes(), sorted = TRUE, nthreads = getFixest_nthreads(),
-                        fixef.tol = 1e-5, fixef.iter = 10000, ...){
-
-	# object is a fixest object
-	# This function retrieves the dummies
-
-    check_arg(notes, sorted, "logical scalar")
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots()
-    }
-
-    check_value(fixef.tol, "numeric scalar GT{0} LT{1}")
-    check_value(fixef.iter, "strict integer scalar GT{0}")
-
-    if(isTRUE(object$lean)){
-        # LATER: recompute the FEs by extracting them from the data
-        stop("Fixed-effects from 'lean' fixest objects cannot be extracted. Please re-estimate with 'lean = FALSE'.")
-    }
-
-	# Preliminary stuff
-	S = object$sumFE
-
-	if(is.null(S)){
-		stop("The estimation was done without fixed-effects (FE). The FE coefficients cannot be retrieved.")
-	}
-
-	family = object$family
-	fixef_names = object$fixef_vars
-
-	fixef_id = object$fixef_id
-
-	Q = length(fixef_id)
-	N = length(S)
-
-	# either (we need to clean its attributes for unlist to be efficient)
-	id_dummies_vect = list()
-	for(i in 1:Q) id_dummies_vect[[i]] = as.vector(fixef_id[[i]])
-
-	is_ref_approx = FALSE
-	isSlope = FALSE
-	if(!is.null(object$fixef_terms)){
-	    isSlope = TRUE
-	    # This is an estimation with slopes
-	    # we apply another method => we use the demeaning function
-
-	    slope_variables = object$slope_variables_reordered
-	    slope_flag = object$slope_flag_reordered
-
-	    new_order = object$fe.reorder
-	    fixef_vars = object$fixef_vars[new_order]
-	    fixef_sizes = as.integer(object$fixef_sizes[new_order])
-
-	    # We reconstruct the terms
-	    fixef_terms = c()
-	    start = c(0, cumsum(abs(slope_flag)))
-	    for(i in seq_along(slope_flag)){
-	        sf = slope_flag[i]
-	        if(sf >= 0){
-	            fixef_terms = c(fixef_terms, fixef_vars[i])
-	        }
-
-	        if(abs(sf) > 0){
-	            fixef_terms = c(fixef_terms, paste0(fixef_vars[i], "[[", names(slope_variables)[start[i] + 1:abs(sf)], "]]"))
-            }
-	    }
-
-	    fe_id_list = object$fixef_id[new_order]
-
-	    #
-	    # STEP 2: demeaning
-	    #
-
-	    nthreads = check_set_nthreads(nthreads)
-
-	    table_id_I = as.integer(unlist(lapply(fe_id_list, table), use.names = FALSE))
-
-	    S_demean = cpp_demean(y = S, X_raw = 0, r_weights = 0, iterMax = as.integer(fixef.iter),
-	                           diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
-	                           fe_id_list = fe_id_list, table_id_I = table_id_I,
-	                           slope_flag_Q = slope_flag, slope_vars_list = slope_variables,
-	                           r_init = 0, nthreads = nthreads, save_fixef = TRUE)
-
-	    fixef_coef = S_demean$fixef_coef
-
-	    names(fixef_sizes) = fixef_vars
-
-	    fe_all = c()
-	    for(i in seq_along(slope_flag)){
-	        fe_all = c(fe_all, rep(fixef_vars[i], 1 + abs(slope_flag[i]) - (slope_flag[i] < 0)))
-	    }
-
-	    start = 1
-	    i = 1
-	    fixef_values = list()
-	    for(q in seq_along(slope_flag)){
-	        sf = slope_flag[q]
-	        if(sf == 0){
-	            fixef_values[[i]] = fixef_coef[seq(start, length.out = fixef_sizes[q])]
-	            i = i + 1
-	            start = start + fixef_sizes[q]
-	        } else {
-	            nb = abs(sf) + (sf > 0)
-
-	            adj = 0
-	            if(sf > 0){
-	                # The fixed-effects is in the last position
-	                j_fe = nb - 1
-	                fixef_values[[i]] = fixef_coef[seq(start + j_fe, by = nb, length.out = fixef_sizes[q])]
-	                adj = 1
-	            }
-
-	            for(j in 0:(nb - 1 - adj)){
-	                fixef_values[[i + j + adj]] = fixef_coef[seq(start + j, by = nb, length.out = fixef_sizes[q])]
-	            }
-	            i = i + nb
-	            start = start + fixef_sizes[q] * nb
-	        }
-
-	    }
-
-	    #
-	    # Now the referenes
-	    #
-
-	    nb_ref = integer(length(fixef_terms))
-
-	    # FE references
-	    who_fe = slope_flag >= 0
-	    Q_fe = sum(who_fe)
-	    if(Q_fe >= 2){
-
-	        my_dum = fe_id_list[who_fe]
-
-	        dumMat = matrix(unlist(my_dum, use.names = FALSE), N, Q_fe) - 1
-	        orderCluster = matrix(unlist(lapply(my_dum, order), use.names = FALSE), N, Q_fe) - 1
-
-	        nbCluster = sapply(my_dum, max)
-
-	        fixef_values_tmp = cpp_get_fe_gnl(Q_fe, N, rep(1, N), dumMat, nbCluster, orderCluster)
-
-	        # the information on the references
-	        nb_ref_fe = fixef_values_tmp[[Q_fe+1]]
-	    } else {
-	        nb_ref_fe = integer(Q_fe)
-	    }
-
-	    # Slope references (if associated FE + constant)
-
-	    names(slope_flag) = fixef_vars
-
-        Q_slope = sum(abs(slope_flag))
-        nb_ref_slope = integer(Q_slope)
-        i_noVS = 1
-        for(i in seq_along(fixef_terms)){
-
-            ft = fixef_terms[i]
-
-            if(!grepl("[[", ft, fixed = TRUE)){
-                # No slope => already computed
-                nb_ref[i] = nb_ref_fe[i_noVS]
-                i_noVS = i_noVS + 1
-
-            } else {
-                # Slope
-                fe_name = gsub("\\[.+", "", ft)
-                my_dum = fe_id_list[[fe_name]]
-
-                my_order = order(my_dum)
-                var_sorted = slope_variables[[gsub(".+\\[|\\]+", "", ft)]][my_order]
-
-                # if no associated FE => we check only 0 values
-                if(slope_flag[fe_name] < 0){
-                    nb_ref[i] = cpp_constant_dum(fixef_sizes[fe_name], var_sorted, my_dum[my_order], only_0 = TRUE)
-                } else {
-                    nb_ref[i] = cpp_constant_dum(fixef_sizes[fe_name], var_sorted, my_dum[my_order])
-                }
-            }
-        }
-
-        # we recreate that to avoid conditioning on isSlope later
-        fixef_id = fixef_id[fe_all]
-        fixef_names = fixef_terms
-
-    } else if(Q == 1){
-		# This is the simplest case
-		id = id_dummies_vect[[1]]
-
-		myOrder = order(id)
-		myDiff = c(1, diff(id[myOrder]))
-
-		select = myOrder[myDiff == 1]
-
-		fixef_values = list(S[select])
-
-		# There are no references => no need to set nb_ref
-	} else {
-		# We apply a Rcpp script to handle complicated cases (and we don't know beforehand if the input is one)
-
-		dumMat = matrix(unlist(id_dummies_vect), N, Q) - 1
-		orderCluster = matrix(unlist(lapply(id_dummies_vect, order)), N, Q) - 1
-
-		nbCluster = sapply(fixef_id, max)
-
-		fixef_values = cpp_get_fe_gnl(Q, N, S, dumMat, nbCluster, orderCluster)
-
-		# The algorithm is fast but may fail on some instance. We need to check
-		if(any(fixef_values[[Q + 1]] > 1) && Q >= 3){
-		    # we re-compute the "sumFE"
-		    sum_FE = fixef_values[[1]][1 + dumMat[, 1]]
-		    for(i in 2:Q){
-		        sum_FE = sum_FE + fixef_values[[i]][1 + dumMat[, i]]
-		    }
-
-		    if(max(abs(sum_FE - S)) > 1e-1){
-		        # divergence => we need to correct
-		        # we recompute the FEs
-
-		        is_ref_approx = TRUE
-
-		        fixef_sizes = as.integer(object$fixef_sizes)
-		        new_order = order(object$fixef_sizes, decreasing = TRUE)
-		        fixef_sizes = fixef_sizes[new_order]
-
-                fe_id_list = object$fixef_id[new_order]
-		        table_id_I = as.integer(unlist(lapply(fe_id_list, table), use.names = FALSE))
-
-		        slope_flag = rep(0L, Q)
-		        slope_variables = list()
-
-		        S_demean = cpp_demean(y = S, X_raw = 0, r_weights = 0, iterMax = as.integer(fixef.iter),
-		                              diffMax = fixef.tol, r_nb_id_Q = fixef_sizes,
-		                              fe_id_list = fe_id_list, table_id_I = table_id_I,
-		                              slope_flag_Q = slope_flag, slope_vars_list = slope_variables,
-		                              r_init = 0, nthreads = nthreads, save_fixef = TRUE)
-
-		        fixef_coef = S_demean$fixef_coef
-
-		        end = cumsum(fixef_sizes)
-		        start = c(1, end + 1)
-		        for(i in 1:Q){
-		            fixef_values[[new_order[i]]] = fixef_coef[start[i]:end[i]]
-		        }
-		    }
-		}
-
-		# the information on the references
-		nb_ref = fixef_values[[Q + 1]]
-		fixef_values[[Q + 1]] = NULL
-	}
-
-	# now saving & adding information
-	all_clust = list()
-	Q_all = ifelse(isSlope, length(fixef_terms), Q)
-	for(i in 1:Q_all){
-	    # We put it in the right order, if requested
-	    fn = attr(fixef_id[[i]], "fixef_names")
-
-	    if(sorted){
-	        if(all(!grepl("[^[:digit:]]", fn))) fn = as.numeric(fn)
-	        my_order = order(fn)
-
-	        cv = fixef_values[[i]][my_order]
-	        names(cv) = fn[my_order]
-	        all_clust[[fixef_names[i]]] = cv
-	    } else {
-	        cv = fixef_values[[i]]
-	        names(cv) = fn
-	        all_clust[[fixef_names[i]]] = cv
-	    }
-
-	}
-
-	class(all_clust) = c("fixest.fixef", "list")
-
-	# Dealing with the references
-	if(Q_all > 1){
-		names(nb_ref) = fixef_names
-		attr(all_clust, "references") = nb_ref
-
-		if(!isSlope) slope_flag = rep(FALSE, Q)
-
-		# warning if unbalanced
-		if(notes && sum(nb_ref[!slope_flag]) > Q-1){
-		    if(is_ref_approx){
-		        message("NOTE: The fixed-effects are not regular, they cannot be straightforwardly interpreted. The number of references is only approximate.")
-		    } else {
-		        message("NOTE: The fixed-effects are not regular, they cannot be straightforwardly interpreted.")
-		    }
-
-		}
-	}
-
-	# Family information
-	attr(all_clust, "exponential") = FALSE
-	if(object$method_type == "feNmlm" && object$family %in% c("poisson", "negbin")){
-		attr(all_clust, "exponential") = TRUE
-	} else if(object$method_type == "feglm" && object$family$link == "log"){
-		attr(all_clust, "exponential") = TRUE
-	}
-
-	return(all_clust)
-}
-
-#' Functions exported from \pkg{nlme} to implement \pkg{fixest} methods
-#'
-#' The package \pkg{fixest} uses the \code{fixef} method from \pkg{nlme}. Unfortunately, re-exporting this method is required in order not to attach package \pkg{nlme}.
-#'
-#' \itemize{
-#' \item Here is the help from package \pkg{nlme}: \code{\link[nlme:fixed.effects]{fixef}}. The help from package \pkg{fixest} is here: \code{\link[fixest]{fixef.fixest}}.
-#' }
-#'
-#' @note
-#' I could find this workaround thanks to the package \pkg{plm}.
-#'
-#' @name fixef_reexported
-#' @keywords internal
-NULL
-
-#' @rdname fixef_reexported
-#' @name fixef
-NULL
-
-
-
-
-#' Displaying the most notable fixed-effects
-#'
-#' This function plots the 5 fixed-effects with the highest and lowest values, for each of the fixed-effect dimension. It takes as an argument the fixed-effects obtained from the function \code{\link{fixef.fixest}} after an estimation using \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @method plot fixest.fixef
-#'
-#' @param x An object obtained from the function \code{\link{fixef.fixest}}.
-#' @param n The number of fixed-effects to be drawn. Defaults to 5.
-#' @param ... Not currently used.
-#'
-#' Note that the fixed-effect coefficients might NOT be interpretable. This function is useful only for fully regular panels.
-#'
-#' If the data are not regular in the fixed-effect coefficients, this means that several \sQuote{reference points} are set to obtain the fixed-effects, thereby impeding their interpretation. In this case a warning is raised.
-#'
-#' @seealso
-#' \code{\link[fixest]{fixef.fixest}} to extract clouster coefficients. See also the main estimation function \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade
-#' # => we account for 3 fixed-effects
-#' est_pois = femlm(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
-#'
-#' # obtaining the fixed-effects coefficients
-#' fe_trade = fixef(est_pois)
-#'
-#' # plotting them
-#' plot(fe_trade)
-#'
-#'
-plot.fixest.fixef = function(x, n = 5, ...){
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = "n")
-    }
-
-	Q = length(x)
-
-	mfrow = as.character(c(11, 12, 22, 22, 32, 32, 33, 33))
-
-	fixef_names = names(x)
-	slope_flag = grepl("\\[", fixef_names)
-
-	if(Q > 1 && sum(attr(x, "references")[!slope_flag]) > sum(!slope_flag)-1){
-		warning("The fixed-effects are not regular, they cannot be straightforwardly interpreted.", call. = FALSE)
-	}
-
-	# modification par:
-	opar = par(no.readonly =TRUE)
-	on.exit(par(opar))
-
-	par(mfrow = as.numeric(strsplit(mfrow[Q], "")[[1]]), mar = c(3, 3, 2.5, 3))
-
-	addExp = attr(x, "exponential")
-	for(i in 1:Q){
-		plot_single_cluster(x[[i]], n = n, addExp = addExp, fe_name = fixef_names[i])
-	}
-
-}
 
 
-#' Collinearity diagnostics for \code{fixest} objects
+#' Collinearity diagnostics for `fixest` objects
 #'
-#' In some occasions, the optimization algorithm of \code{\link[fixest]{femlm}} may fail to converge, or the variance-covariance matrix may not be available. The most common reason of why this happens is colllinearity among variables. This function helps to find out which set of variables is problematic.
+#' In some occasions, the optimization algorithm of [`femlm`] may fail to converge, or the variance-covariance matrix may not be available. The most common reason of why this happens is collinearity among variables. This function helps to find out which set of variables is problematic.
 #'
 #'
-#' @param x A \code{fixest} object obtained from, e.g. functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#' @param verbose An integer. If higher than or equal to 1, then a note is prompted at each step of the algorithm. By default \code{verbose = 0} for small problems and to 1 for large problems.
+#' @param x A `fixest` object obtained from, e.g. functions [`femlm`], [`feols`] or [`feglm`].
+#' @param verbose An integer. If higher than or equal to 1, then a note is prompted at each step of the algorithm. By default `verbose = 0` for small problems and to 1 for large problems.
 #'
 #' @details
 #' This function tests: 1) collinearity with the fixed-effect variables, 2) perfect multi-collinearity between the variables, 4) perfect multi-collinearity between several variables and the fixed-effects, and 4) identification issues when there are non-linear in parameters parts.
@@ -1506,7 +63,7 @@ collinearity = function(x, verbose){
     # stop("Sorry, it does not work. A new version will hopefully come soon.")
 
 	if(!inherits(x, "fixest")){
-		stop("Argument 'x' must be a fixest object.")
+		stop("Argument `x` must be a fixest object.")
 	}
 
 	# I) (linear) collinearity with fixed-effects
@@ -1540,7 +97,7 @@ collinearity = function(x, verbose){
 	coef = x$coefficients
 
 	# Getting the data
-	data = fetch_data(x, "To apply function 'collinearity', ")
+	data = fetch_data(x, "To apply function `collinearity`, ")
 
 	if(is.matrix(data)){
 	    data = as.data.frame(data)
@@ -1713,7 +270,7 @@ collinearity = function(x, verbose){
 				ccat("\n")
 				varnames = colnames(linear_mat_noIntercept)
 				collin_var = varnames[max_residuals < 1e-6]
-				message = paste0("Variable", enumerate_items(collin_var, "s.is.quote"), " collinear with fixed-effects '", names(cluster)[q], "'.")
+				message = paste0("Variable", enumerate_items(collin_var, "s.is.quote"), " collinear with fixed-effects `", names(cluster)[q], "`.")
 
 				print(message)
 				return(invisible(message))
@@ -1746,7 +303,7 @@ collinearity = function(x, verbose){
 	            varnames = colnames(linear_mat_noIntercept)
 	            collin_var = varnames[max_residuals < 1e-6]
 
-	            message = paste0("Variable", enumerate_items(collin_var, "s.is.quote"), " collinear with variable with varying slope '", slope_vars[q], "' (on '", slope_fe[q], "').")
+	            message = paste0("Variable", enumerate_items(collin_var, "s.is.quote"), " collinear with variable with varying slope `", slope_vars[q], "` (on `", slope_fe[q], "`).")
 
 	            print(message)
 	            return(invisible(message))
@@ -1795,7 +352,7 @@ collinearity = function(x, verbose){
 				coef_lm = res$coefficients
 				vars = colnames(mat_base)[-i]
 				collin_var = vars[!is.na(coef_lm) & abs(coef_lm) > 1e-6]
-				message = paste0("Variable '", dict_name[v], "' is collinear with variable", enumerate_items(dict_name[collin_var], "s.quote"), ".")
+				message = paste0("Variable `", dict_name[v], "` is collinear with variable", enumerate_items(dict_name[collin_var], "s.quote"), ".")
 
 				print(message)
 				return(invisible(message))
@@ -1833,7 +390,7 @@ collinearity = function(x, verbose){
 					ccat("\n")
 					coef_lm = coef(res)
 					collin_var = names(coef_lm)[!is.na(coef_lm) & abs(coef_lm) > 1e-6]
-					message = paste0("Variable '", dict_name[v], "' is collinear with variable", enumerate_items(dict_name[collin_var], "s.quote"), ", together with the fixed-effects ", dum_names[id_cluster], ".")
+					message = paste0("Variable `", dict_name[v], "` is collinear with variable", enumerate_items(dict_name[collin_var], "s.quote"), ", together with the fixed-effects ", dum_names[id_cluster], ".")
 
 					print(message)
 					return(invisible(message))
@@ -1975,25 +532,25 @@ collinearity = function(x, verbose){
 #' This function shows the means and standard-deviations of several variables conditional on whether they are from the treated or the control group. The groups can further be split according to a pre/post variable. Results can be seamlessly be exported to Latex.
 #'
 #'
-#' @param fml Either a formula of the type \code{var1 + ... + varN ~ treat} or \code{var1 + ... + varN ~ treat | post}. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: \code{. ~ treat}.
-#' @param base A data base containing all the variables in the formula \code{fml}.
-#' @param treat_var Only if argument \code{fml} is *not* a formula. The vector identifying the treated and the control observations (the vector can be of any type but must contain only two possible values). Must be of the same length as the data.
-#' @param post_var Only if argument \code{fml} is *not* a formula. The vector identifying the periods (pre/post) of the observations (the vector can be of any type but must contain only two possible values). The first value (in the sorted sense) of the vector is taken as the pre period. Must be of the same length as the data.
+#' @param fml Either a formula of the type `var1 + ... + varN ~ treat` or `var1 + ... + varN ~ treat | post`. Either a data.frame/matrix containing all the variables for which the means are to be computed (they must be numeric of course). Both the treatment and the post variables must contain only exactly two values. You can use a point to select all the variables of the data set: `. ~ treat`.
+#' @param base A data base containing all the variables in the formula `fml`.
+#' @param treat_var Only if argument `fml` is *not* a formula. The vector identifying the treated and the control observations (the vector can be of any type but must contain only two possible values). Must be of the same length as the data.
+#' @param post_var Only if argument `fml` is *not* a formula. The vector identifying the periods (pre/post) of the observations (the vector can be of any type but must contain only two possible values). The first value (in the sorted sense) of the vector is taken as the pre period. Must be of the same length as the data.
 #' @param treat_first Which value of the 'treatment' vector should appear on the left? By default the max value appears first (e.g. if the treatment variable is a 0/1 vector, 1 appears first).
-#' @param tex Should the result be displayed in Latex? Default is \code{FALSE}. Automatically set to \code{TRUE} if the table is to be saved in a file using the argument \code{file}.
-#' @param treat_dict A character vector of length two. What are the names of the treated and the control? This should be a dictionary: e.g. \code{c("1"="Treated", "0" = "Control")}.
-#' @param dict A named character vector. A dictionary between the variables names and an alias. For instance \code{dict=c("x"="Inflation Rate")} would replace the variable name \code{x} by \dQuote{Inflation Rate}.
+#' @param tex Should the result be displayed in Latex? Default is `FALSE`. Automatically set to `TRUE` if the table is to be saved in a file using the argument `file`.
+#' @param treat_dict A character vector of length two. What are the names of the treated and the control? This should be a dictionary: e.g. `c("1"="Treated", "0" = "Control")`.
+#' @param dict A named character vector. A dictionary between the variables names and an alias. For instance `dict=c("x"="Inflation Rate")` would replace the variable name `x` by \dQuote{Inflation Rate}.
 #' @param file A file path. If given, the table is written in Latex into this file.
-#' @param replace Default is \code{TRUE}, which means that when the table is exported, the existing file is not erased.
+#' @param replace Default is `TRUE`, which means that when the table is exported, the existing file is not erased.
 #' @param title Character string giving the Latex title of the table. (Only if exported.)
 #' @param label Character string giving the Latex label of the table. (Only if exported.)
-#' @param raw Logical, default is \code{FALSE}. If \code{TRUE}, it returns the information without formatting.
+#' @param raw Logical, default is `FALSE`. If `TRUE`, it returns the information without formatting.
 #' @param indiv Either the variable name of individual identifiers, a one sided formula, or a vector. If the data is that of a panel, this can be used to track the number of individuals per group.
-#' @param prepostnames Only if there is a 'post' variable. The names of the pre and post periods to be displayed in Latex. Default is \code{c("Before", "After")}.
-#' @param diff.inv Logical, default to \code{FALSE}. Whether to inverse the difference.
+#' @param prepostnames Only if there is a 'post' variable. The names of the pre and post periods to be displayed in Latex. Default is `c("Before", "After")`.
+#' @param diff.inv Logical, default to `FALSE`. Whether to inverse the difference.
 #'
 #' @details
-#' By default, when the user tries to apply this function to nun-numeric variables, an error is raised. The exception is when the all variables are selected with the dot (like in \code{. ~ treat}. In this case, non-numeric variables are automatically omitted (with a message).
+#' By default, when the user tries to apply this function to nun-numeric variables, an error is raised. The exception is when the all variables are selected with the dot (like in `. ~ treat`. In this case, non-numeric variables are automatically omitted (with a message).
 #'
 #' NAs are removed automatically: if the data contains NAs an information message will be prompted. First all observations containing NAs relating to the treatment or post variables are removed. Then if there are still NAs for the variables, they are excluded separately for each variable, and a new message detailing the NA breakup is prompted.
 #'
@@ -2050,35 +607,35 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
             indiv_varname = attr(terms(indiv), "term.labels")
 
             if(missing(base)){
-                stop("To use 'indiv' as a formula, you must provide the argument 'base'.")
+                stop("To use `indiv` as a formula, you must provide the argument `base`.")
             }
 
             if(length(indiv_varname) > 1){
-                stop("The argument 'indiv' must refer to only one variable.")
+                stop("The argument `indiv` must refer to only one variable.")
             }
 
             if(!all(all.vars(indiv) %in% names(base))){
                 pblm = setdiff(all.vars(indiv), names(base))
-                stop("In argument 'indiv': the variable", enumerate_items(pblm, "s.is")," not in the data set.")
+                stop("In argument `indiv`: the variable", enumerate_items(pblm, "s.is")," not in the data set.")
             }
 
             indiv_var = try(eval(str2lang(indiv_varname), base), silent = TRUE)
             if("try-error" %in% class(indiv_var)){
-                stop("Evaluation of 'indiv' raises and error:\n", indiv_var)
+                stop("Evaluation of `indiv` raises and error:\n", indiv_var)
             }
         } else if(length(indiv) == 1 && is.character(indiv)){
             indiv_varname = indiv
 
             if(missing(base) || !indiv %in% names(base)){
-                stop("To use 'indiv' as a 'character string' you must provide the argument 'base'.")
+                stop("To use `indiv` as a `character string` you must provide the argument `base`.")
             } else {
                 indiv_var = base[[indiv]]
             }
         } else {
             if(!missing(base) && length(indiv) != NROW(base)){
-                stop("The length of 'indiv' must be the same as the data.")
+                stop("The length of `indiv` must be the same as the data.")
             } else if(missing(base) && length(indiv) != NROW(fml)){
-                stop("The length of 'indiv' must be the same as the data.")
+                stop("The length of `indiv` must be the same as the data.")
             }
             indiv_var = indiv
         }
@@ -2093,12 +650,12 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
     usePost = FALSE
     if("formula" %in% class(fml_in)){
         if(missing(base) || !is.data.frame(base)){
-            stop("If you provide a formula, a data.frame must be given in argument 'base'.")
+            stop("If you provide a formula, a data.frame must be given in argument `base`.")
         }
 
         # Creation of x and the condition
         if(!length(fml_in) == 3){
-            stop("The formula must be of the type 'var1 + ... + varN ~ treat' or 'var1 + ... + varN ~ treat | post'.")
+            stop("The formula must be of the type `var1 + ... + varN ~ treat` or `var1 + ... + varN ~ treat | post`.")
         }
 
         fml_parts = fml_split(fml_in)
@@ -2120,18 +677,18 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
 
         treat_var = try(eval(fml[[3]], base), silent = TRUE)
         if("try-error" %in% class(treat_var)){
-            stop("Evaluation of the 'treatment' variable raises and error: \n", treat_var)
+            stop("Evaluation of the `treatment` variable raises and error: \n", treat_var)
         }
 
         if(!is.null(pipe)){
             if(!(all(all.vars(pipe) %in% names(base)))){
                 pblm = setdiff(all.vars(pipe), names(base))
-                stop("In the evaluation of the 'post' variable: ", enumerate_items(pblm, "is"), " not in the data set.")
+                stop("In the evaluation of the `post` variable: ", enumerate_items(pblm, "is"), " not in the data set.")
             }
 
             post_var = try(eval(pipe[[2]], base), silent = TRUE)
             if("try-error" %in% class(post_var)){
-                stop("Evaluation of the 'post' variable raises and error: \n", treat_var)
+                stop("Evaluation of the `post` variable raises and error: \n", treat_var)
             }
 
             usePost = TRUE
@@ -2173,7 +730,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
             all_vars = all.vars(fml_x)
             pblm = setdiff(all_vars, names(base))
             if(length(pblm) > 0){
-                stop("The variable", enumerate_items(pblm, "s.is"), " not in the data set (", deparse(substitute(base)), ").")
+                stop("The variable", enumerate_items(pblm, "s.is"), " not in the data set (", deparse_short(substitute(base)), ").")
             }
 
             # Evaluation control
@@ -2184,7 +741,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
                 var = var2eval[i]
                 x_small = try(eval(parse(text=var), base_small), silent = TRUE)
                 if("try-error" %in% class(x_small)){
-                    stop("Evaluation of the variable '", var, "' raises and error:\n", x_small)
+                    stop("Evaluation of the variable `", var, "` raises and error:\n", x_small)
                 }
 
                 if(!is.numeric(x_small) && !is.logical(x_small)){
@@ -2203,17 +760,17 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
         x_name = colnames(mat_vars)
     } else {
         if(missing(treat_var)){
-            stop("If argument 'fml' is not a formula, you must provide the argument 'treat_var'.")
+            stop("If argument `fml` is not a formula, you must provide the argument `treat_var`.")
         } else {
             mat_vars = fml_in
 
             if(NROW(mat_vars) != length(treat_var)){
-                stop("The arguments 'x' and 'treat_var' must be of the same length.")
+                stop("The arguments `x` and `treat_var` must be of the same length.")
             }
 
             if(!missing(post_var) && !is.null(post_var)){
                 if(NROW(mat_vars) != length(post_var)){
-                    stop("If provided, the argument 'post_var' must be of the same length of 'x'.")
+                    stop("If provided, the argument `post_var` must be of the same length of `x`.")
                 }
                 usePost = TRUE
             }
@@ -2227,9 +784,9 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
                 }
                 mat_vars = as.matrix(mat_vars)
             } else if(!is.matrix(mat_vars)){
-                stop("If not a formula, argument 'fml' must be a data.frame or a matrix. Currently it is of class ", class(mat_vars)[1], ".")
+                stop("If not a formula, argument `fml` must be a data.frame or a matrix. Currently it is of class ", class(mat_vars)[1], ".")
             } else if(!is.numeric(mat_vars) && !is.logical(mat_vars)){
-                stop("If not a formula, argument 'fml' must be a data.frame or a matrix with numeric variables. Currenlty its is not numeric.")
+                stop("If not a formula, argument `fml` must be a data.frame or a matrix with numeric variables. Currenlty its is not numeric.")
             }
 
             if(is.logical(mat_vars)) mat_vars = as.numeric(mat_vars)
@@ -2254,9 +811,9 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
             msg = "treatment variable."
             if(usePost && anyNA(post_var)){
                 if(anyNA(treat_var)){
-                    msg = "'treatment' and 'post' variables."
+                    msg = "`treatment` and `post` variables."
                 } else {
-                    msg = "'post' variable."
+                    msg = "`post` variable."
                 }
             }
             stop("All observation contain NA values for the ", msg)
@@ -2285,7 +842,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
     if(usePost && length(unique(post_var)) != 2){
         n = length(unique(post_var))
         msg = ifelse(n == 1, "only one value.", paste0(n, " values."))
-        stop("This function supports only 2 conditional values for the 'post' variable. Currently, it contains ", msg)
+        stop("This function supports only 2 conditional values for the `post` variable. Currently, it contains ", msg)
     }
 
     if(usePost){
@@ -2296,12 +853,12 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
     if(!missing(treat_dict) && !is.null(treat_dict)){
 
         if(!isVector(treat_dict) || is.null(names(treat_dict))){
-            stop("The argument 'treat_dict' must be a named character vector.")
+            stop("The argument `treat_dict` must be a named character vector.")
         }
 
         pblm = setdiff(treat_cases, names(treat_dict))
         if(length(pblm) > 0){
-            stop("The value", enumerate_items(pblm, "s.is"), " not in 'treat_dict'.")
+            stop("The value", enumerate_items(pblm, "s.is"), " not in `treat_dict`.")
         }
     } else {
         treat_dict = paste0("cond: ", treat_cases)
@@ -2314,7 +871,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
 
     if(!missing(treat_first) && !is.null(treat_first)){
         if(!treat_first %in% treat_cases){
-            stop("Argument 'treat_first' must be an element of the treated variable.")
+            stop("Argument `treat_first` must be an element of the treated variable.")
         } else if(treat_first != treat_cases[1]){
             treat_cases = rev(treat_cases)
         }
@@ -2504,33 +1061,33 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
 
 #' Create, or interact variables with, factors
 #'
-#' Treat a variable as a factor, or interacts a variable with a factor. Values to be dropped/kept from the factor can be easily set. Note that to interact fixed-effects, this function should not be used: instead use directly the syntax \code{fe1^fe2}.
+#' Treat a variable as a factor, or interacts a variable with a factor. Values to be dropped/kept from the factor can be easily set. Note that to interact fixed-effects, this function should not be used: instead use directly the syntax `fe1^fe2`.
 #'
 #'
 #' @inheritParams bin
 #'
-#' @param factor_var  A vector (of any type) that will be treated as a factor. You can set references (i.e. exclude values for which to create dummies) with the \code{ref} argument.
-#' @param var A variable of the same length as \code{factor_var}. This variable will be interacted with the factor in \code{factor_var}. It can be numeric or factor-like. To force a numeric variable to be treated as a factor, you can add the \code{i.} prefix to a variable name. For instance take a numeric variable \code{x_num}: \code{i(x_fact, x_num)} will treat \code{x_num} as numeric while \code{i(x_fact, i.x_num)} will treat \code{x_num} as a factor (it's a shortcut to \code{as.factor(x_num)}).
-#' @param ref A vector of values to be taken as references from \code{factor_var}. Can also be a logical: if \code{TRUE}, then the first value of \code{factor_var} will be removed. If \code{ref} is a character vector, partial matching is applied to values; use "@" as the first character to enable regular expression matching. See examples.
-#' @param keep A vector of values to be kept from \code{factor_var} (all others are dropped). By default they should be values from \code{factor_var} and if \code{keep} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
-#' @param ref2 A vector of values to be dropped from \code{var}. By default they should be values from \code{var} and if \code{ref2} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
-#' @param keep2 A vector of values to be kept from \code{var} (all others are dropped). By default they should be values from \code{var} and if \code{keep2} is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
-#' @param bin2 A list or vector defining the binning of the second variable. See help for the argument \code{bin} for details (or look at the help of the function \code{\link[fixest]{bin}}). You can use \code{.()} for \code{list()}.
+#' @param factor_var  A vector (of any type) that will be treated as a factor. You can set references (i.e. exclude values for which to create dummies) with the `ref` argument.
+#' @param var A variable of the same length as `factor_var`. This variable will be interacted with the factor in `factor_var`. It can be numeric or factor-like. To force a numeric variable to be treated as a factor, you can add the `i.` prefix to a variable name. For instance take a numeric variable `x_num`: `i(x_fact, x_num)` will treat `x_num` as numeric while `i(x_fact, i.x_num)` will treat `x_num` as a factor (it's a shortcut to `as.factor(x_num)`).
+#' @param ref A vector of values to be taken as references from `factor_var`. Can also be a logical: if `TRUE`, then the first value of `factor_var` will be removed. If `ref` is a character vector, partial matching is applied to values; use "@" as the first character to enable regular expression matching. See examples.
+#' @param keep A vector of values to be kept from `factor_var` (all others are dropped). By default they should be values from `factor_var` and if `keep` is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
+#' @param ref2 A vector of values to be dropped from `var`. By default they should be values from `var` and if `ref2` is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
+#' @param keep2 A vector of values to be kept from `var` (all others are dropped). By default they should be values from `var` and if `keep2` is a character vector partial matching is applied. Use "@" as the first character to enable regular expression matching instead.
+#' @param bin2 A list or vector defining the binning of the second variable. See help for the argument `bin` for details (or look at the help of the function [`bin`]). You can use `.()` for `list()`.
 #' @param ... Not currently used.
 #'
 #' @details
-#' To interact fixed-effects, this function should not be used: instead use directly the syntax \code{fe1^fe2} in the fixed-effects part of the formula. Please see the details and examples in the help page of \code{\link[fixest]{feols}}.
+#' To interact fixed-effects, this function should not be used: instead use directly the syntax `fe1^fe2` in the fixed-effects part of the formula. Please see the details and examples in the help page of [`feols`].
 #'
 #' @return
-#' It returns a matrix with number of rows the length of \code{factor_var}. If there is no interacted variable or it is interacted with a numeric variable, the number of columns is equal to the number of cases contained in \code{factor_var} minus the reference(s). If the interacted variable is a factor, the number of columns is the number of combined cases between \code{factor_var} and \code{var}.
+#' It returns a matrix with number of rows the length of `factor_var`. If there is no interacted variable or it is interacted with a numeric variable, the number of columns is equal to the number of cases contained in `factor_var` minus the reference(s). If the interacted variable is a factor, the number of columns is the number of combined cases between `factor_var` and `var`.
 #'
 #' @author
 #' Laurent Berge
 #'
 #' @seealso
-#' \code{\link[fixest:coefplot]{iplot}} to plot interactions or factors created with \code{i()}, \code{\link[fixest]{feols}} for OLS estimation with multiple fixed-effects.
+#' [`iplot`][fixest::coefplot] to plot interactions or factors created with `i()`, [`feols`] for OLS estimation with multiple fixed-effects.
 #'
-#' See the function \code{\link[fixest]{bin}} for binning variables.
+#' See the function [`bin`] for binning variables.
 #'
 #' @examples
 #'
@@ -2699,9 +1256,9 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
 
             if(grepl("^[[:alpha:]\\.][[:alnum:]\\._]*:[[:alpha:]\\.][[:alnum:]\\._]*$", var_name)){
                 info = strsplit(var_name, ":")[[1]]
-                stop("In i(): When 'var' is equal to a product, please use I(", info[1], "*", info[2], ") instead of ", var_name, ".")
+                stop("In i(): When `var` is equal to a product, please use I(", info[1], "*", info[2], ") instead of ", var_name, ".")
             } else {
-                stop("The arguments 'var' and 'f' must be of the same length (currently ", length(var), " vs ", length(f), ").")
+                stop("The arguments `var` and `f` must be of the same length (currently ", length(var), " vs ", length(f), ").")
             }
         }
     }
@@ -2765,6 +1322,11 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
 
     check_arg(ref2, keep, keep2, "vector no na")
 
+    NO_ERROR = FALSE
+    if(is_calling_fun("fixest_model_matrix_extra", full_search = TRUE, full_name = TRUE)){
+        NO_ERROR = TRUE
+    }
+
     no_rm = TRUE
     id_drop = c()
     if(!missing(ref)){
@@ -2773,29 +1335,36 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
             # Que ce soit items ici est normal (et pas f_items)
             id_drop = which(items == items[1])
         } else {
-            id_drop = items_to_drop(f_items, ref, "factor_var")
+            id_drop = items_to_drop(f_items, ref, "factor_var", no_error = NO_ERROR)
         }
         ref_id = id_drop
     }
 
 
     if(!missing(keep)){
-        id_drop = c(id_drop, items_to_drop(f_items, keep, "factor_var", keep = TRUE))
+        id_drop = c(id_drop, items_to_drop(f_items, keep, "factor_var", keep = TRUE, no_error = NO_ERROR))
     }
 
     if(IS_INTER_FACTOR){
         if(!missing(ref2)){
-            id_drop = c(id_drop, items_to_drop(var_items, ref2, "var"))
+            id_drop = c(id_drop, items_to_drop(var_items, ref2, "var", no_error = NO_ERROR))
         }
 
         if(!missing(keep2)){
-            id_drop = c(id_drop, items_to_drop(var_items, keep2, "var", keep = TRUE))
+            id_drop = c(id_drop, items_to_drop(var_items, keep2, "var", keep = TRUE, no_error = NO_ERROR))
         }
     }
 
     if(length(id_drop) > 0){
         id_drop = unique(sort(id_drop))
-        if(length(id_drop) == length(items)) stop("All items from the interaction have been removed.")
+        if(length(id_drop) == length(items)){
+            if(FROM_FIXEST) {
+                # we return something neutral in an estimation
+                return(rep(0, length(f)))
+            }
+
+            stop("All items from the interaction have been removed.")
+        }
         who_is_dropped = id_drop
         no_rm = FALSE
     } else {
@@ -2936,295 +1505,6 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 }
 
 
-#' Bins the values of a variable (typically a factor)
-#'
-#' Tool to easily group the values of a given variable.
-#'
-#' @param x A vector whose values have to be grouped. Can be of any type but must be atomic.
-#' @param bin A list of values to be grouped, a vector, a formula, or the special values \code{"bin::digit"} or \code{"cut::values"}. To create a new value from old values, use \code{bin = list("new_value"=old_values)} with \code{old_values} a vector of existing values. You can use \code{.()} for \code{list()}.
-#' It accepts regular expressions, but they must start with an \code{"@"}, like in \code{bin="@Aug|Dec"}. It accepts one-sided formulas which must contain the variable \code{x}, e.g. \code{bin=list("<2" = ~x < 2)}.
-#' The names of the list are the new names. If the new name is missing, the first value matched becomes the new name. In the name, adding \code{"@d"}, with \code{d} a digit, will relocate the value in position \code{d}: useful to change the position of factors. Use \code{"@"} as first item to make subsequent items be located first in the factor.
-#' Feeding in a vector is like using a list without name and only a single element. If the vector is numeric, you can use the special value \code{"bin::digit"} to group every \code{digit} element.
-#' For example if \code{x} represents years, using \code{bin="bin::2"} creates bins of two years.
-#' With any data, using \code{"!bin::digit"} groups every digit consecutive values starting from the first value.
-#' Using \code{"!!bin::digit"} is the same but starting from the last value.
-#' With numeric vectors you can: a) use \code{"cut::n"} to cut the vector into \code{n} equal parts, b) use \code{"cut::a]b["} to create the following bins: \code{[min, a]}, \code{]a, b[}, \code{[b, max]}.
-#' The latter syntax is a sequence of number/quartile (q0 to q4)/percentile (p0 to p100) followed by an open or closed square bracket. You can add custom bin names by adding them in the character vector after \code{'cut::values'}. See details and examples. Dot square bracket expansion (see \code{\link[fixest]{dsb}}) is enabled.
-#'
-#' @section "Cutting" a numeric vector:
-#'
-#' Numeric vectors can be cut easily into: a) equal parts, b) user-specified bins.
-#'
-#' Use \code{"cut::n"} to cut the vector into \code{n} (roughly) equal parts. Percentiles are used to partition the data, hence some data distributions can lead to create less than \code{n} parts (for example if P0 is the same as P50).
-#'
-#' The user can specify custom bins with the following syntax: \code{"cut::a]b]c]"etc}. Here the numbers \code{a}, \code{b}, \code{c}, etc, are a sequence of increasing numbers, each followed by an open or closed square bracket. The numbers can be specified as either plain numbers (e.g. \code{"cut::5]12[32["}), quartiles (e.g. \code{"cut::q1]q3["}), or percentiles (e.g. \code{"cut::p10]p15]p90]"}). Values of different types can be mixed: \code{"cut::5]q2[p80["} is valid provided the median (\code{q2}) is indeed greater than \code{5}, otherwise an error is thrown.
-#'
-#' The square bracket right of each number tells whether the numbers should be included or excluded from the current bin. For example, say \code{x} ranges from 0 to 100, then \code{"cut::5]"} will create two  bins: one from 0 to 5 and a second from 6 to 100. With \code{"cut::5["} the bins would have been 0-4 and 5-100.
-#'
-#' A factor is returned. The labels report the min and max values in each bin.
-#'
-#' To have user-specified bin labels, just add them in the character vector following \code{'cut::values'}. You don't need to provide all of them, and \code{NA} values fall back to the default label. For example, \code{bin = c("cut::4", "Q1", NA, "Q3")} will modify only the first and third label that will be displayed as \code{"Q1"} and \code{"Q3"}.
-#'
-#' @section \code{bin} vs \code{ref}:
-#'
-#' The functions \code{\link[fixest]{bin}} and \code{\link[fixest]{ref}} are able to do the same thing, then why use one instead of the other? Here are the differences:
-#'
-#' \itemize{
-#' \item{}{\code{ref} always returns a factor. This is in contrast with \code{bin} which returns, when possible, a vector of the same type as the vector in input.}
-#' \item{}{\code{ref} always places the values modified in the first place of the factor levels. On the other hand, \code{bin} tries to not modify the ordering of the levels. It is possible to make \code{bin} mimic the behavior of \code{ref} by adding an \code{"@"} as the first element of the list in the argument \code{bin}.}
-#'  \item{}{when a vector (and not a list) is given in input, \code{ref} will place each element of the vector in the first place of the factor levels. The behavior of \code{bin} is totally different, \code{bin} will transform all the values in the vector into a single value in \code{x} (i.e. it's binning).}
-#' }
-#'
-#' @return
-#' It returns a vector of the same length as \code{x}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' To re-factor variables: \code{\link[fixest]{ref}}.
-#'
-#' @examples
-#'
-#' data(airquality)
-#' month_num = airquality$Month
-#' table(month_num)
-#'
-#' # Grouping the first two values
-#' table(bin(month_num, 5:6))
-#'
-#' # ... plus changing the name to '10'
-#' table(bin(month_num, list("10" = 5:6)))
-#'
-#' # ... and grouping 7 to 9
-#' table(bin(month_num, list("g1" = 5:6, "g2" = 7:9)))
-#'
-#' # Grouping every two months
-#' table(bin(month_num, "bin::2"))
-#'
-#' # ... every 2 consecutive elements
-#' table(bin(month_num, "!bin::2"))
-#'
-#' # ... idem starting from the last one
-#' table(bin(month_num, "!!bin::2"))
-#'
-#' # Using .() for list():
-#' table(bin(month_num, .("g1" = 5:6)))
-#'
-#'
-#' #
-#' # with non numeric data
-#' #
-#'
-#' month_lab = c("may", "june", "july", "august", "september")
-#' month_fact = factor(month_num, labels = month_lab)
-#'
-#' # Grouping the first two elements
-#' table(bin(month_fact, c("may", "jun")))
-#'
-#' # ... using regex
-#' table(bin(month_fact, "@may|jun"))
-#'
-#' # ...changing the name
-#' table(bin(month_fact, list("spring" = "@may|jun")))
-#'
-#' # Grouping every 2 consecutive months
-#' table(bin(month_fact, "!bin::2"))
-#'
-#' # ...idem but starting from the last
-#' table(bin(month_fact, "!!bin::2"))
-#'
-#' # Relocating the months using "@d" in the name
-#' table(bin(month_fact, .("@5" = "may", "@1 summer" = "@aug|jul")))
-#'
-#' # Putting "@" as first item means subsequent items will be placed first
-#' table(bin(month_fact, .("@", "aug", "july")))
-#'
-#' #
-#' # "Cutting" numeric data
-#' #
-#'
-#' data(iris)
-#' plen = iris$Petal.Length
-#'
-#' # 3 parts of (roughly) equal size
-#' table(bin(plen, "cut::3"))
-#'
-#' # Three custom bins
-#' table(bin(plen, "cut::2]5]"))
-#'
-#' # .. same, excluding 5 in the 2nd bin
-#' table(bin(plen, "cut::2]5["))
-#'
-#' # Using quartiles
-#' table(bin(plen, "cut::q1]q2]q3]"))
-#'
-#' # Using percentiles
-#' table(bin(plen, "cut::p20]p50]p70]p90]"))
-#'
-#' # Mixing all
-#' table(bin(plen, "cut::2[q2]p90]"))
-#'
-#' # NOTA:
-#' # -> the labels always contain the min/max values in each bin
-#'
-#' # Custom labels can be provided, just give them in the char. vector
-#' # NA values lead to the default label
-#' table(bin(plen, c("cut::2[q2]p90]", "<2", "]2; Q2]", NA, ">90%")))
-#'
-#'
-#'
-#' #
-#' # With a formula
-#' #
-#'
-#' data(iris)
-#' plen = iris$Petal.Length
-#'
-#' # We need to use "x"
-#' table(bin(plen, list("< 2" = ~x < 2, ">= 2" = ~x >= 2)))
-#'
-#'
-bin = function(x, bin){
-    check_arg(x, "vector mbt")
-
-    bin = error_sender(eval_dot(bin), arg_name = "bin")
-
-    check_arg(bin, "list | vector mbt")
-
-    varname = deparse(substitute(x))[1]
-    bin_factor(bin, x, varname)
-}
-
-#' Refactors a variable
-#'
-#' Takes a variables of any types, transforms it into a factors, and modifies the values of the factors. Useful in estimations when you want to set some value of a vector as a reference.
-#'
-#' @inheritSection bin \code{bin} vs \code{ref}
-#'
-#' @param x A vector of any type (must be atomic though).
-#' @param ref A vector or a list, or special binning values (explained later). If a vector, it must correspond to (partially matched) values of the vector \code{x}. The vector \code{x} which will be transformed into a factor and these values will be placed first in the levels. That's the main usage of this function. You can also bin on-the-fly the values of \code{x}, using the same syntax as the function \code{\link[fixest]{bin}}. Here's a description of what bin does: To create a new value from old values, use \code{bin = list("new_value"=old_values)} with \code{old_values} a vector of existing values. You can use \code{.()} for \code{list()}.
-#' It accepts regular expressions, but they must start with an \code{"@"}, like in \code{bin="@Aug|Dec"}. It accepts one-sided formulas which must contain the variable \code{x}, e.g. \code{bin=list("<2" = ~x < 2)}.
-#' The names of the list are the new names. If the new name is missing, the first value matched becomes the new name. In the name, adding \code{"@d"}, with \code{d} a digit, will relocate the value in position \code{d}: useful to change the position of factors.
-#' If the vector \code{x} is numeric, you can use the special value \code{"bin::digit"} to group every \code{digit} element.
-#' For example if \code{x} represents years, using \code{bin="bin::2"} creates bins of two years.
-#' With any data, using \code{"!bin::digit"} groups every digit consecutive values starting from the first value.
-#' Using \code{"!!bin::digit"} is the same but starting from the last value.
-#' With numeric vectors you can: a) use \code{"cut::n"} to cut the vector into \code{n} equal parts, b) use \code{"cut::a]b["} to create the following bins: \code{[min, a]}, \code{]a, b[}, \code{[b, max]}.
-#' The latter syntax is a sequence of number/quartile (q0 to q4)/percentile (p0 to p100) followed by an open or closed square bracket. You can add custom bin names by adding them in the character vector after \code{'cut::values'}. See details and examples. Dot square bracket expansion (see \code{\link[fixest]{dsb}}) is enabled.
-#'
-#' @return
-#' It returns a factor of the same length as \code{x}, where levels have been modified according to the argument \code{ref}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' To bin the values of a vectors: \code{\link[fixest]{bin}}.
-#'
-#' @examples
-#'
-#' data(airquality)
-#'
-#' # A vector of months
-#' month_num = airquality$Month
-#' month_lab = c("may", "june", "july", "august", "september")
-#' month_fact = factor(month_num, labels = month_lab)
-#' table(month_num)
-#' table(month_fact)
-#'
-#' #
-#' # Main use
-#' #
-#'
-#' # Without argument: equivalent to as.factor
-#' ref(month_num)
-#'
-#' # Main usage: to set a level first:
-#' # (Note that partial matching is enabled.)
-#' table(ref(month_fact, "aug"))
-#'
-#' # You can rename the level on-the-fly
-#' # (Northern hemisphere specific!)
-#' table(ref(month_fact, .("Hot month"="aug",
-#'                         "Late summer" = "sept")))
-#'
-#'
-#' # Main use is in estimations:
-#' a = feols(Petal.Width ~ Petal.Length + Species, iris)
-#'
-#' # We change the reference
-#' b = feols(Petal.Width ~ Petal.Length + ref(Species, "vers"), iris)
-#'
-#' etable(a, b)
-#'
-#'
-#' #
-#' # Binning
-#' #
-#'
-#' # You can also bin factor values on the fly
-#' # Using @ first means a regular expression will be used to match the values.
-#' # Note that the value created is placed first.
-#' # To avoid that behavior => use the function "bin"
-#' table(ref(month_fact, .(summer = "@jul|aug|sep")))
-#'
-#' # Please refer to the example in the bin help page for more example.
-#' # The syntax is the same.
-#'
-#'
-#' #
-#' # Precise relocation
-#' #
-#'
-#' # You can place a factor at the location you want
-#' #  by adding "@digit" in the name first:
-#' table(ref(month_num, .("@5"=5)))
-#'
-#' # Same with renaming
-#' table(ref(month_num, .("@5 five"=5)))
-#'
-#'
-ref = function(x, ref){
-    check_arg(x, "vector mbt")
-
-    if(missing(ref)){
-        return(as.factor(x))
-    }
-
-    ref = error_sender(eval_dot(ref), arg_name = "ref")
-    check_arg(ref, "list | vector mbt")
-
-    varname = deparse(substitute(x))[1]
-
-    IS_SPECIAL = FALSE
-    if(!is.list(ref)){
-        if(is.character(ref[1]) && grepl("^(cut|bin)", ref[1])){
-            IS_SPECIAL = TRUE
-            if(!is.numeric(x)){
-                stop(.dsb("To use the special binning '.[ref[1]]' the variable ",
-                          "'.[varname]' must be numeric. Currently this is not the case ",
-                          "(it is of class .[3KO, C?class(x)] instead)."))
-            }
-        } else {
-            ref = as.list(ref)
-        }
-    }
-
-    if(!IS_SPECIAL && !is.factor(x)){
-        x = as.factor(x)
-    }
-
-    if(!IS_SPECIAL && ref[[1]] != "@"){
-        ref_new = list("@")
-        index = 1:length(ref) + 1
-        ref_new[index] = ref
-        names(ref_new)[index] = names(ref)
-        ref = ref_new
-    }
-
-    bin_factor(ref, x, varname)
-}
 
 
 
@@ -3234,41 +1514,48 @@ ref = function(x, ref){
 #'
 #' @inheritParams setFixest_fml
 #'
-#' @param fml A formula containing macros variables. Each macro variable must start with two dots. The macro variables can be set globally using \code{setFixest_fml}, or can be defined in \code{...}. Special macros of the form \code{..("regex")} can be used to fetch, through a regular expression, variables directly in a character vector (or in column names) given in the argument \code{data}. square brackets have a special meaning: Values in them are evaluated and parsed accordingly. Example: \code{y~x.[1:2] + z.[i]} will lead to \code{y~x1+x2+z3} if \code{i==3}. See examples.
-#' @param lhs If present then a formula will be constructed with \code{lhs} as the full left-hand-side. The value of \code{lhs} can be a one-sided formula, a call, or a character vector. Note that the macro variables wont be applied. You can use it in combination with the argument \code{rhs}. Note that if \code{fml} is not missing, its LHS will be replaced by \code{lhs}.
-#' @param rhs If present, then a formula will be constructed with \code{rhs} as the full right-hand-side. The value of \code{rhs} can be a one-sided formula, a call, or a character vector. Note that the macro variables wont be applied. You can use it in combination with the argument \code{lhs}. Note that if \code{fml} is not missing, its RHS will be replaced by \code{rhs}.
-#' @param data Either a character vector or a data.frame. This argument will only be used if a macro of the type \code{..("regex")} is used in the formula of the argument \code{fml}. If so, any variable name from \code{data} that matches the regular expression will be added to the formula.
+#' @param fml A formula containing macros variables. Each macro variable must start with two dots. The macro variables can be set globally using `setFixest_fml`, or can be defined in `...`. Special macros of the form `..("regex")` can be used to fetch, through a regular expression, variables directly in a character vector (or in column names) given in the argument `data` (note that the algorithm tries to "guess" the argument data when nested in function calls \[see example\]). You can negate the regex by starting with a `"!"`. Square brackets have a special meaning: Values in them are evaluated and parsed accordingly. Example: `y~x.[1:2] + z.[i]` will lead to `y~x1+x2+z3` if `i==3`. You can trigger the auto-completion of variables by using the `'..'` suffix, like in `y ~ x..` which would include `x1` and `x2`, etc. See examples.
+#' @param add Either a character scalar or a one-sided formula. The elements will be added to the right-hand-side of the formula, before any macro expansion is applied.
+#' @param lhs If present then a formula will be constructed with `lhs` as the full left-hand-side. The value of `lhs` can be a one-sided formula, a call, or a character vector. Note that the macro variables wont be applied. You can use it in combination with the argument `rhs`. Note that if `fml` is not missing, its LHS will be replaced by `lhs`.
+#' @param rhs If present, then a formula will be constructed with `rhs` as the full right-hand-side. The value of `rhs` can be a one-sided formula, a call, or a character vector. Note that the macro variables wont be applied. You can use it in combination with the argument `lhs`. Note that if `fml` is not missing, its RHS will be replaced by `rhs`.
+#' @param data Either a character vector or a data.frame. This argument will only be used if a macro of the type `..("regex")` is used in the formula of the argument `fml`. If so, any variable name from `data` that matches the regular expression will be added to the formula.
+#' @param frame The environment containing the values to be expanded with the dot square bracket operator. Default is `parent.frame()`.
 #'
 #' @details
-#' In \code{xpd}, the default macro variables are taken from \code{getFixest_fml}. Any value in the \code{...} argument of \code{xpd} will replace these default values.
+#' In `xpd`, the default macro variables are taken from `getFixest_fml`. Any value in the `...` argument of `xpd` will replace these default values.
 #'
-#' The definitions of the macro variables will replace in verbatim the macro variables. Therefore, you can include multi-part formulas if you wish but then beware of the order of the macros variable in the formula. For example, using the \code{airquality} data, say you want to set as controls the variable \code{Temp} and \code{Day} fixed-effects, you can do \code{setFixest_fml(..ctrl = ~Temp | Day)}, but then \code{feols(Ozone ~ Wind + ..ctrl, airquality)} will be quite different from \code{feols(Ozone ~ ..ctrl + Wind, airquality)}, so beware!
+#' The definitions of the macro variables will replace in verbatim the macro variables. Therefore, you can include multi-part formulas if you wish but then beware of the order of the macros variable in the formula. For example, using the `airquality` data, say you want to set as controls the variable `Temp` and `Day` fixed-effects, you can do `setFixest_fml(..ctrl = ~Temp | Day)`, but then `feols(Ozone ~ Wind + ..ctrl, airquality)` will be quite different from `feols(Ozone ~ ..ctrl + Wind, airquality)`, so beware!
+#'
 #'
 #' @section Dot square bracket operator in formulas:
 #'
 #' In a formula, the dot square bracket (DSB) operator can: i) create manifold variables at once, or ii) capture values from the current environment and put them verbatim in the formula.
 #'
-#' Say you want to include the variables \code{x1} to \code{x3} in your formula. You can use \code{xpd(y ~ x.[1:3])} and you'll get \code{y ~ x1 + x2 + x3}.
+#' Say you want to include the variables `x1` to `x3` in your formula. You can use `xpd(y ~ x.[1:3])` and you'll get `y ~ x1 + x2 + x3`.
 #'
-#' To summon values from the environment, simply put the variable in square brackets. For example: \code{for(i in 1:3) xpd(y.[i] ~ x)} will create the formulas \code{y1 ~ x} to \code{y3 ~ x} depending on the value of \code{i}.
+#' To summon values from the environment, simply put the variable in square brackets. For example: `for(i in 1:3) xpd(y.[i] ~ x)` will create the formulas `y1 ~ x` to `y3 ~ x` depending on the value of `i`.
 #'
-#' You can include a full variable from the environment in the same way: \code{for(y in c("a", "b")) xpd(.[y] ~ x)} will create the two formulas \code{a ~ x} and \code{b ~ x}.
+#' You can include a full variable from the environment in the same way: `for(y in c("a", "b")) xpd(.[y] ~ x)` will create the two formulas `a ~ x` and `b ~ x`.
 #'
-#' The DSB can even be used within variable names, but then the variable must be nested in character form. For example \code{y ~ .["x.[1:2]_sq"]} will create \code{y ~ x1_sq + x2_sq}. Using the character form is important to avoid a formula parsing error. Double quotes must be used. Note that the character string that is nested will be parsed with the function \code{\link[fixest]{dsb}}, and thus it will return a vector.
+#' The DSB can even be used within variable names, but then the variable must be nested in character form. For example `y ~ .["x.[1:2]_sq"]` will create `y ~ x1_sq + x2_sq`. Using the character form is important to avoid a formula parsing error. Double quotes must be used. Note that the character string that is nested will be parsed with the function [`dsb`], and thus it will return a vector.
 #'
-#' By default, the DSB operator expands vectors into sums. You can add a comma, like in \code{.[, x]}, to expand with commas--the content can then be used within functions. For instance: \code{c(x.[, 1:2])} will create \code{c(x1, x2)} (and \emph{not} \code{c(x1 + x2)}).
+#' By default, the DSB operator expands vectors into sums. You can add a comma, like in `.[, x]`, to expand with commas--the content can then be used within functions. For instance: `c(x.[, 1:2])` will create `c(x1, x2)` (and *not* `c(x1 + x2)`).
 #'
-#' In all \code{fixest} estimations, this special parsing is enabled, so you don't need to use \code{xpd}.
+#' In all `fixest` estimations, this special parsing is enabled, so you don't need to use `xpd`.
 #'
-#' You can even use multiple square brackets within a single variable, but then the use of nesting is required. For example, the following \code{xpd(y ~ .[".[letters[1:2]]_.[1:2]"])} will create \code{y ~ a_1 + b_2}. Remember that the nested character string is parsed with \code{\link[fixest]{dsb}}, which explains this behavior.
+#' One-sided formulas can be expanded with the DSB operator: let `x = ~sepal + petal`, then `xpd(y ~ .[x])` leads to `color ~ sepal + petal`.
+#'
+#' You can even use multiple square brackets within a single variable, but then the use of nesting is required. For example, the following `xpd(y ~ .[".[letters[1:2]]_.[1:2]"])` will create `y ~ a_1 + b_2`. Remember that the nested character string is parsed with [`dsb`], which explains this behavior.
+#'
+#' When the element to be expanded i) is equal to the empty string or, ii) is of length 0, it is replaced with a neutral element, namely `1`. For example, `x = "" ; xpd(y ~ .[x])` leads to `y ~ 1`.
 #'
 #' @section Regular expressions:
 #'
-#' You can catch several variable names at once by using regular expressions. To use regular expressions, you need to enclose it in the dot-dot or the regex function: \code{..("regex")} or \code{regex("regex")}. For example, \code{regex("Sepal")} will catch both the variables \code{Sepal.Length} and \code{Sepal.Width} from the \code{iris} data set. In a \code{fixest} estimation, the variables names from which the regex will be applied come from the data set. If you use \code{xpd}, you need to provide either a data set or a vector of names in the argument \code{data}.
+#' You can catch several variable names at once by using regular expressions. To use regular expressions, you need to enclose it in the dot-dot or the regex function: `..("regex")` or `regex("regex")`. For example, `regex("Sepal")` will catch both the variables `Sepal.Length` and `Sepal.Width` from the `iris` data set. In a `fixest` estimation, the variables names from which the regex will be applied come from the data set. If you use `xpd`, you need to provide either a data set or a vector of names in the argument `data`.
 #'
-#' By default the variables are aggregated with a sum. For example in a data set with the variables x1 to x10, \code{regex("x(1|2)"} will yield \code{x1 + x2 + x10}. You can instead ask for "comma" aggregation by using a comma first, just before the regular expression: \code{y ~ sw(regex(,"x(1|2)"))} would lead to \code{y ~ sw(x1, x2, x10)}.
+#' By default the variables are aggregated with a sum. For example in a data set with the variables x1 to x10, `regex("x(1|2)"` will yield `x1 + x2 + x10`. You can instead ask for "comma" aggregation by using a comma first, just before the regular expression: `y ~ sw(regex(,"x(1|2)"))` would lead to `y ~ sw(x1, x2, x10)`.
 #'
-#' Note that the dot square bracket operator (DSB, see before) is applied before the regular expression is evaluated. This means that \code{regex("x.[3:4]_sq")} will lead, after evaluation of the DSB, to \code{regex("x3_sq|x4_sq")}. It is a handy way to insert range of numbers in a regular expression.
+#' Note that the dot square bracket operator (DSB, see before) is applied before the regular expression is evaluated. This means that `regex("x.[3:4]_sq")` will lead, after evaluation of the DSB, to `regex("x3_sq|x4_sq")`. It is a handy way to insert range of numbers in a regular expression.
 #'
 #'
 #' @return
@@ -3279,7 +1566,7 @@ ref = function(x, ref){
 #'
 #'
 #' @seealso
-#' \code{\link[fixest]{setFixest_fml}} to set formula macros, and \code{\link[fixest]{dsb}} to modify character strings with the DSB operator.
+#' [`setFixest_fml`] to set formula macros, and [`dsb`] to modify character strings with the DSB operator.
 #'
 #' @examples
 #'
@@ -3308,6 +1595,19 @@ ref = function(x, ref){
 #'
 #' # No xpd() needed in feols
 #' feols(y ~ x.[2:3] + .[z], base)
+#'
+#' #
+#' # Auto completion with '..' suffix
+#' #
+#'
+#' # You can trigger variables autocompletion with the '..' suffix
+#' # You need to provide the argument data
+#' base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+#' xpd(y ~ x.., data = base)
+#'
+#' # In fixest estimations, this is automatically taken care of
+#' feols(y ~ x.., data = base)
+#'
 #'
 #' #
 #' # You can use xpd for stepwise estimations
@@ -3375,15 +1675,34 @@ ref = function(x, ref){
 #' # To create a two sided formula
 #' xpd(lhs = "y", rhs = vars)
 #'
+#' #
+#' # argument 'add'
+#' #
+#'
+#' xpd(~x1, add = ~ x2 + x3)
+#'
+#' # also works with character vectors
+#' xpd(~x1, add = c("x2", "x3"))
+#'
+#' # only adds to the RHS
+#' xpd(y ~ x, add = ~bon + jour)
 #'
 #' #
 #' # Dot square bracket operator
 #' #
 #'
+#' # The basic use id to add variables in the formula
+#' x = c("x1", "x2")
+#' xpd(y ~ .[x])
+#'
+#' # Alternatively, one-sided formulas can be used and their content will be inserted verbatim
+#' x = ~x1 + x2
+#' xpd(y ~ .[x])
+#'
 #' # You can create multiple variables at once
 #' xpd(y ~ x.[1:5] + z.[2:3])
 #'
-#' # You can summon variables from the environment
+#' # You can summon variables from the environment to complete variables names
 #' var = "a"
 #' xpd(y ~ x.[var])
 #'
@@ -3436,11 +1755,38 @@ ref = function(x, ref){
 #' #       sw(poly(Temp, 1), poly(Temp, 2), poly(Temp, 3))
 #'
 #'
-xpd = function(fml, ..., lhs, rhs, data = NULL){
-    .xpd(fml = fml, ..., lhs = lhs, rhs = rhs, data = data, check = TRUE, macro = TRUE, frame = parent.frame())
+#' #
+#' # In non-fixest functions: guessing the data allows to use regex
+#' #
+#'
+#' # When used in non-fixest functions, the algorithm tries to "guess" the data
+#' # so that ..("regex") can be directly evaluated without passing the argument 'data'
+#' data(longley)
+#' lm(xpd(Armed.Forces ~ Population + ..("GNP|ployed")), longley)
+#'
+#' # same for the auto completion with '..'
+#' lm(xpd(Armed.Forces ~ Population + GN..), longley)
+#'
+#'
+xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame()){
+
+    if(MISSNULL(data)){
+        # We "guess" the data
+        sc = sys.calls()
+        n_sc = length(sc)
+        if(n_sc > 1){
+            mc = tryCatch(match.call(definition = sys.function(n_sc - 1), call = sys.call(n_sc - 1)), error = function(e) NULL)
+            if("data" %in% names(mc)){
+                data = tryCatch(eval(mc$data, parent.frame(2)), error = function(e) NULL)
+            }
+        }
+    }
+
+    .xpd(fml = fml, ..., add = add, lhs = lhs, rhs = rhs, data = data, check = TRUE,
+         macro = TRUE, frame = frame)
 }
 
-.xpd = function(fml, ..., lhs, rhs, data = NULL, check = FALSE, macro = FALSE, frame = NULL){
+.xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, check = FALSE, macro = FALSE, frame = .GlobalEnv){
 
     is_lhs = !missing(lhs)
     is_rhs = !missing(rhs)
@@ -3472,7 +1818,9 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
 
         fml = res
 
-        if(!macro) return(fml)
+        attr(fml, ".Environment") = frame
+
+        if(!macro && missnull(add)) return(fml)
 
         # NOTA:
         # if we allow for macro implementation ex post:
@@ -3480,8 +1828,34 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
         # Now, without macro variables, speed is at 30us while it was 20us before
         # so in .xpd => macro argument
 
+    } else if(!missing(add)){
+
+        if(check){
+            check_arg(fml, .type = "NULL formula", .up = 1)
+        }
+
+        if(missnull(fml)){
+            fml = ~ 1
+            fml[[2]] = value2stringCall(add, call = TRUE, check = check)
+            add = NULL
+
+            attr(fml, ".Environment") = frame
+        }
+
     } else if(check){
         check_arg(fml, .type = "formula mbt", .up = 1)
+    }
+
+
+    if(!missnull(add)){
+        # Direct formula manipulation is too complicated (and I want to avoid ugly parentheses)
+        # by string it's easy
+        fml_dp = deparse_long(fml)
+
+        add_txt = value2stringCall(add, call = FALSE, check = check)
+        add_txt = gsub("^~", "", add_txt)
+
+        fml = as.formula(paste0(fml_dp, "+", add_txt), frame)
     }
 
     macros = parse_macros(..., from_xpd = TRUE, check = check, frame = frame)
@@ -3523,6 +1897,7 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
         }
     }
 
+    data_vars = NULL
     if(is_regex){
         # We expand only if data is provided (it means the user wants us to check)
         # if .[]: we expand inside the ..(".[1:3]") => ..("1|2|3")
@@ -3540,14 +1915,16 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
                 if(is.matrix(data)){
                     data = colnames(data)
                     if(is.null(data)){
-                        stop("The argument 'data' must contain variable names. It is currently a matrix without column names.")
+                        stop("The argument `data` must contain variables names. It is currently a matrix without column names.")
                     }
                 } else if(is.data.frame(data)){
                     data = names(data)
                 }
+
+                data_vars = data
             }
 
-            fml_dp_split = strsplit(fml_dp, '(?!<[[:alnum:]._])(regex|\\.\\.)\\((?=[,"])',
+            fml_dp_split = strsplit(fml_dp, '(?<![[:alnum:]._])(regex|\\.\\.)\\((?=[,"])',
                                     perl = TRUE)[[1]]
 
             res = fml_dp_split
@@ -3563,7 +1940,14 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
                 re = dot_square_bracket(re, frame, regex = TRUE)
 
                 if(is_data){
-                    vars = grep(re, data, value = TRUE, perl = TRUE)
+                    if(substr(re, 1, 1) == "!"){
+                        # negation
+                        re = str_trim(re, 1)
+                        vars = data[!grepl(re, data, perl = TRUE)]
+                    } else {
+                        vars = grep(re, data, value = TRUE, perl = TRUE)
+                    }
+
                     if(length(vars) == 0){
                         vars = "1"
                     }
@@ -3580,8 +1964,8 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
             fml_txt = paste(res, collapse = "")
             fml = error_sender(as.formula(fml_txt, frame),
                                "Expansion of variables in ..(\"regex\"): coercion of the following text to a formula led to an error.\n",
-                               fit_screen(paste0("     TEXT: ", fml_txt)),
-                               "\n  PROBLEM: see below", up = 1)
+                               fit_screen(paste0("...TEXT: `", fml_txt, "`")),
+                               "\nPROBLEM: see below", up = 1)
         }
     }
 
@@ -3597,267 +1981,84 @@ xpd = function(fml, ..., lhs, rhs, data = NULL){
 
             fml = error_sender(as.formula(fml_txt, frame),
                                "Dot square bracket operator: coercion of the following text to a formula led to an error.\n",
-                               fit_screen(paste0("     TEXT: ", fml_txt)),
-                               "\n  PROBLEM: see below", up = 1)
+                               fit_screen(paste0("...TEXT: `", fml_txt, "`")),
+                               "\nPROBLEM: see below", up = 1)
         }
 
+    }
+
+    if(is_data){
+        var_to_complete = grep("[[:alnum:]]\\.\\.$", all.vars(fml), value = TRUE)
+        n_var = length(var_to_complete)
+        if(n_var > 0){
+
+            if(is.null(data_vars)){
+                check_arg(data, "character vector no na | matrix | data.frame")
+
+                if(is.matrix(data)){
+                    data = colnames(data)
+                    if(is.null(data)){
+                        stop("The argument `data` must contain variables names. It is currently a matrix without column names.")
+                    }
+                } else if(is.data.frame(data)){
+                    data = names(data)
+                }
+
+                data_vars = data
+            }
+
+            fml_txt = deparse_long(fml)
+            for(i in 1:n_var){
+                var = var_to_complete[i]
+                vars_filled = data_vars[startsWith(data_vars, str_trim(var, n_last = 2))]
+                if(length(vars_filled) == 0) next
+
+                vars_new = paste0(vars_filled, collapse = " + ")
+
+                pattern = dsb("(?<![[:alnum:]._])\\Q.[var]\\E(?![[:alnum:]._])")
+
+                fml_txt = gsub(pattern, vars_new, fml_txt, perl = TRUE)
+            }
+
+            fml = error_sender(as.formula(fml_txt, frame),
+                               "Expansion of variables ending with `..` did not work. Coercion of the following text to a formula led to an error.\n",
+                               fit_screen(paste0("...TEXT: `", fml_txt, "`")),
+                               "\nPROBLEM: see below", up = 1)
+        }
     }
 
     fml
 }
 
 
-#' Fast transform of any type of vector(s) into an integer vector
-#'
-#' Tool to transform any type of vector, or even combination of vectors, into an integer vector ranging from 1 to the number of unique values. This actually creates an unique identifier vector.
-#'
-#' @param ... Vectors of any type, to be transformed in integer.
-#' @param sorted Logical, default is \code{FALSE}. Whether the integer vector should make reference to sorted values?
-#' @param add_items Logical, default is \code{FALSE}. Whether to add the unique values of the original vector(s). If requested, an attribute \code{items} is created containing the values (alternatively, they can appear in a list if \code{items.list=TRUE}).
-#' @param items.list Logical, default is \code{FALSE}. Only used if \code{add_items=TRUE}. If \code{TRUE}, then a list of length 2 is returned with \code{x} the integer vector and \code{items} the vector of items.
-#' @param multi.df Logical, default is \code{FALSE}. If \code{TRUE} then a data.frame listing the unique elements is returned in the form of a data.frame. Ignored if \code{add_items = FALSE}.
-#' @param multi.join Character scalar used to join the items of multiple vectors. The default is \code{"_"}. Ignored if \code{add_items = FALSE}.
-#' @param internal Logical, default is \code{FALSE}. For programming only. If this function is used within another function, setting \code{internal = TRUE} is needed to make the evaluation of \code{...} valid. End users of \code{to_integer} should not care.
-#'
-#'
-#' @return
-#' Reruns a vector of the same length as the input vectors.
-#' If \code{add_items=TRUE} and \code{items.list=TRUE}, a list of two elements is returned: \code{x} being the integer vector and \code{items} being the unique values to which the values in \code{x} make reference.
-#'
-#' @examples
-#'
-#' x1 = iris$Species
-#' x2 = as.integer(iris$Sepal.Length)
-#'
-#' # transforms the species vector into integers
-#' to_integer(x1)
-#'
-#' # To obtain the "items":
-#' to_integer(x1, add_items = TRUE)
-#' # same but in list form
-#' to_integer(x1, add_items = TRUE, items.list = TRUE)
-#'
-#' # transforms x2 into an integer vector from 1 to 4
-#' to_integer(x2, add_items = TRUE)
-#'
-#' # To have the sorted items:
-#' to_integer(x2, add_items = TRUE, sorted = TRUE)
-#'
-#' # The result can safely be used as an index
-#' res = to_integer(x2, add_items = TRUE, sorted = TRUE, items.list = TRUE)
-#' all(res$items[res$x] == x2)
-#'
-#'
-#' #
-#' # Multiple vectors
-#' #
-#'
-#' to_integer(x1, x2, add_items = TRUE)
-#'
-#' # You can use multi.join to handle the join of the items:
-#' to_integer(x1, x2, add_items = TRUE, multi.join = "; ")
-#'
-to_integer = function(..., sorted = FALSE, add_items = FALSE, items.list = FALSE,
-                      multi.df = FALSE, multi.join = "_", internal = FALSE){
-
-    if(!internal) check_arg(..., "vector mbt")
-    check_arg(sorted, add_items, items.list, "logical scalar")
-    check_arg(multi.join, "character scalar")
-
-    dots = list(...)
-
-    # Removing NAs
-    Q = length(dots)
-    n_all = lengths(dots)
-    n = n_all[1]
-
-    if(length(unique(n_all)) != 1) stop("All elements in '...' should be of the same length (current lenghts are ", enumerate_items(n_all), ").")
-
-    is_na = is.na(dots[[1]])
-    for(q in seq(from = 2, length.out = Q - 1)){
-        is_na = is_na | is.na(dots[[q]])
-    }
-
-    ANY_NA = FALSE
-    if(any(is_na)){
-        ANY_NA = TRUE
-
-        if(all(is_na)){
-            message("NOTE: All values are NA.")
-            res = rep(NA, n)
-            if(add_items){
-                if(items.list){
-                    res = list(x = res, items = NA)
-                } else {
-                    attr(res, "items") = NA
-                }
-            }
-
-            return(res)
-        }
-
-        for(q in 1:Q) dots[[q]] = dots[[q]][!is_na]
-    }
-
-    #
-    # Creating the ID
-    #
-
-    if(Q == 1){
-        if(sorted && !is.numeric(dots[[1]]) && !is.character(dots[[1]])){
-            # general way => works for any type with a sort method
-            f = dots[[1]]
-            res_raw = quickUnclassFactor(f, addItem = TRUE, sorted = FALSE)
-            obs_1st = cpp_get_first_item(res_raw$x, length(res_raw$items))
-            f_unik = f[obs_1st]
-            f_order = order(f_unik)
-            x_new = order(f_order)[res_raw$x]
-            if(add_items){
-                items_new = f_unik[f_order]
-                res = list(x = x_new, items = items_new)
-            } else {
-                res = x_new
-            }
-
-        } else {
-            res = quickUnclassFactor(dots[[1]], addItem = add_items, sorted = sorted)
-        }
-
-    } else {
-
-        QUF_raw = list()
-        for(q in 1:Q){
-            QUF_raw[[q]] = quickUnclassFactor(dots[[q]], sorted = FALSE, addItem = TRUE)
-        }
-
-        # Then we combine
-        power = floor(1 + log10(sapply(QUF_raw, function(x) length(x$items))))
-
-        is_large = sum(power) > 14
-        if(is_large){
-            # 15 Aug 2021, finally found a solution. It was so obvious with hindsight...
-            QUF_raw_value = lapply(QUF_raw, `[[`, 1)
-            order_index = do.call(order, QUF_raw_value)
-            index = cpp_combine_clusters(QUF_raw_value, order_index)
-        } else {
-            # quicker, but limited by the precision of doubles
-            index = QUF_raw[[1]]$x
-            for(q in 2:Q){
-                index = index + QUF_raw[[q]]$x*10**sum(power[1:(q-1)])
-            }
-        }
-
-        res = quickUnclassFactor(index, addItem = add_items || sorted, sorted = sorted)
-
-        if(add_items || sorted){
-            # we re order appropriately
-            # f prefix means factor
-
-            obs_1st = cpp_get_first_item(res$x, length(res$items))
-
-            f_all = list()
-            for(q in 1:Q){
-                f_all[[q]] = dots[[q]][obs_1st]
-            }
-
-            f_order = do.call("order", f_all)
-
-            x_new = order(f_order)[res$x]
-
-            if(multi.df){
-                # Putting into a DF => we take care of names
-                mc_dots = match.call(expand.dots = FALSE)[["..."]]
-                n_dots = length(mc_dots)
-                mc_dots_names = names(mc_dots)
-                if(is.null(mc_dots_names)) mc_dots_names = character(n_dots)
-
-                my_names = character(n_dots)
-                for(q in 1:n_dots){
-                    if(nchar(mc_dots_names[q]) > 0){
-                        my_names[q] = mc_dots_names[q]
-                    } else {
-                        my_names[q] = deparse_long(mc_dots[[q]])
-                    }
-                }
-
-                names(f_all) = my_names
-
-                f_df = as.data.frame(f_all)
-                items_new = f_df[f_order, , drop = FALSE]
-                row.names(items_new) = 1:nrow(items_new)
-            } else {
-                # we "paste" them
-                arg_list = f_all
-                arg_list$sep = multi.join
-                f_char = do.call("paste", arg_list)
-                items_new = f_char[f_order]
-            }
-
-            if(add_items){
-                res = list(x = x_new, items = items_new)
-            } else {
-                res = x_new
-            }
-        }
-    }
-
-    if(ANY_NA){
-        if(is.list(res)){
-            x = res$x
-        } else {
-            x = res
-        }
-
-        x_na = rep(NA, n)
-        x_na[!is_na] = x
-
-        if(is.list(res)){
-            res$x = x_na
-        } else {
-            res = x_na
-        }
-
-    }
-
-    if(add_items && isFALSE(items.list)){
-        res_tmp = res$x
-        attr(res_tmp, "items") = res$items
-        res = res_tmp
-    }
-
-    res
-}
-
-
-
 #' Centers a set of variables around a set of factors
 #'
-#' User-level access to internal demeaning algorithm of \code{fixest}.
+#' User-level access to internal demeaning algorithm of `fixest`.
 #'
 #' @inheritSection feols Varying slopes
 #'
-#' @param X A matrix, vector, data.frame or a list OR a formula OR a \code{\link[fixest]{feols}} estimation. If equal to a formula, then the argument \code{data} is required, and it must be of the type: \code{x1 + x2 ~ f1 + fe2} with on the LHS the variables to be centered, and on the RHS the factors used for centering. Note that you can use variables with varying slopes with the syntax \code{fe[v1, v2]} (see details in \code{\link[fixest]{feols}}). If a \code{feols} estimation, all variables (LHS+RHS) are demeaned and then returned (only if it was estimated with fixed-effects). Otherwise, it must represent the data to be centered. Of course the number of observations of that data must be the same as the factors used for centering (argument \code{f}).
-#' @param f A matrix, vector, data.frame or list. The factors used to center the variables in argument \code{X}. Matrices will be coerced using \code{as.data.frame}.
-#' @param slope.vars A vector, matrix or list representing the variables with varying slopes. Matrices will be coerced using \code{as.data.frame}. Note that if this argument is used it MUST be in conjunction with the argument \code{slope.flag} that maps the factors to which the varying slopes are attached. See examples.
-#' @param slope.flag An integer vector of the same length as the number of variables in \code{f} (the factors used for centering). It indicates for each factor the number of variables with varying slopes to which it is associated. Positive values mean that the raw factor should also be included in the centering, negative values that it should be excluded. Sorry it's complicated... but see the examples it may get clearer.
-#' @param data A data.frame containing all variables in the argument \code{X}. Only used if \code{X} is a formula, in which case \code{data} is mandatory.
-#' @param weights Vector, can be missing or NULL. If present, it must contain the same number of observations as in \code{X}.
-#' @param nthreads Number of threads to be used. By default it is equal to \code{getFixest_nthreads()}.
-#' @param notes Logical, whether to display a message when NA values are removed. By default it is equal to \code{getFixest_notes()}.
+#' @param X A matrix, vector, data.frame or a list OR a formula OR a [`feols`] estimation. If equal to a formula, then the argument `data` is required, and it must be of the type: `x1 + x2 ~ f1 + fe2` with on the LHS the variables to be centered, and on the RHS the factors used for centering. Note that you can use variables with varying slopes with the syntax `fe[v1, v2]` (see details in [`feols`]). If a `feols` estimation, all variables (LHS+RHS) are demeaned and then returned (only if it was estimated with fixed-effects). Otherwise, it must represent the data to be centered. Of course the number of observations of that data must be the same as the factors used for centering (argument `f`).
+#' @param f A matrix, vector, data.frame or list. The factors used to center the variables in argument `X`. Matrices will be coerced using `as.data.frame`.
+#' @param slope.vars A vector, matrix or list representing the variables with varying slopes. Matrices will be coerced using `as.data.frame`. Note that if this argument is used it MUST be in conjunction with the argument `slope.flag` that maps the factors to which the varying slopes are attached. See examples.
+#' @param slope.flag An integer vector of the same length as the number of variables in `f` (the factors used for centering). It indicates for each factor the number of variables with varying slopes to which it is associated. Positive values mean that the raw factor should also be included in the centering, negative values that it should be excluded. Sorry it's complicated... but see the examples it may get clearer.
+#' @param data A data.frame containing all variables in the argument `X`. Only used if `X` is a formula, in which case `data` is mandatory.
+#' @param weights Vector, can be missing or NULL. If present, it must contain the same number of observations as in `X`.
+#' @param nthreads Number of threads to be used. By default it is equal to `getFixest_nthreads()`.
+#' @param notes Logical, whether to display a message when NA values are removed. By default it is equal to `getFixest_notes()`.
 #' @param iter Number of iterations, default is 2000.
-#' @param tol Stopping criterion of the algorithm. Default is \code{1e-6}. The algorithm stops when the maximum absolute increase in the coefficients values is lower than \code{tol}.
-#' @param na.rm Logical, default is \code{TRUE}. If \code{TRUE} and the input data contains any NA value, then any observation with NA will be discarded leading to an output with less observations than the input. If \code{FALSE}, if NAs are present the output will also be filled with NAs for each NA observation in input.
-#' @param as.matrix Logical, if \code{TRUE} a matrix is returned, if \code{FALSE} it will be a data.frame. The default depends on the input, if atomic then a matrix will be returned.
-#' @param im_confident Logical, default is \code{FALSE}. FOR EXPERT USERS ONLY! This argument allows to skip some of the preprocessing of the arguments given in input. If \code{TRUE}, then \code{X} MUST be a numeric vector/matrix/list (not a formula!), \code{f} MUST be a list, \code{slope.vars} MUST be a list, \code{slope.vars} MUST be consistent with \code{slope.flag}, and \code{weights}, if given, MUST be numeric (not integer!). Further there MUST be not any NA value, and the number of observations of each element MUST be consistent. Non compliance to these rules may simply lead your R session to break.
-#' @param fixef.reorder Logical, default is \code{TRUE}. Whether to reorder the fixed-effects by frequencies before feeding them into the algorithm. If \code{FALSE}, the original fixed-effects order provided by the user is maintained. In general, reordering leads to faster and more precise performance.
+#' @param tol Stopping criterion of the algorithm. Default is `1e-6`. The algorithm stops when the maximum absolute increase in the coefficients values is lower than `tol`.
+#' @param na.rm Logical, default is `TRUE`. If `TRUE` and the input data contains any NA value, then any observation with NA will be discarded leading to an output with less observations than the input. If `FALSE`, if NAs are present the output will also be filled with NAs for each NA observation in input.
+#' @param as.matrix Logical, if `TRUE` a matrix is returned, if `FALSE` it will be a data.frame. The default depends on the input, if atomic then a matrix will be returned.
+#' @param im_confident Logical, default is `FALSE`. FOR EXPERT USERS ONLY! This argument allows to skip some of the preprocessing of the arguments given in input. If `TRUE`, then `X` MUST be a numeric vector/matrix/list (not a formula!), `f` MUST be a list, `slope.vars` MUST be a list, `slope.vars` MUST be consistent with `slope.flag`, and `weights`, if given, MUST be numeric (not integer!). Further there MUST be not any NA value, and the number of observations of each element MUST be consistent. Non compliance to these rules may simply lead your R session to break.
+#' @param fixef.reorder Logical, default is `TRUE`. Whether to reorder the fixed-effects by frequencies before feeding them into the algorithm. If `FALSE`, the original fixed-effects order provided by the user is maintained. In general, reordering leads to faster and more precise performance.
 #' @param ... Not currently used.
 #'
 #' @return
 #' It returns a data.frame of the same number of columns as the number of variables to be centered.
 #'
-#' If \code{na.rm = TRUE}, then the number of rows is equal to the number of rows in input minus the number of NA values (contained in \code{X}, \code{f}, \code{slope.vars} or \code{weights}). The default is to have an output of the same number of observations as the input (filled with NAs where appropriate).
+#' If `na.rm = TRUE`, then the number of rows is equal to the number of rows in input minus the number of NA values (contained in `X`, `f`, `slope.vars` or `weights`). The default is to have an output of the same number of observations as the input (filled with NAs where appropriate).
 #'
-#' A matrix can be returned if \code{as.matrix = TRUE}.
+#' A matrix can be returned if `as.matrix = TRUE`.
 #'
 #' @examples
 #'
@@ -4407,9 +2608,9 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
 #' Extracts the observations used for the estimation
 #'
-#' This function extracts the observations used in \code{fixest} estimation.
+#' This function extracts the observations used in `fixest` estimation.
 #'
-#' @param x A \code{fixest} object.
+#' @param x A `fixest` object.
 #'
 #' @return
 #' It returns a simple vector of integers.
@@ -4422,8 +2623,8 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 #'
 #' # Split sample estimations
 #' est_split = feols(y ~ x1, base, split = ~species)
-#' (obs_setosa = obs(est_split$setosa))
-#' (obs_versi = obs(est_split$versicolor))
+#' (obs_setosa = obs(est_split[[1]]))
+#' (obs_versi = obs(est_split[sample = "versi", drop = TRUE]))
 #'
 #' est_versi = feols(y ~ x1, base, subset = obs_versi)
 #'
@@ -4451,19 +2652,19 @@ obs = function(x){
 
 
 
-#' Check the fixed-effects convergence of a \code{feols} estimation
+#' Check the fixed-effects convergence of a `feols` estimation
 #'
-#' Checks the convergence of a \code{feols} estimation by computing the first-order conditions of all fixed-effects (all should be close to 0)
+#' Checks the convergence of a `feols` estimation by computing the first-order conditions of all fixed-effects (all should be close to 0)
 #'
-#' @param x A \code{\link[fixest]{feols}} estimation that should contain fixed-effects.
-#' @param object An object returned by \code{check_conv_feols}.
+#' @param x A [`feols`] estimation that should contain fixed-effects.
+#' @param object An object returned by `check_conv_feols`.
 #' @param type Either "short" (default) or "detail". If "short", only the maximum absolute FOC are displayed, otherwise the 2 smallest and the 2 largest FOC are reported for each fixed-effect and each variable.
 #' @param ... Not currently used.
 #'
 #' Note that this function first re-demeans the variables, thus possibly incurring some extra computation time.
 #'
 #' @return
-#' It returns a list of \code{N} elements, \code{N} being the number of variables in the estimation (dependent variable + explanatory variables +, if IV, endogenous variables and instruments). For each variable, all the first-order conditions for each fixed-effect are returned.
+#' It returns a list of `N` elements, `N` being the number of variables in the estimation (dependent variable + explanatory variables +, if IV, endogenous variables and instruments). For each variable, all the first-order conditions for each fixed-effect are returned.
 #'
 #' @examples
 #'
@@ -4608,993 +2809,23 @@ summary.fixest_check_conv = function(object, type = "short", ...){
 
 
 
-#' Prints the number of unique elements in a data set
+
+
+#' Replicates `fixest` objects
 #'
-#' This utility tool displays the number of unique elements in one or multiple data.frames as well as their number of NA values.
+#' Simple function that replicates `fixest` objects while (optionally) computing different standard-errors. Useful mostly in combination with [`etable`] or [`coefplot`].
 #'
-#' @param x A formula, with data set names on the LHS and variables on the RHS, like \code{data1 + data2 ~ var1 + var2}. The following special variables are admitted: \code{"."} to get default values, \code{".N"} for the number of observations, \code{".U"} for the number of unique rows, \code{".NA"} for the number of rows with at least one NA. Variables can be combined with \code{"^"}, e.g. \code{df~id^period}; use \code{id\%^\%period} to also include the terms on both sides. Note that using \code{:} and \code{*} is equivalent to \code{^} and \code{\%^\%}. Sub select with \code{id[cond]}, when doing so \code{id} is automatically included. Conditions can be chained, as in \code{id[cond1, cond2]}. Use \code{NA(x, y)} in conditions instead of \code{is.na(x) | is.na(y)}. Use the \code{!!} operator to have both a condition and its opposite. To compare the keys in two data sets, use \code{data1:data2}. If not a formula, \code{x} can be: a vector (displays the # of unique values); a \code{data.frame} (default values are displayed), or a "sum" of data sets like in \code{x = data1 + data2}, in that case it is equivalent to \code{data1 + data2 ~ .}.
-#' @param ... Not currently used.
-#'
-#' @section Special values and functions:
-#'
-#' In the formula, you can use the following special values: \code{"."}, \code{".N"}, \code{".U"}, and \code{".NA"}.
-#'
-#' \itemize{
-#'
-#' \item{\code{"."}}{Accesses the default values. If there is only one data set and the data set is \emph{not} a \code{data.table}, then the default is to display the number of observations and the number of unique rows. If the data is a \code{data.table}, the number of unique items in the key(s) is displayed instead of the number of unique rows (if the table has keys of course). If there are two or more data sets, then the default is to display the unique items for: a) the variables common across all data sets, if there's less than 4, and b) if no variable is shown in a), the number of variables common across at least two data sets, provided there are less than 5. If the data sets are data tables, the keys are also displayed on top of the common variables. In any case, the number of observations is always displayed.}
-#'
-#' \item{\code{".N"}}{Displays the number of observations.}
-#'
-#' \item{\code{".U"}}{Displays the number of unique rows.}
-#'
-#' \item{\code{".NA"}}{Displays the number of rows with at least one NA.}
-#'
-#' }
-#'
-#' @section The \code{NA} function:
-#'
-#' The special function \code{NA} is an equivalent to \code{is.na} but can handle several variables. For instance, \code{NA(x, y)} is equivalent to \code{is.na(x) | is.na(y)}. You can add as many variables as you want as arguments. If no argument is provided, as in \code{NA()}, it is identical to having all the variables of the data set as argument.
-#'
-#' @section Combining variables:
-#'
-#' Use the "hat", \code{"^"}, operator to combine several variables. For example \code{id^period} will display the number of unique values of id x period combinations.
-#'
-#' Use the "super hat", \code{"\%^\%"}, operator to also include the terms on both sides. For example, instead of writing \code{id + period + id^period}, you can simply write \code{id\%^\%period}.
-#'
-#' Alternatively, you can use \code{:} for \code{^} and \code{*} for \code{\%^\%}.
-#'
-#' @section Sub-selections:
-#'
-#' To show the number of unique values for sub samples, simply use \code{[]}. For example, \code{id[x > 10]} will display the number of unique \code{id} for which \code{x > 10}.
-#'
-#' Simple square brackets lead to the inclusion of both the variable and its subset. For example \code{id[x > 10]} is equivalent to \code{id + id[x > 10]}. To include only the sub selection, use double square brackets, as in \code{id[[x > 10]]}.
-#'
-#' You can add multiple sub selections at once, only separate them with a comma. For example \code{id[x > 10, NA(y)]} is equivalent to \code{id[x > 10] + id[NA(y)]}.
-#'
-#' Use the double negative operator, i.e. \code{!!}, to include both a condition and its opposite at once. For example \code{id[!!x > 10]} is equivalent to \code{id[x > 10, !x > 10]}. Double negative operators can be chained, like in \code{id[!!cond1 & !!cond2]}, then the cardinal product of all double negatived conditions is returned.
-#'
-#' @return
-#' It returns a vector containing the number of unique values per element. If several data sets were provided, a list is returned, as long as the number of data sets, each element being a vector of unique values.
-#'
-#' @examples
-#'
-#' data = base_did
-#' data$x1.L1 = round(lag(x1~id+period, 1, data))
-#'
-#' # By default, just the formatted number of observations
-#' n_unik(data)
-#'
-#' # Or the nber of unique elements of a vector
-#' n_unik(data$id)
-#'
-#' # number of unique id values and id x period pairs
-#' n_unik(data ~.N + id + id^period)
-#'
-#' # use the %^% operator to include the terms on the two sides at once
-#' # => same as id*period
-#' n_unik(data ~.N + id %^% period)
-#'
-#' # using sub selection with []
-#' n_unik(data ~.N + period[!NA(x1.L1)])
-#'
-#' # to show only the sub selection: [[]]
-#' n_unik(data ~.N + period[[!NA(x1.L1)]])
-#'
-#' # you can have multiple values in [],
-#' # just separate them with a comma
-#' n_unik(data ~.N + period[!NA(x1.L1), x1 > 7])
-#'
-#' # to have both a condition and its opposite,
-#' # use the !! operator
-#' n_unik(data ~.N[!!NA(x1.L1)])
-#'
-#' # the !! operator works within condition chains
-#' n_unik(data ~.N[!!NA(x1.L1) & !!x1 > 7])
-#'
-#' # Conditions can be distributed
-#' n_unik(data ~ (id + period)[x1 > 7])
-#'
-#' #
-#' # Several data sets
-#' #
-#'
-#' # Typical use case: merging
-#' # Let's create two data sets and merge them
-#'
-#' data(base_did)
-#' base_main = base_did
-#' base_extra = sample_df(base_main[, c("id", "period")], 100)
-#' base_extra$id[1:10] = 111:120
-#' base_extra$period[11:20] = 11:20
-#' base_extra$z = rnorm(100)
-#'
-#' # You can use db1:db2 to compare the common keys in two data sets
-#'  n_unik(base_main:base_extra)
-#'
-#' tmp = merge(base_main, base_extra, all.x = TRUE, by = c("id", "period"))
-#'
-#' # You can show unique values for any variable, as before
-#' n_unik(tmp + base_main + base_extra ~ id[!!NA(z)] + id^period)
-#'
-#'
-#'
-n_unik = function(x){
-    # returns a vector with the nber of unique values
-    # attr("na.info") => nber of NA values, vector
-
-    if(missing(x)){
-        stop("Argument 'x' must be provided. Problem: it is missing.")
-    }
-
-    # Non standard-evaluation
-    x_dp = deparse_long(substitute(x))
-    if(!grepl("~", x_dp, fixed = TRUE)){
-        if(grepl("[+:*]", x_dp)){
-            # Non standard-evaluation
-            x = as.formula(paste0(x_dp, "~ ."))
-        } else {
-            check_arg(x, "data.frame | vector l0 | ts formula")
-        }
-    } else {
-        check_arg(x, "ts formula")
-    }
-
-    nthreads = getFixest_nthreads()
-
-    # If vector
-    comp_pairs = list()
-    if(is.vector(x)){
-
-        x_name = gsub("^[[:alpha:]\\.][[:alnum:]\\._]*\\$", "", x_dp)
-
-        na.info = 0
-        if(anyNA(x)){
-            who_NA = is.na(x)
-            na.info = sum(who_NA)
-            x = x[!who_NA]
-        }
-
-        res = len_unique(x, nthreads)
-        names(res) = x_name
-
-        attr(res, "na.info") = na.info
-
-        class(res) = "vec_n_unik"
-        return(res)
-
-    } else if(is.data.frame(x)){
-
-        n_x = 1
-        x_all = list(x)
-        fml = ~.
-
-    } else if(inherits(x, "formula")){
-
-        x_terms = terms(x[1:2])
-
-        fact_mat = attr(x_terms, "factors")
-
-        x_all_names = rownames(fact_mat)
-
-        # We get the comparison pairs
-        vars = colnames(fact_mat)
-        for(pair in grep(":", vars, fixed = TRUE, value = TRUE)){
-            dict = setNames(1:length(x_all_names), x_all_names)
-            pair_split = strsplit(pair, ":", fixed = TRUE)[[1]]
-            comb = combn(pair_split, 2)
-            for(i in 1:ncol(comb)){
-                comp_pairs[[length(comp_pairs) + 1]] = unname(dict[comb[, i]])
-            }
-        }
-
-        if(length(comp_pairs) > 0){
-            comp_pairs = unique(comp_pairs)
-        }
-
-        # Construction of the list  + sanity check
-        n_x = length(x_all_names)
-        x_all = vector("list", n_x)
-        for(i in 1:n_x){
-            x_all[[i]] = error_sender(eval(str2lang(x_all_names[i]), parent.frame()),
-                                      "The left-hand-side of the formula must contain valid data.frames. Problem in the evaluation of '", x_all_names[i], "':")
-            check_value(x_all[[i]], "data.frame",
-                        .message = paste0("The value '", x_all_names[i], "' (in the LHS of the formula) must be a data.frame."))
-        }
-
-        fml = x[c(1, 3)]
-
-    }
-
-    # If DF + formula
-    # ex: fml = ~ id^year + author_id[sw0(is.na(author_name), is.na(affil_name), year == min_year)]
-    # fml = ~ id^sw0(fe)
-
-    # check variable names
-    naked_vars = origin_vars = all.vars(fml)
-    valid_vars = c(".N", ".U", ".NA", ".", unique(unlist(lapply(x_all, names))))
-
-    check_value_plus(naked_vars, "multi match", .choices = valid_vars,
-                     .message = paste0("The formula must only use variables in the data set", plural_len(x_all), "."))
-
-    if("." %in% naked_vars){
-        # The default values
-
-        IS_DT = requireNamespace("data.table", quietly = TRUE)
-
-        dot_default = ".N"
-        x_keys = c()
-        x_common_vars = c()
-
-        # keys
-        if(IS_DT){
-            for(I in 1:n_x){
-                if(inherits(x_all[[I]], "data.table")){
-                    x_keys = c(x_keys, data.table::key(x_all[[I]]))
-                }
-            }
-        }
-
-        # common variables
-        if(n_x > 1){
-
-            # Common to all
-            x_names_current = names(x_all[[1]])
-            for(i in 2:n_x){
-                x_names_current = intersect(x_names_current, names(x_all[[i]]))
-                if(length(x_names_current) == 0) break
-            }
-
-            if(length(x_names_current) %in% 1:4){
-                # No more than 4 common variables by default
-                x_common_vars = x_names_current
-
-                if(length(comp_pairs) > 0 && length(x_names_current) <= 3){
-                    x_common_vars = paste0(x_names_current, collapse = "*")
-                }
-
-            } else if(n_x > 2){
-                # Common to at least 2 data sets
-                for(i in 1:(n_x - 1)){
-                    x_names_current = names(x_all[[i]])
-                    for(j in (i + 1):n_x){
-                        qui_common = x_names_current %in% names(x_all[[j]])
-                        if(any(qui_common)){
-                            x_common_vars = c(x_common_vars, x_names_current[qui_common])
-                        }
-                    }
-                }
-
-                x_common_vars = unique(x_common_vars)
-
-                if(length(x_common_vars) > 5){
-                    #  we keep max 5
-                    x_common_vars = c()
-                }
-            }
-        }
-
-        if(length(x_keys) > 0 || length(x_common_vars) > 0){
-            dot_default = unique(c(dot_default, x_keys, x_common_vars))
-        }
-
-        if(length(dot_default) == 1){
-            dot_default = c(".N", ".U")
-        }
-
-        rhs_txt = as.character(fml)[[2]]
-        rhs_txt = gsub("(^| )\\.( |$)", dsb(".['+'c? dot_default]"), rhs_txt)
-        fml = .xpd(rhs = rhs_txt)
-    }
-
-    if(any(naked_vars != origin_vars)){
-        # we complete the partial matching
-        fml_txt = deparse_long(fml)
-
-        var_diff = which(naked_vars != origin_vars)
-
-        for(i in var_diff){
-            re = paste0("(?!<[[:alnum:]._])", origin_vars[i], "(?!=[[:alnum:]._])")
-            fml_txt = gsub(re, naked_vars[i], fml_txt, perl = TRUE)
-        }
-
-        fml = as.formula(fml_txt)
-    }
-
-    tm = terms_hat(fml, n_unik = TRUE)
-    all_vars = attr(tm, "term.labels")
-    var_final = c()
-
-    # stepwise function
-    for(var in all_vars){
-        # var = all_vars[1]
-
-        if(grepl("combine_clusters(_fast)?", var)){
-            var = gsub("combine_clusters(_fast)?", "to_integer", var)
-        }
-
-        IS_HAT_SW = grepl("sw0?\\)\\(", var)
-        if(IS_HAT_SW){
-            var = paste0(gsub("(sw0?)\\)\\(", "\\1(", var), ")")
-        }
-
-        if(grepl("^[[:alpha:].][[:alnum:]._]*\\[", var, perl = TRUE) && !grepl("sw0?\\(", var)){
-            # We use sw to make id[cond1, cond2] work
-            # That's what's called path dependency!
-
-            var_new = gsub("^([[:alpha:].][[:alnum:]._]*)\\[", "\\1[sw0(", var)
-            if(grepl("sw0([", var_new, fixed = TRUE)){
-                var_new = sub("sw0([", "sw(", str_trim(var_new, -1), fixed = TRUE)
-            }
-            var_new = sub("\\]$", ")]", var_new)
-
-            var = var_new
-        }
-
-        if(is_fun_in_char(var, "sw0?")){
-
-            info = extract_fun(var, "sw0?", err_msg = "The stepwise function can be used only once per variable.")
-
-            sw_value = eval(str2lang(info$fun))
-
-            qui_double = grepl("!!", trimws(sw_value))
-            while(any(qui_double)){
-                i = which(qui_double)[1]
-
-                value = sw_value[i]
-                value_split = strsplit(value, "!!")[[1]]
-
-                n_split = length(value_split)
-                n_s = 2 ** (n_split - 1)
-                new_values = rep(value_split[1], n_s)
-
-                prefixes = do.call(expand.grid, rep(list(c("", "!")), n_split - 1))
-
-                for(j in 1:ncol(prefixes)){
-                    new_values = paste0(new_values, prefixes[, j], value_split[j + 1])
-                }
-
-                sw_value = insert(sw_value[-i], new_values, i)
-                qui_double = grepl("!!", sw_value)
-            }
-
-            var_char_new = paste0(info$before, sw_value, info$after)
-
-            if(IS_HAT_SW){
-                var_char_new[1] = gsub(", (,|\\))", "\\1", var_char_new[1])
-
-                qui_nested = grepl("^(to_integer\\(.+){2,}", var_char_new)
-                if(any(qui_nested)){
-                    # later => add check problem if another function is used
-                    var_char_new[qui_nested] = paste0("to_integer(", gsub("to_integer\\(|\\)", "", var_char_new[qui_nested]), ")")
-                }
-            }
-
-            if(grepl("[]", var_char_new[1], fixed = TRUE)){
-                var_char_new[1] = gsub("[]", "", var_char_new[1], fixed = TRUE)
-            }
-
-            var_final = c(var_final, var_char_new)
-        } else {
-            var_final = c(var_final, var)
-        }
-    }
-
-    var_final = unique(var_final)
-
-    var_final_names = var_final
-    # we take care of id^year cases
-    if(any(who_combine <- is_fun_in_char(var_final, "to_integer"))){
-
-        for(i in which(who_combine)){
-            info = extract_fun(var_final[i], "to_integer")
-
-            # we use sw() to get the vars
-            sw_char = gsub("^[^\\(]+\\(", "sw(", info$fun)
-            sw_value = eval(str2lang(sw_char))
-
-            hat_value = paste(sw_value, collapse = "^")
-
-            var_final_names[i] = paste0(info$before, hat_value, info$after)
-        }
-    }
-
-    # NA counting + unique counting
-
-    res_all = list()
-    for(I in 1:n_x){
-
-        x = x_all[[I]]
-        x_list = unclass(x)
-        x_list[["NA_fun"]] = function(...) NA_fun(..., df = x)
-
-        vars_legit = c(".N", ".U", ".NA", names(x))
-
-        res = c()
-        na.info = c()
-
-        for(i in seq_along(var_final)){
-
-            vf = var_final[i]
-            vf_name = var_final_names[i]
-            na_i = 0
-
-            vf = gsub("((?<=[^[:alnum:]_\\.])|^)NA\\(", "NA_fun(", vf, perl = TRUE)
-
-            vf_call = str2lang(vf)
-
-            if(!all(all.vars(vf_call) %in% vars_legit)){
-                res_i = NA_real_
-                vf_name = ""
-
-            } else if(grepl("^\\.(N|U)($|\\[)", vf)){
-
-
-                if(vf %in% c(".N", ".N[]")){
-                    res_i = nrow(x)
-                    vf_name = "# Observations"
-
-                } else if(vf %in% c(".U", ".U[]")){
-                    res_i = nrow(unique(x))
-                    vf_name = "# Unique rows"
-
-                } else {
-                    # Other methods are faster but are less general
-
-                    vf_new = gsub("(^\\.(N|U)\\[)|(\\]$)", "", vf)
-                    do_unik = grepl("^\\.U", vf)
-
-                    val = eval(str2lang(vf_new), x_list)
-
-                    # we want to drop the NAs for indices
-                    if(anyNA(val)){
-                        val = val[!is.na(val)]
-                    }
-
-                    if(length(val) == 0){
-                        res_i = 0
-
-                    } else if(do_unik){
-                        res_i = NROW(unique(x[val, ]))
-
-                    } else {
-                        res_i = if(is.logical(val)) sum(val) else length(val)
-                    }
-
-                    msg = if(do_unik) "# Unique rows" else "# Obs."
-                    vf_new = gsub("NA_fun", "NA", vf_new, fixed = TRUE)
-                    vf_name = paste0(msg, " with ", vf_new)
-                }
-
-            } else if(grepl("^(\\.NA|NA_fun\\(\\))", vf)) {
-
-                if(vf %in% c(".NA", ".NA[]", "NA_fun()", "NA_fun()[]")){
-                    res_i = sum(!complete.cases(x))
-                    vf_name = "# Rows with NAs"
-
-                } else {
-
-                    subselect = NULL
-                    sub_text = ""
-                    if(grepl("\\]$", vf)){
-                        sub_text_split = strsplit(vf, "[", fixed = TRUE)[[1]]
-                        sub_text = paste0(sub_text_split[-1], collapse = "[")
-                        sub_text = gsub("\\]$", "", sub_text)
-
-                        subselect = eval(str2lang(sub_text), x_list)
-                    }
-
-                    if(length(subselect) == 0){
-                        res_i = 0
-                    } else {
-                        res_i = sum(!complete.cases(x[subselect, ]))
-                    }
-
-                    vf_name = dsb("# Rows with NAs, with .[sub_text]")
-                }
-            } else {
-                val = eval(vf_call, x_list)
-
-                if(anyNA(val)){
-                    who_NA = is.na(val)
-                    na_i = sum(who_NA)
-                    val = val[!who_NA]
-                }
-
-                if(grepl("^NA_fun\\(", vf)){
-                    res_i = sum(val)
-
-                    # now the message
-                    leftover = sub("^[^\\)]+\\)", "", vf)
-                    begin = substr(vf, 1, nchar(vf) - nchar(leftover))
-
-                    my_fun = list("NA_fun" = function(x) enumerate_items(sapply(sys.call()[-1], deparse_long)))
-                    na_vars = eval(str2lang(begin), my_fun)
-                    msg_start = paste0("# NAs in ", na_vars)
-
-                    msg_end = ""
-                    if(grepl("[", vf, fixed = TRUE)){
-                        msg_end = paste0(" with ", gsub("^\\[|\\]$", "", leftover))
-                    }
-
-                    vf_name = paste0(msg_start, msg_end)
-
-                } else {
-                    res_i = len_unique(val, nthreads)
-                }
-
-            }
-
-            res[vf_name] = res_i
-            na.info[i] = na_i
-        }
-
-        attr(res, "na.info") = na.info
-        class(res) = "vec_n_unik"
-
-        if(n_x == 1){
-            return(res)
-        }
-
-        res_all[[x_all_names[I]]] = res
-    }
-
-
-    # Specific data set comparisons
-    info_pairs = list()
-    for(pair in comp_pairs){
-
-        i_x = pair[1]
-        i_y = pair[2]
-
-        x = x_all[[i_x]]
-        x_list = unclass(x)
-        x_list[["NA_fun"]] = function(...) NA_fun(..., df = x)
-
-        y = x_all[[i_y]]
-        y_list = unclass(y)
-        y_list[["NA_fun"]] = function(...) NA_fun(..., df = y)
-
-        vars_legit = intersect(names(x), names(y))
-
-        # two last elements: id and common
-        all_rows_id_common = c()
-        row_temp = rep(NA_real_, n_x + 2)
-
-        for(i in seq_along(var_final)){
-
-            vf = var_final[i]
-            vf = gsub("((?<=[^[:alnum:]_\\.])|^)NA\\(", "NA_fun(", vf, perl = TRUE)
-            vf_call = str2lang(vf)
-
-            if(!all(all.vars(vf_call) %in% vars_legit) || grepl("^NA_fun", vf)){
-                next
-
-            } else {
-
-                if(grepl("to_integer", vf, fixed = TRUE)){
-                    # specific scheme for combinations
-
-                    if(grepl("NA_fun()", vf, fixed = TRUE)){
-                        # we don't allow that
-                        next
-                    }
-
-                    vars_keep = all.vars(vf_call)
-
-                    xy_list = list()
-                    for(v in vars_keep){
-                        xy_list[[v]] = c(x_list[[v]], y_list[[v]])
-                    }
-
-                    xy_list[["NA_fun"]] = function(...) NA_fun(..., df = stop("Internal error."))
-
-
-                    val_xy = eval(vf_call, xy_list)
-
-                    nrow_x = length(x_list[[1]])
-                    nrow_y = length(y_list[[1]])
-                    val_x = val_xy[1:nrow_x]
-                    val_y = val_xy[(nrow_x + 1):(nrow_x + nrow_y)]
-
-                } else {
-                    val_x = eval(vf_call, x_list)
-                    val_y = eval(vf_call, y_list)
-                }
-
-
-                if(anyNA(val_x)){
-                    val_x = val_x[!is.na(val_x)]
-                }
-
-                if(anyNA(val_y)){
-                    val_y = val_y[!is.na(val_y)]
-                }
-
-                # first col is ID
-                val_x_unik = unique(val_x)
-                val_y_unik = unique(val_y)
-
-                n_x_not_in_y = sum(!val_x_unik %in% val_y_unik)
-                n_y_not_in_x = sum(!val_y_unik %in% val_x_unik)
-                n_common = sum(val_x_unik %in% val_y_unik)
-
-                row = row_temp
-                row[i_x] = n_x_not_in_y
-                row[i_y] = n_y_not_in_x
-
-                row[n_x + 1] = i
-                row[n_x + 2] = n_common
-
-                all_rows_id_common = rbind(all_rows_id_common, row)
-
-            }
-        }
-
-        if(length(all_rows_id_common) > 0){
-            attr(all_rows_id_common, "data_id") = c(i_x, i_y)
-            info_pairs[[length(info_pairs) + 1]] = all_rows_id_common
-        }
-    }
-
-    if(length(info_pairs) > 0){
-        attr(res_all, "info_pairs") = info_pairs
-    }
-
-    class(res_all) = "list_n_unik"
-
-    return(res_all)
-}
-
-#' @rdname n_unik
-print.vec_n_unik = function(x, ...){
-
-    hash = "## "
-
-    x_names = sfill(names(x))
-    na.info = attr(x, "na.info")
-    na.info_format = sfill(fsignif(na.info))
-    x_value = sfill(fsignif(x))
-
-    n = length(x)
-    na_col = paste0("(# NAs: ", na.info_format, ")")
-    na_col[na.info == 0] = ""
-
-    res = paste0(hash, x_names, ": ", x_value, " ", na_col)
-    cat(res, sep = "\n")
-}
-
-#' @rdname n_unik
-print.list_n_unik = function(x, ...){
-
-
-    # I can't use #> anymore!!! The auto complete by the new version
-    # of Rstudio drives me nuts!!!
-    hash = "## "
-
-    x_all = x
-    n_x = length(x_all)
-
-    if(n_x == 1) return(x_all[[1]])
-
-    info_pairs = attr(x, "info_pairs")
-    IS_PAIR = !is.null(info_pairs)
-
-    # First, the variable names
-
-    all_names = names(x_all[[1]])
-    qui_0 = nchar(all_names) == 0
-    i = 2
-    while(any(qui_0) && i <= n_x){
-        names_i = names(x_all[[i]])
-        all_names[qui_0] = names_i[qui_0]
-        qui_0 = nchar(all_names) == 0
-        i = i + 1
-    }
-
-    # id_vars: used in info_pairs
-    id_vars = seq_along(all_names)
-
-    if(all(qui_0)){
-        stop("Not any valid information to display: please check that all your variables exist in all data sets.")
-
-    } else if(any(qui_0)){
-        warning("Some variables could not be evaluated in any data set: please check that all your variables exist in all data sets.")
-
-        all_names = all_names[!qui_0]
-        id_vars = id_vars[!qui_0]
-
-        for(i in 1:n_x){
-            x = x_all[[i]]
-            na.info = attr(x, "na.info")
-
-            x = x[!qui_0]
-            na.info = na.info[!qui_0]
-            attr(x, "na.info") = na.info
-
-            x_all[[i]] = x
-        }
-    }
-
-
-    x_names = sfill(all_names)
-
-    # If ambiguous pairs: we add data set suffixes
-    if(n_x > 2 && IS_PAIR){
-        add_suffix = function(x, i) paste0(x, " (", letters[i], ")")
-        var_width = max(nchar("Exclusive "), nchar(x_names[1]))
-    } else {
-        add_suffix = function(x, i) x
-        var_width = nchar(x_names[1])
-    }
-
-    var_col = paste0(hash, x_names, ":")
-    na_intro = paste0(hash, sfill(" ", var_width), "|NAs:")
-    var_col = insert_in_between(var_col, na_intro)
-    # we add the first row of the data sets names + format
-    var_col = sfill(c(hash, var_col), right = TRUE)
-
-    print_mat = var_col
-
-    KEEP_NA_ROW = rep(FALSE, length(x_names))
-
-    for(i in 1:n_x){
-
-        data_name = add_suffix(names(x_all)[i], i)
-
-        x = x_all[[i]]
-
-        na.info = attr(x, "na.info")
-        KEEP_NA_ROW = KEEP_NA_ROW | na.info > 0
-        na.info_format = fsignif(na.info)
-        x_value = fsignif(x)
-        x_value[is.na(x)] = "--"
-        na.info_format[is.na(x)] = "--"
-
-
-        width = max(nchar(na.info_format), nchar(x_value))
-
-        na.info_format = sfill(na.info_format, width)
-        x_value = sfill(x_value, width)
-
-        x_col = insert_in_between(x_value, na.info_format)
-        x_col = sfill(c(data_name, x_col))
-
-        print_mat = cbind(print_mat, x_col)
-    }
-
-    if(!any(KEEP_NA_ROW)){
-        print_mat[, 1] = substr(print_mat[, 1], 1, nchar(print_mat[1, 1]) - 4)
-    }
-
-    keep = c(TRUE, insert_in_between(TRUE, KEEP_NA_ROW))
-
-    print_mat = print_mat[keep, ]
-
-    # PAIR information
-    if(IS_PAIR){
-
-        # identifiers used for insertion
-        id_vars_all = c(0, insert_in_between(id_vars, 0))
-        id_vars_all = id_vars_all[keep]
-
-        # we add two columns: id and common
-        print_mat = cbind(print_mat, id_vars_all, "")
-
-        insert_row_after_id = function(mat, row, col_id){
-
-            for(i in 1:nrow(row)){
-                i_id_mat = max(which(mat[, col_id] == row[i, col_id]))
-                tmp_before = mat[1:i_id_mat, ]
-
-                if(i_id_mat < nrow(mat)){
-                    tmp_after = mat[(i_id_mat + 1):nrow(mat), ]
-                } else {
-                    tmp_after = NULL
-                }
-
-                mat = rbind(tmp_before, row[i, ], tmp_after)
-            }
-
-            mat
-        }
-
-        for(pair in info_pairs){
-
-            data_id = attr(pair, "data_id")
-            pair = as.data.frame(pair)
-
-            if(n_x == 2){
-                # data_col = paste0(hash, sfill(" ", var_width, right = TRUE), "|Excl:")
-                data_col = paste0(hash, sfill("# Exclusive ", var_width, right = TRUE), "|")
-            } else {
-                data_col = paste0(hash, sfill("# Exclusive ", var_width, right = TRUE),
-                                  "|", paste0(letters[data_id], collapse = ":"))
-            }
-
-            # formatting the NAs
-            for(i in 1:(ncol(pair) - 2)){
-                pair[[i]] = fsignif(pair[[i]])
-            }
-            pair[is.na(pair)] = " "
-            pair = as.matrix(pair)
-
-            # adding the data col
-            pair = cbind(data_col, pair)
-
-            print_mat = insert_row_after_id(print_mat, pair, n_x + 2)
-
-        }
-
-        # Formatting
-        print_mat = print_mat[, -(n_x + 2)]
-        print_mat[, 1] = sfill(print_mat[, 1], right = TRUE)
-        for(j in 2:(n_x + 1)){
-            print_mat[, j] = sfill(print_mat[, j])
-        }
-
-        # Last column
-        common = print_mat[, n_x + 2]
-        is_num = grepl("\\d", common)
-        common[is_num] = sfill(fsignif(as.numeric(common[is_num])))
-        common[is_num] = paste0("# Common: ", common[is_num])
-        print_mat[, n_x + 2] = common
-    }
-
-    vec2print = apply(print_mat, 1, paste, collapse = " ")
-
-    cat(vec2print, sep = "\n")
-
-}
-
-
-#' Formatted object size
-#'
-#' Tools that returns a formatted object size, where the appropriate unit is automatically chosen.
-#'
-#' @param x Any R object.
-#' @param ... Not currently used.
-#'
-#' @return
-#' Returns a character scalar.
-#'
-#' @examples
-#'
-#' osize(iris)
-#'
-#' data(trade)
-#' osize(trade)
-#'
-#'
-osize = function(x){
-
-    size = as.numeric(utils::object.size(x))
-    n = log10(size)
-
-    if (n < 3) {
-        res = paste0(size, " Octets.")
-    } else if (n < 6) {
-        res = paste0(fsignif(size/1000), " Ko.")
-    } else {
-        res = paste0(fsignif(size/1e+06), " Mo.")
-    }
-
-    class(res) = "osize"
-    res
-}
-
-#' @rdname osize
-print.osize = function(x, ...){
-    cat(x, "\n")
-}
-
-
-#' Randomly draws observations from a data set
-#'
-#' This function is useful to check a data set. It gives a random number of rows of the input data set.
-#'
-#' @param x A data set: either a vector, a matrix or a data frame.
-#' @param n The number of random rows/elements to sample randomly.
-#' @param previous Logical scalar. Whether the results of the previous draw should be returned.
-#'
-#' @return
-#' A data base (resp vector) with \code{n} rows (resp elements).
-#'
-#' @examples
-#'
-#' sample_df(iris)
-#'
-#' sample_df(iris, previous = TRUE)
-#'
-sample_df = function(x, n = 10, previous = FALSE){
-
-    check_arg(n, "integer scalar")
-    check_arg(previous, "logical scalar")
-
-    if(MISSNULL(x)){
-        if(missing(x)) stop("The argument 'x' cannot be missing, please provide it.")
-        if(is.null(x)) stop("The argument 'x' must be a vector, matrix or data.frame. Currently it is NULL.")
-    }
-
-    all_draws = getOption("fixest_sample_df")
-    x_dp = deparse(substitute(x))
-
-    make_draw = TRUE
-    if(previous){
-        if(x_dp %in% names(all_draws)){
-            draw__ = all_draws[[x_dp]]
-            make_draw = FALSE
-        } else {
-            warning("No previous draw found for this data. Making a new draw.")
-        }
-    }
-
-    is_unidim = is.null(dim(x)) || inherits(x, "table")
-    n_data = if(is_unidim) length(x) else nrow(x)
-
-
-    n = min(n, n_data)
-
-    if(make_draw){
-        # complicated var name to avoid issue with data.table variables
-        draw__ = sample(n_data, n)
-    }
-
-    # saving
-    all_draws[[x_dp]] = draw__
-    options(fixest_sample_df = all_draws)
-
-    # returning
-    if(is_unidim){
-        return(x[draw__])
-    } else {
-        return(x[draw__, ])
-    }
-}
-
-len_unique = function(x, nthreads = getFixest_nthreads()){
-
-    if(!is.vector(x)){
-        return(length(unique(x)))
-    }
-
-    ANY_NA = FALSE
-    if(is.numeric(x)){
-        info_na = cpp_which_na_inf(x, nthreads)
-        if(info_na$any_na_inf){
-            ANY_NA = TRUE
-            x = x[!info_na$is_na_inf]
-        }
-    } else {
-        if(anyNA(x)){
-            ANY_NA = TRUE
-            x = x[!is.na(x)]
-        }
-    }
-
-    if(length(x) == 0){
-        return(0)
-    }
-
-    x_quf = quickUnclassFactor(x, addItem = TRUE, sorted = FALSE)
-
-    length(x_quf$items) + ANY_NA
-}
-
-#' Replicates \code{fixest} objects
-#'
-#' Simple function that replicates \code{fixest} objects while (optionally) computing different standard-errors. Useful mostly in combination with \code{\link[fixest]{etable}} or \code{\link[fixest]{coefplot}}.
-#'
-#' @param x Either a \code{fixest} object, either a list of \code{fixest} objects created with \code{.l()}.
-#' @param times Integer vector giving the number of repetitions of the vector of elements. By default \code{times = 1}. It must be either of length 1, either of the same length as the argument \code{x}.
+#' @param x Either a `fixest` object, either a list of `fixest` objects created with `.l()`.
+#' @param times Integer vector giving the number of repetitions of the vector of elements. By default `times = 1`. It must be either of length 1, either of the same length as the argument `x`.
 #' @param each Integer scalar indicating the repetition of each element. Default is 1.
-#' @param vcov A list containing the types of standard-error to be computed, default is missing. If not missing, it must be of the same length as \code{times}, \code{each}, or the final vector. Note that if the arguments \code{times} and \code{each} are missing, then \code{times} becomes equal to the length of \code{vcov}. To see how to summon a VCOV, see the dedicated section in the \href{https://lrberge.github.io/fixest/articles/fixest_walkthrough.html#the-vcov-argument-1}{vignette}.
-#' @param ... In \code{.l()}: \code{fixest} objects. In \code{rep()}: not currently used.
+#' @param vcov A list containing the types of standard-error to be computed, default is missing. If not missing, it must be of the same length as `times`, `each`, or the final vector. Note that if the arguments `times` and `each` are missing, then `times` becomes equal to the length of `vcov`. To see how to summon a VCOV, see the dedicated section in the [vignette](https://lrberge.github.io/fixest/articles/fixest_walkthrough.html#the-vcov-argument-1).
+#' @param ... In `.l()`: `fixest` objects. In `rep()`: not currently used.
 #'
 #' @details
-#' To apply \code{rep.fixest} on a list of \code{fixest} objects, it is absolutely necessary to use \code{.l()} and not \code{list()}.
+#' To apply `rep.fixest` on a list of `fixest` objects, it is absolutely necessary to use `.l()` and not `list()`.
 #'
 #' @return
-#' Returns a list of the appropriate length. Each element of the list is a \code{fixest} object.
+#' Returns a list of the appropriate length. Each element of the list is a `fixest` object.
 #'
 #' @examples
 #'
@@ -5739,7 +2970,7 @@ rep.fixest_list = function(x, times = 1, each = 1, vcov, ...){
     if(length(dots) == 1){
 
         if("fixest_multi" %in% class(dots[[1]])){
-            res = attr(dots[[1]], "data")
+            res = dots[[1]]
             class(res) = "fixest_list"
             return(res)
         }
@@ -5758,10 +2989,9 @@ rep.fixest_list = function(x, times = 1, each = 1, vcov, ...){
         } else {
             obj = dots[[i]]
 
-            if(class(obj) %in% "fixest_multi"){
-                data = attr(obj, "data")
-                for(j in seq_along(data)){
-                    res[[length(res) + 1]] = data[[j]]
+            if("fixest_multi" %in% class(obj)){
+                for(j in seq_along(obj)){
+                    res[[length(res) + 1]] = obj[[j]]
                 }
 
             } else {
@@ -6018,8 +3248,8 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
                 x_txt = paste0("dsb_check_set_agg(", x_txt, ")")
                 my_list = list(dsb_check_set_agg = dsb_check_set_agg)
                 my_call = error_sender(eval(str2lang(x_txt), my_list, frame),
-                                       "Dot square bracket operator: Evaluation of '.[",
-                                       x_split[i], "]' led to an error:",
+                                       "Dot square bracket operator: Evaluation of `.[",
+                                       x_split[i], "]` led to an error:",
                                        up = up + 1)
 
                 operator[i] = op
@@ -6029,8 +3259,8 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
 
         if(do_lang){
             my_call = error_sender(str2lang(x_split[i]),
-                                   "Dot square bracket operator: Evaluation of '.[",
-                                   x_split[i], "]' led to an error:",
+                                   "Dot square bracket operator: Evaluation of `.[",
+                                   x_split[i], "]` led to an error:",
                                    up = up + 1)
         }
 
@@ -6041,11 +3271,19 @@ dot_square_bracket = function(x, frame = .GlobalEnv, regex = FALSE, text = FALSE
         } else {
             # Informative error message
             value = error_sender(as.character(eval(my_call, frame)),
-                                 "Dot square bracket operator: Evaluation of '.[",
-                                 x_split[i], "]' led to an error:",
+                                 "Dot square bracket operator: Evaluation of `.[",
+                                 x_split[i], "]` led to an error:",
                                  up = up + 1)
+
+            if(length(value) == 2 && value[1] == "~"){
+                value = char_to_vars(value[2])
+            }
         }
 
+        if(length(value) == 0 || (is.character(value) && length(value) == 1 && nchar(value) == 0)){
+            # Neutral element in formulas
+            value = "1"
+        }
 
         res[[i]] = value
     }
@@ -6360,7 +3598,7 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
     # We need to check a^b otherwise error is thrown in terms()
     rhs_txt = deparse_long(fml[[2]])
     if(grepl("\\^[[:alpha:]]", rhs_txt)){
-        stop("The special operator '^' can only be used in the fixed-effects part of the formula. Please use ':' instead.")
+        stop("The special operator `^` can only be used in the fixed-effects part of the formula. Please use `:` instead.")
     }
 
     #
@@ -6435,8 +3673,14 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
 
     if(useModel.matrix){
         # to catch the NAs, model.frame needs to be used....
+
         if(is.null(mf)){
             mf = stats::model.frame(fml, data, na.action = na.pass)
+        } else {
+            # => predict, newdata
+            # case i() + anything that requires evaluation based on the raw data (poly, factor, etc)
+            # is there any drawback?
+            fml = formula(mf)
         }
 
         linear.mat = stats::model.matrix(fml, mf)
@@ -6482,7 +3726,7 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
 
         if(!original_data && any(!all_vars %in% names(newdata))){
             pblm = setdiff(all_vars, names(newdata))
-            stop("In 'model.matrix', the variable", enumerate_items(pblm, "is.s.quote"), " in the formula but not in the argument 'data'. Use 'subset = TRUE' to enable the creation of partial data.")
+            stop("In `model.matrix`, the variable", enumerate_items(pblm, "is.s.quote"), " in the formula but not in the argument `data`. Use `subset = TRUE` to enable the creation of partial data.")
         }
 
     } else {
@@ -6493,7 +3737,7 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
 
             vars_keep = keep_apply(vars_keep, subset)
             if(length(vars_keep) == 0){
-                stop("The variables in 'subset' do not match any variable in the 'data'.")
+                stop("The variables in `subset` do not match any variable in the `data`.")
             }
 
             if(isFALSE(keep_apply("(Intercept)", subset, logical = TRUE))){
@@ -6521,7 +3765,7 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
             }
 
             if(all(terms_drop)){
-                stop("Due to the use of the argument 'subset', not a single variable is left.")
+                stop("Due to the use of the argument `subset`, not a single variable is left.")
             }
 
             fml = .xpd(rhs = terms_all[!terms_drop])
@@ -6550,7 +3794,7 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
         if(length(fml) == 3) fml = fml[c(1, 3)]
 
         # We apply model.frame to the original data
-        data = fetch_data(object, "To apply 'model.matrix.fixest', ")
+        data = fetch_data(object, "To apply `model.matrix.fixest`, ")
 
         panel__meta__info = set_panel_meta_info(object, data)
 
@@ -6569,6 +3813,8 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml, fake_i
     }
 
     GLOBAL_fixest_mm_info = list()
+
+    I_IGNORE_ERRORS = TRUE
 
     new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref, mf = mf)
 
@@ -6806,7 +4052,7 @@ fml_combine = function(fml_char, fastCombine, vars = FALSE){
                 # we add some error control -- imperfect, but... it's enough
                 lab_collapsed = gsub("\\([^\\)]+\\)", "", lab)
                 if(length(lab_split) != length(strsplit(lab_collapsed, "%^%", fixed = TRUE)[[1]])){
-                    msg = "Wrong formatting of the fixed-effects interactions. The '^' operator should not be within parentheses."
+                    msg = "Wrong formatting of the fixed-effects interactions. The `^` operator should not be within parentheses."
                     stop(msg)
                 }
             }
@@ -7024,7 +4270,7 @@ check_set_nthreads = function(nthreads){
     # Simple function that checks that the nber of threads is valid
     set_up(1)
 
-    check_value(nthreads, "integer scalar GE{0} | numeric scalar GT{0} LT{1}", .message = paste0("The argument 'nthreads' must be an integer lower or equal to the number of threads available (", max(cpp_get_nb_threads(), 1), "). It can be equal to 0 which means all threads. Alternatively, if equal to a number strictly between 0 and 1, it represents the fraction of all threads to be used."))
+    check_value(nthreads, "integer scalar GE{0} | numeric scalar GT{0} LT{1}", .message = paste0("The argument `nthreads` must be an integer lower or equal to the number of threads available (", max(cpp_get_nb_threads(), 1), "). It can be equal to 0 which means all threads. Alternatively, if equal to a number strictly between 0 and 1, it represents the fraction of all threads to be used."))
 
     max_threads = cpp_get_nb_threads()
 
@@ -7318,7 +4564,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
     ref = argname == "ref" && !valid_ref
 
     if(keep_first && (keep || ref)){
-        stop("Internal error: keep_first should not be used with 'keep' or 'ref'.")
+        stop("Internal error: keep_first should not be used with `keep` or `ref`.")
     }
 
     if(is.factor(items)){
@@ -7333,27 +4579,27 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
     if(inherits(x, "formula")){
 
         if(!identical(all.vars(x), "x")){
-            stop_up("In argument '", argname, "', the formula must contain a single variable name: 'x'. So far '", deparse_long(x), "' is not valid.")
+            stop_up("In argument `", argname, "`, the formula must contain a single variable name: `x`. So far `", deparse_long(x), "` is not valid.")
         }
 
         if(length(x) > 2){
-            stop_up("In argument '", argname, "', if a formula, it must be one-sided. Problem: '", deparse_long(x), "' is two-sided.")
+            stop_up("In argument `", argname, "`, if a formula, it must be one-sided. Problem: `", deparse_long(x), "` is two-sided.")
         }
 
         is_here = error_sender(eval(x[[2]], list(x = items)),
-                               "In argument '", argname, "', the evaluation of the formula led to an error:")
+                               "In argument `", argname, "`, the evaluation of the formula led to an error:")
         if(length(is_here) != length(items)){
-            stop_up("In argument '", argname, "', the evaluation of the formula must return a logical vector of the same length as 'x'. Problem: '", deparse_long(x), "' returns a vector of length ", length(is_here), " (expected: ", length(items), ").")
+            stop_up("In argument `", argname, "`, the evaluation of the formula must return a logical vector of the same length as `x`. Problem: `", deparse_long(x), "` returns a vector of length ", length(is_here), " (expected: ", length(items), ").")
         }
 
         if(!is.logical(is_here)){
-            stop_up("In argument '", argname, "', the evaluation of the formula must return a logical vector. Problem: '", deparse_long(x), "' is not logical (instead it is of class ", enumerate_items(class(is_here)), ").")
+            stop_up("In argument `", argname, "`, the evaluation of the formula must return a logical vector. Problem: `", deparse_long(x), "` is not logical (instead it is of class ", enumerate_items(class(is_here)), ").")
         }
 
         is_here = !is.na(is_here) & is_here
 
         if(!no_error && !any(is_here)){
-            stop_up("In argument '", argname, "', the evaluation of the formula must match at least one value. Problem: '", deparse_long(x), "' does not match any.")
+            stop_up("In argument `", argname, "`, the evaluation of the formula must match at least one value. Problem: `", deparse_long(x), "` does not match any.")
         }
 
         if(keep){
@@ -7373,7 +4619,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
                 new_x = grep(pattern, items, value = TRUE)
                 if(length(new_x) == 0 && !no_error){
                     # strong checking!
-                    stop_up("In argument '", argname, "', the regular expression '", pattern, "' does not match any value of '", varname, "'.")
+                    stop_up("In argument `", argname, "`, the regular expression `", pattern, "` does not match any value of `", varname, "`.")
                 }
                 all_x = c(all_x, new_x)
             } else {
@@ -7383,7 +4629,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
                     my_x = items[qui_ok]
                     my_x = my_x[!is.na(my_x)]
                 } else {
-                    check_value_plus(my_x, "match", .choices = unique(items), .message = paste0("The argument '", argname, "' should contain values of the variable '", varname, "'."))
+                    check_value_plus(my_x, "match", .choices = unique(items), .message = paste0("The argument `", argname, "` should contain values of the variable `", varname, "`."))
                 }
 
                 all_x = c(all_x, my_x)
@@ -7429,7 +4675,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
                 if(keep_first){
 
                     if(!x[1] %in% items && !no_error){
-                        stop_up("In argument '", argname, "', the value ", x[1], " does not match any value of '", varname, "'.")
+                        stop_up("In argument `", argname, "`, the value ", x[1], " does not match any value of `", varname, "`.")
                     }
 
                     id_drop = unique(c(which(items %in% x[1]), id_drop))
@@ -7438,7 +4684,7 @@ items_to_drop = function(items, x, varname, keep = FALSE, argname,
             }
 
             if(length(id_drop) == 0 && !no_error){
-                stop_up("In argument '", argname, "', the value", plural_len(x, "s.don't"), " match any value of '", varname, "'.")
+                stop_up("In argument `", argname, "`, the value", plural_len(x, "s.don't"), " match any value of `", varname, "`.")
             }
         }
 
@@ -7473,7 +4719,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
                 bin_names[i] = error_sender(dsb(bin_names[i], frame = parent.frame(2), nest = FALSE,
                                                 vectorize = TRUE, collapse = ""),
                                             dsb("Error when binning: the name (.[bin_names[i]]) expanded",
-                                                " with '.[]' led to an error:"))
+                                                " with `.[]` led to an error:"))
 
             }
         }
@@ -7486,7 +4732,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
             for(j in qui_bis){
                 value[[j]] = error_sender(.dsb(value[[j]], frame = parent.frame(2), nest = FALSE),
                                            dsb("Error when binning: the name (.[value[[j]]]) expanded",
-                                               " with '.[]' led to an error:"))
+                                               " with `.[]` led to an error:"))
             }
             bin[[i]] = unlist(value)
         }
@@ -7500,7 +4746,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
     if(!is.list(bin) && (is.character(bin) && any(grepl("^cut::", bin)))){
 
         if(!grepl("^cut::", bin[1])){
-            stop_up("To use the special binning 'cut::values', it must be in the first position of the vector, possibly followed by custom names. Currently 'cut::values' is in position ", which(grepl("^cut::", bin))[1], ".")
+            stop_up("To use the special binning `cut::values`, it must be in the first position of the vector, possibly followed by custom names. Currently `cut::values` is in position ", which(grepl("^cut::", bin))[1], ".")
         }
 
         n_names = length(bin) - 1
@@ -7513,12 +4759,12 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
             }
 
             if(n_names > n_cuts){
-                stop_up("In the special binning 'cut::values', the number of custom names is greater than the number of bins (", n_names, " vs ", n_cuts, ").")
+                stop_up("In the special binning `cut::values`, the number of custom names is greater than the number of bins (", n_names, " vs ", n_cuts, ").")
             }
         }
 
         if(!is.numeric(x)){
-            stop_up("To use the special binning 'cut::values', the variable '", varname, "' must be numeric. Currently this is not the case (it is of class ", enumerate_items(class(x)), " instead).")
+            stop_up("To use the special binning `cut::values`, the variable `", varname, "` must be numeric. Currently this is not the case (it is of class ", enumerate_items(class(x)), " instead).")
         }
 
         return(cut_vector(x, bin))
@@ -7537,13 +4783,13 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
         if(is.character(bin) && any(grepl("^!?!?bin::", bin))){
 
             if(length(bin) > 1){
-                stop_up("To use the special binning 'bin::digit', the argument '", argname, "' must be of length 1. Currently it is of length ", length(bin), ".")
+                stop_up("To use the special binning `bin::digit`, the argument `", argname, "` must be of length 1. Currently it is of length ", length(bin), ".")
             }
 
             d = gsub("^!?!?bin::", "", bin)
             if(any(grepl("[^[:digit:]]", d))){
                 bin_type = gsub("^(!?!?bin).*", "\\1", bin)
-                stop_up("In the argument bin, the special binning must be of the form '", bin_type, "::digit'. Currently this is not the case for '", bin_type, "::", d, "'.")
+                stop_up("In the argument bin, the special binning must be of the form `", bin_type, "::digit`. Currently this is not the case for `", bin_type, "::", d, "`.")
             }
             d = as.numeric(d)
 
@@ -7552,7 +4798,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
 
             if(!consecutive){
                 if(!is.numeric(x_items)){
-                    stop_up("To use the special binning 'bin::digit', the variable '", varname, "' must be numeric. Currently this is not the case (it is of class ", enumerate_items(class(x_items)), " instead).")
+                    stop_up("To use the special binning `bin::digit`, the variable `", varname, "` must be numeric. Currently this is not the case (it is of class ", enumerate_items(class(x_items)), " instead).")
                 }
 
                 new_x = (x_items %/% d) * d
@@ -7600,7 +4846,7 @@ bin_factor = function(bin, x, varname, no_error = FALSE){
         t_id = table(unlist(id_bin))
         n_max = max(t_id)
         pblm = x_items[as.numeric(names(t_id)[t_id == n_max])]
-        stop_up("In 'bin', some values are binned in different bins, it's of course not allowed. The value '", pblm, "' is in ", n_max, " bins.")
+        stop_up("In `bin`, some values are binned in different bins, it's of course not allowed. The value `", pblm, "` is in ", n_max, " bins.")
     }
 
     # recreating the factor
@@ -7757,7 +5003,7 @@ cut_vector = function(x, bin){
 
     # checking bin
     if(!is.character(bin) || !grepl("^cut::", bin)){
-        stop("Internal bug: Argument 'bin' should be equal to 'cut::stg' over here -- this is not the case.")
+        stop("Internal bug: Argument `bin` should be equal to `cut::stg` over here -- this is not the case.")
     }
 
     # cleaning x
@@ -7794,7 +5040,7 @@ cut_vector = function(x, bin){
         n_cuts = length(values)
 
         if(n_cuts != length(bounds)){
-            stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles/percentiles. Problem: each number must be followed by an open (or closed) square bracket, this is currentlly not the case.")
+            stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles/percentiles. Problem: each number must be followed by an open (or closed) square bracket, this is currentlly not the case.")
         }
 
         cut_points = numeric(n_cuts)
@@ -7808,7 +5054,7 @@ cut_vector = function(x, bin){
             } else if(grepl("^p|P|q|Q", v)){
                 p = gsub("^.", "", v)
                 if(!is_numeric_in_char(p)){
-                    stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect.")
+                    stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value `", v, "`, in `", bin, "`, is incorrect.")
                 }
 
                 p = as.numeric(p)
@@ -7817,26 +5063,26 @@ cut_vector = function(x, bin){
                 if(grepl("^q|Q", v)){
                     # we transform the quartile into a percentile
                     if(!p %in% c(0:4)){
-                        stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. \n  The quartile must be an integer between 0 and 4.")
+                        stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value `", v, "`, in `", bin, "`, is incorrect. \n  The quartile must be an integer between 0 and 4.")
                     }
 
                     p = c(0, 25, 50, 75, 100)[p + 1]
                 }
 
                 if(!p %in% 0:100){
-                    stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. \n  The percentile must be an integer between 0 and 100.")
+                    stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value `", v, "`, in `", bin, "`, is incorrect. \n  The percentile must be an integer between 0 and 100.")
                 }
 
                 cut_points[i] = quantile(x, p/100)
 
             } else {
-                stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value '", v, "', in '", bin, "', is incorrect. This is not a percentile nor a number.")
+                stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The value `", v, "`, in `", bin, "`, is incorrect. This is not a percentile nor a number.")
             }
         }
 
         if(n_cuts > 1 && any(cut_points[1:(n_cuts-1)] > cut_points[1 + 1:(n_cuts-1)])){
             i_pblm = which(cut_points[1:(n_cuts-1)] > cut_points[1 + 1:(n_cuts-1)])[1]
-            stop_up("In 'bin', the format should be 'cut::a]b]' with 'a', 'b', etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The values 'a', 'b', etc should be increasing, but the ", n_th(i_pblm), " value (", cut_points[i_pblm], ") is larger than the ", n_th(i_pblm + 1), " (", cut_points[i_pblm + 1], ").")
+            stop_up("In `bin`, the format should be `cut::a]b]` with `a`, `b`, etc, numbers or quartiles (resp. percentiles) of the form qX (resp. pX) with X a number. \n  The values `a`, `b`, etc should be increasing, but the ", n_th(i_pblm), " value (", cut_points[i_pblm], ") is larger than the ", n_th(i_pblm + 1), " (", cut_points[i_pblm + 1], ").")
         }
 
     }
@@ -7863,7 +5109,7 @@ cut_vector = function(x, bin){
     if(any(isnt_empty == 0)){
         i_empty = which(isnt_empty == 0)
         if(getFixest_notes()){
-            message("When binning: in '", bin, "', the ", enumerate_items(n_th(i_empty)), " bin", plural_len(i_empty, "s.is"), " empty.")
+            message("When binning: in `", bin, "`, the ", enumerate_items(n_th(i_empty)), " bin", plural_len(i_empty, "s.is"), " empty.")
         }
 
         x_int = cumsum(isnt_empty)[x_int]
@@ -7947,10 +5193,10 @@ fixest_pvalue = function(x, zvalue, vcov){
     if(use_t_distr(x)){
 
         if(missing(vcov)) {
-            stop("Internal error (=bug): the argument 'vcov' should not be missing in fixest_pvalue().")
+            stop("Internal error (=bug): the argument `vcov` should not be missing in fixest_pvalue().")
 
         } else if(is.null(attr(vcov, "dof.K"))){
-            stop("Internal error (=bug): the attribute 'dof.K' from 'vcov' should not be NULL.")
+            stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
         }
 
         # df.t is always an attribute of the vcov
@@ -7976,10 +5222,10 @@ fixest_CI_factor = function(x, level, vcov){
     if(use_t_distr(x)){
 
         if(missing(vcov)) {
-            stop("Internal error (=bug): the argument 'vcov' should not be missing in fixest_CI_factor().")
+            stop("Internal error (=bug): the argument `vcov` should not be missing in fixest_CI_factor().")
 
         } else if(is.null(attr(vcov, "dof.K"))){
-            stop("Internal error (=bug): the attribute 'dof.K' from 'vcov' should not be NULL.")
+            stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
         }
 
         # df.t is always an attribute of the vcov
@@ -8160,7 +5406,7 @@ par_fit = function(my_par, id){
 
 dict_apply = function(x, dict = NULL){
 
-    check_arg(dict, "NULL named character vector no na", .message = "The argument 'dict' must be a dictionnary, ie a named vector (eg dict=c(\"old_name\"=\"new_name\")")
+    check_arg(dict, "NULL named character vector no na", .message = "The argument `dict` must be a dictionnary, ie a named vector (eg dict=c(\"old_name\"=\"new_name\")")
 
     if(missing(dict) || length(dict) == 0){
         return(x)
@@ -8177,7 +5423,7 @@ dict_apply = function(x, dict = NULL){
         names(dict) = gsub(" ", "", names(dict), fixed = TRUE)
         if(anyDuplicated(names(dict))){
             dup = duplicated(names(dict))
-            stop("The dictionary 'dict' contains several items with the same names, it concerns ",
+            stop("The dictionary `dict` contains several items with the same names, it concerns ",
                  enumerate_items(names(dict)[dup]), " (note that spaces are ignored).")
         }
     }
@@ -8197,7 +5443,7 @@ keep_apply = function(x, keep = NULL, logical = FALSE){
         }
     }
 
-    check_arg(keep, "character vector no na", .message = "The arg. 'keep' must be a vector of regular expressions (see help(regex)).")
+    check_arg(keep, "character vector no na", .message = "The arg. `keep` must be a vector of regular expressions (see help(regex)).")
 
     res = x
 
@@ -8210,7 +5456,7 @@ keep_apply = function(x, keep = NULL, logical = FALSE){
             var2keep = gsub("^%", "", var2keep)
             vect2check = names(res)
             if(is.null(vect2check)){
-                # warning("In keep, the special character '%' cannot be used here.")
+                # warning("In keep, the special character `%` cannot be used here.")
                 vect2check = res
             }
         }
@@ -8233,7 +5479,7 @@ drop_apply = function(x, drop = NULL){
         return(x)
     }
 
-    check_arg(drop, "character vector no na", .message = "The arg. 'drop' must be a vector of regular expressions (see help(regex)). ")
+    check_arg(drop, "character vector no na", .message = "The arg. `drop` must be a vector of regular expressions (see help(regex)). ")
 
     res = x
 
@@ -8245,7 +5491,7 @@ drop_apply = function(x, drop = NULL){
             var2drop = gsub("^%", "", var2drop)
             vect2check = names(res)
             if(is.null(vect2check)){
-                # warning("In drop, the special character '%' cannot be used here.")
+                # warning("In drop, the special character `%` cannot be used here.")
                 vect2check = res
             }
         }
@@ -8266,7 +5512,7 @@ order_apply = function(x, order = NULL){
         return(x)
     }
 
-    check_arg(order, "character vector no na", .message = "The arg. 'order' must be a vector of regular expressions (see help(regex)). ")
+    check_arg(order, "character vector no na", .message = "The arg. `order` must be a vector of regular expressions (see help(regex)). ")
 
     res = x
 
@@ -8278,7 +5524,7 @@ order_apply = function(x, order = NULL){
             var2order = gsub("^%", "", var2order)
             vect2check = names(res)
             if(is.null(vect2check)){
-                # warning("In order, the special character '%' cannot be used here.")
+                # warning("In order, the special character `%` cannot be used here.")
                 vect2check = res
             }
         }
@@ -8295,15 +5541,24 @@ order_apply = function(x, order = NULL){
     res
 }
 
-charShorten = function(x, width){
+charShorten = function(x, width, keep.digits = FALSE){
 	# transforms characters => they can't go beyond a certain width
 	# two dots are added to suggest longer character
 	# charShorten("bonjour", 5) => "bon.."
 	n = nchar(x)
 
 	if(n > width && width > 3){
-		res = substr(x, 1, width - 2)
-		res = paste0(res, "..")
+	    if(keep.digits){
+	        trailing_digits = dsb("'\\d+$'X ? x")
+	        n_d = nchar(trailing_digits)
+	        if(length(n_d) == 1 && n_d > 0){
+	            res = dsb(".[`max(width - n_d - 2, 3)`k ? x]...[trailing_digits]")
+	            return(res)
+	        }
+	    }
+
+        res = substr(x, 1, width - 2)
+        res = paste0(res, "..")
 	} else {
 		res = x
 	}
@@ -8478,7 +5733,7 @@ fml2varnames = function(fml, combine_fun = FALSE){
     } else {
         t = terms(fml)
         all_var_names = attr(t, "term.labels")
-        # => maybe I should be more cautious below???? Sometimes ':' really means stuff like 1:5
+        # => maybe I should be more cautious below???? Sometimes `:` really means stuff like 1:5
         all_var_names = gsub(":", "*", all_var_names) # for very special cases
     }
 
@@ -8536,6 +5791,16 @@ extract_fe_slope = function(t){
     fe_all = gsub("\\[.+", "", t)
 
     list(fixef_vars=fixef_vars, slope_vars=slope_vars, slope_fe=slope_fe, slope_terms=slope_terms, fe_all=fe_all)
+}
+
+
+deparse_short = function(x){
+    x_dp = deparse(x)
+    if(length(x_dp) > 1){
+        x_dp = paste0(x_dp, "...")
+    }
+
+    x_dp
 }
 
 deparse_long = function(x){
@@ -8723,7 +5988,7 @@ error_sender = function(expr, ..., clean, up = 0, arg_name){
             if(missing(arg_name)){
                 arg_name = deparse(substitute(expr))
             }
-            msg = paste0("Argument '", arg_name, "' could not be evaluated: ")
+            msg = paste0("Argument `", arg_name, "` could not be evaluated: ")
             stop_up(msg, res[[2]])
 
         } else {
@@ -8799,7 +6064,7 @@ merge_fml = function(fml_linear, fml_fixef = NULL, fml_iv = NULL){
 
         if(is_iv) fml_all[[length(fml_all) + 1]] = deparse_long(fml_iv)
 
-       res = as.formula(paste(fml_all, collapse = "|"))
+       res = as.formula(paste(fml_all, collapse = "|"), .GlobalEnv)
     }
 
     res
@@ -8864,7 +6129,7 @@ fixest_fml_rewriter = function(fml){
             rhs_text = gsub("(?<!I\\()(\\b(\\.[[:alpha:]]|[[:alpha:]])[[:alnum:]\\._]*\\^[[:digit:]]+)", "I(\\1)", rhs_text, perl = TRUE)
 
             if(grepl("\\^[[:alpha:]]", rhs_text)){
-                stop_up("The operator '^' between variables can be used only in the fixed-effects part of the formula. Otherwise, please use ':' instead.")
+                stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
             }
 
             fml_rhs = as.formula(rhs_text)
@@ -8973,14 +6238,14 @@ fixest_fml_rewriter = function(fml){
             rhs_txt = fml_split(fml, i = 1, text = TRUE)
 
             if(grepl("\\^[[:alpha:]]", rhs_txt)){
-                stop_up("The operator '^' between variables can be used only in the fixed-effects part of the formula. Otherwise, please use ':' instead.")
+                stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
             }
 
             if(is_fml_inside(fml_parts[[n_parts]])){
                 iv_txt = fml_split(fml, i = n_parts, text = TRUE)
 
                 if(grepl("\\^[[:alpha:]]", iv_txt)){
-                    stop_up("The operator '^' between variables can be used only in the fixed-effects part of the formula. Otherwise, please use ':' instead.")
+                    stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
                 }
             }
 
@@ -9025,14 +6290,14 @@ check_set_digits = function(digits, up = 1){
         # Control
         if(!d_type %in% c("r", "s")){
             arg = deparse(substitute(digits))
-            stop_up("The argument '", arg, "' must start with 'r' (for round) or 's' (for significant). Currently it starts with '", d_type,"' which is not valid.\nExample of valid use: digits = 'r3'.")
+            stop_up("The argument `", arg, "` must start with `r` (for round) or `s` (for significant). Currently it starts with `", d_type,"` which is not valid.\nExample of valid use: digits = `r3`.")
         }
 
         round = d_type == "r"
 
         if(!grepl("^[0-9]$", d_value)){
             arg = deparse(substitute(digits))
-            stop_up("The argument '", arg, "' must be equal to the character 'r' or 's' followed by a single digit. Currently '", digits,"' is not valid.\nExample of valid use: digits = '", d_type, "3'.")
+            stop_up("The argument `", arg, "` must be equal to the character `r` or `s` followed by a single digit. Currently `", digits,"` is not valid.\nExample of valid use: digits = `", d_type, "3`.")
         }
 
         digits = as.numeric(d_value)
@@ -9250,7 +6515,7 @@ extract_fun = function(fml_char, fun, err_msg = NULL, bool = FALSE, drop = TRUE)
 
             if(only_one && length(fml_split) > 2){
                 if(is.null(err_msg)){
-                    stop_up("Only one function '", fun, "' can be used at a time.")
+                    stop_up("Only one function `", fun, "` can be used at a time.")
                 } else {
                     stop_up(err_msg)
                 }
@@ -9318,7 +6583,7 @@ str_trim = function(x, n_first = 0, n_last = 0){
         n_first = 0
     }
 
-    res = substr(x, 1 + n_first, nchar(x) - n_last)
+    substr(x, 1 + n_first, nchar(x) - n_last)
 }
 
 str_split = function(x, split){
@@ -9386,1923 +6651,98 @@ is_user_level_call = function(){
 }
 
 
-is_calling_fun = function(pattern){
+is_calling_fun = function(pattern, full_search = FALSE, full_name = FALSE){
     sc_all = sys.calls()
     n_sc = length(sc_all)
     if(n_sc > 2){
 
-        if(grepl(".fixest", sc_all[[n_sc - 1]][[1]], fixed = TRUE)){
-            if(n_sc == 3){
-                return(FALSE)
+        if(full_search){
+            fun_all = sapply(tail(sc_all, 13), function(x) deparse(x)[1])
+
+            if(full_name){
+                pattern = .dsb("^.[pattern]\\(")
             }
 
-            sc = sc_all[[n_sc - 3]]
+            res = any(grepl(pattern, fun_all))
         } else {
-            sc = sc_all[[n_sc - 2]]
+            if(grepl(".fixest", sc_all[[n_sc - 1]][[1]], fixed = TRUE)){
+                if(n_sc == 3){
+                    return(FALSE)
+                }
+
+                sc = sc_all[[n_sc - 3]]
+            } else {
+                sc = sc_all[[n_sc - 2]]
+            }
+
+            fun_name = deparse(sc)[1]
+            if(full_name){
+                pattern = .dsb("^.[pattern]\\(")
+            }
+
+            res = grepl(pattern, fun_name)
         }
 
-        return(grepl(pattern, as.character(sc[[1]])))
+        return(res)
     }
 
     FALSE
 }
 
+# x = ~a + (b + c) + d*k
+extract_vars_simple = function(x){
+    # We don't apply terms!
+    # => m * (a + b) is not expanded
+    # a bit slow
 
-#### ................. ####
-#### Additional Methods ####
-####
+    check_arg(x, "formula")
 
-# Here we add common statistical functions
+    res = c()
+    x = x[[length(x)]]
 
-#' Extracts the number of observations form a \code{fixest} object
-#'
-#' This function simply extracts the number of observations form a \code{fixest} object, obtained using the functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @inheritParams summary.fixest
-#'
-#' @param ... Not currently used.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Use \code{\link[fixest]{summary.fixest}} to see the results with the appropriate standard-errors, \code{\link[fixest]{fixef.fixest}} to extract the fixed-effects coefficients, and the function \code{\link[fixest]{etable}} to visualize the results of multiple estimations.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @return
-#' It returns an interger.
-#'
-#' @examples
-#'
-#' # simple estimation on iris data with "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
-#'
-#' nobs(res)
-#' logLik(res)
-#'
-#'
-nobs.fixest = function(object, ...){
-	object$nobs
+    while(is_operator(x, "+")){
+        res = c(res, deparse_long(x[[3]]))
+        x = x[[2]]
+    }
+
+    res = c(res, deparse_long(x))
+
+    rev(res)
 }
 
-#' Aikake's an information criterion
-#'
-#' This function computes the AIC (Aikake's, an information criterion) from a \code{fixest} estimation.
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param ... Optionally, more fitted objects.
-#' @param k A numeric, the penalty per parameter to be used; the default k = 2 is the classical AIC (i.e. \code{AIC=-2*LL+k*nparams}).
-#'
-#' @details
-#' The AIC is computed as:
-#' \deqn{AIC = -2\times LogLikelihood + k\times nbParams}
-#' with k the penalty parameter.
-#'
-#' You can have more information on this criterion on \code{\link[stats]{AIC}}.
-#'
-#' @return
-#' It return a numeric vector, with length the same as the number of objects taken as arguments.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Other statictics methods: \code{\link[fixest]{BIC.fixest}}, \code{\link[fixest]{logLik.fixest}}, \code{\link[fixest]{nobs.fixest}}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # two fitted models with different expl. variables:
-#' res1 = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'              Petal.Width | Species, iris)
-#' res2 = femlm(Sepal.Length ~ Petal.Width | Species, iris)
-#'
-#' AIC(res1, res2)
-#' BIC(res1, res2)
-#'
-#'
-AIC.fixest = function(object, ..., k = 2){
+# x = "a + (b + c) + d*k"
+char_to_vars = function(x){
 
-	dots = list(...)
-	if(length(dots) > 0){
-		# we check consistency with observations
-		nobs_all = c(nobs(object), sapply(dots, nobs))
+    check_arg(x, "character scalar")
 
-		if(any(diff(nobs_all) != 0)){
-			warning("Models are not all fitted to the same number of observations.")
-		}
+    if(!grepl("(", x, fixed = TRUE)){
+        res = trimws(strsplit(x, "+", fixed = TRUE)[[1]])
+        return(res)
+    }
 
-		otherAIC = sapply(dots, AIC)
-	} else {
-		otherAIC = c()
-	}
+    res = c()
+    x = str2lang(x)
 
-	all_AIC = c(-2*logLik(object) + k*object$nparams, otherAIC)
+    while(is_operator(x, "+")){
+        res = c(res, deparse_long(x[[3]]))
+        x = x[[2]]
+    }
 
-	all_AIC
+    res = c(res, deparse_long(x))
+
+    rev(res)
 }
 
-#' Bayesian information criterion
-#'
-#' This function computes the BIC (Bayesian information criterion) from a \code{fixest} estimation.
-#'
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param ... Optionally, more fitted objects.
-#'
-#' @details
-#' The BIC is computed as follows:
-#' \deqn{BIC = -2\times LogLikelihood + \log(nobs)\times nbParams}
-#' with k the penalty parameter.
-#'
-#' You can have more information on this criterion on \code{\link[stats]{AIC}}.
-#'
-#' @return
-#' It return a numeric vector, with length the same as the number of objects taken as arguments.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Other statistics functions: \code{\link[fixest]{AIC.fixest}}, \code{\link[fixest]{logLik.fixest}}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # two fitted models with different expl. variables:
-#' res1 = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
-#' res2 = femlm(Sepal.Length ~ Petal.Width | Species, iris)
-#'
-#' AIC(res1, res2)
-#' BIC(res1, res2)
-#'
-BIC.fixest = function(object, ...){
-
-	dots = list(...)
-	if(length(dots) > 0){
-		# we check consistency with observations
-		nobs_all = c(nobs(object), sapply(dots, nobs))
-
-		if(any(diff(nobs_all) != 0)){
-			warning("Models are not all fitted to the same number of observations.")
-		}
-
-		otherBIC = sapply(dots, BIC)
-	} else {
-		otherBIC = c()
-	}
-
-	all_BIC = c(-2*logLik(object) + object$nparams*log(nobs(object)), otherBIC)
-
-	all_BIC
-}
-
-#' Extracts the log-likelihood
-#'
-#' This function extracts the log-likelihood from a \code{fixest} estimation.
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param ... Not currently used.
-#'
-#' @details
-#' This function extracts the log-likelihood based on the model fit. You can have more information on the likelihoods in the details of the function \code{\link[fixest]{femlm}}.
-#'
-#' @return
-#' It returns a numeric scalar.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. Other statistics functions: \code{\link[fixest]{AIC.fixest}}, \code{\link[fixest]{BIC.fixest}}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # simple estimation on iris data with "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
-#'
-#' nobs(res)
-#' logLik(res)
-#'
-#'
-logLik.fixest = function(object, ...){
-
-	if(object$method_type == "feols"){
-	    # if the summary is 'lean', then no way we can compute that
-	    resid = object$residuals
-	    if(is.null(resid)) resid = NA
-
-		sigma = sqrt(mean(resid^2))
-		n = length(resid)
-		ll = -1/2/sigma^2 * sum(resid^2) - n * log(sigma) - n * log(2*pi)/2
-	} else {
-		ll = object$loglik
-	}
-
-	ll
-}
-
-#' Extracts the coefficients from a \code{fixest} estimation
-#'
-#' This function extracts the coefficients obtained from a model estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @inheritParams nobs.fixest
-#' @inheritParams etable
-#'
-#' @param agg Logical scalar, default is \code{TRUE}. If the coefficients of the estimation have been aggregated, whether to report the aggregated coefficients. If \code{FALSE}, the raw coefficients will be returned.
-#' @param ... Not currently used.
-#'
-#' @details
-#' The coefficients are the ones that have been found to maximize the log-likelihood of the specified model. More information can be found on the models from the estimations help pages: \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' Note that if the model has been estimated with fixed-effects, to obtain the fixed-effect coefficients, you need to use the function \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @return
-#' This function returns a named numeric vector.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{confint.fixest}}, \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{etable}}, \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @examples
-#'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
-#'
-#' # the coefficients of the variables:
-#' coef(res)
-#'
-#' # the fixed-effects coefficients:
-#' fixef(res)
-#'
-#'
-coef.fixest = coefficients.fixest = function(object, keep, drop, order, agg = TRUE, ...){
-
-    check_arg(keep, drop, order, "NULL character vector no na")
-    check_arg(agg, "logical scalar")
-
-    if(isTRUE(object$is_agg) && agg){
-        res = object$coeftable[, 1]
-        names(res) = rownames(object$coeftable)
-    } else {
-        res = object$coefficients
-    }
-
-    if(!missnull(keep) || !missnull(drop) || !missnull(order)){
-        cnames = names(res)
-        cnames = keep_apply(cnames, keep)
-        cnames = drop_apply(cnames, drop)
-        cnames = order_apply(cnames, order)
-
-        if(length(cnames) == 0){
-            return(numeric(0))
-        }
-
-        res = res[cnames]
-    }
-
-    if(identical(object$family, "negbin")){
-        res = res[-length(res)]
-    }
-
-
-    # deltaMethod tweak
-    if(is_calling_fun("deltaMethod")){
-        sysOrigin = sys.parent()
-        mc_DM = match.call(definition = sys.function(sysOrigin), call = sys.call(sysOrigin))
-
-        if("parameterNames" %in% names(mc_DM)){
-            PN = eval(mc_DM$parameterNames, parent.frame())
-
-            check_value(PN, "character vector no na len(data)", .data = res,
-                        .arg_name = "parameterNames", .up = 1)
-
-            names(res) = PN
-        }
-    }
-
-    res
-}
-
-#' @rdname coef.fixest
-coefficients.fixest <- coef.fixest
-
-
-#' Extracts fitted values from a \code{fixest} fit
-#'
-#' This function extracts the fitted values from a model estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. The fitted values that are returned are the \emph{expected predictor}.
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param type Character either equal to \code{"response"} (default) or \code{"link"}. If \code{type="response"}, then the output is at the level of the response variable, i.e. it is the expected predictor \eqn{E(Y|X)}. If \code{"link"}, then the output is at the level of the explanatory variables, i.e. the linear predictor \eqn{X\cdot \beta}.
-#' @param na.rm Logical, default is \code{TRUE}. If \code{FALSE} the number of observation returned will be the number of observations in the original data set, otherwise it will be the number of observations used in the estimation.
-#' @param ... Not currently used.
-#'
-#' @details
-#' This function returns the \emph{expected predictor} of a \code{fixest} fit. The likelihood functions are detailed in \code{\link[fixest]{femlm}} help page.
-#'
-#' @return
-#' It returns a numeric vector of length the number of observations used to estimate the model.
-#'
-#' If \code{type = "response"}, the value returned is the expected predictor, i.e. the expected value of the dependent variable for the fitted model: \eqn{E(Y|X)}.
-#' If \code{type = "link"}, the value returned is the linear predictor of the fitted model, that is \eqn{X\cdot \beta} (remind that \eqn{E(Y|X) = f(X\cdot \beta)}).
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{resid.fixest}}, \code{\link[fixest]{predict.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @examples
-#'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res_poisson = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'                     Petal.Width | Species, iris)
-#'
-#' # we extract the fitted values
-#' y_fitted_poisson = fitted(res_poisson)
-#'
-#' # Same estimation but in OLS (Gaussian family)
-#' res_gaussian = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'                     Petal.Width | Species, iris, family = "gaussian")
-#'
-#' y_fitted_gaussian = fitted(res_gaussian)
-#'
-#' # comparison of the fit for the two families
-#' plot(iris$Sepal.Length, y_fitted_poisson)
-#' points(iris$Sepal.Length, y_fitted_gaussian, col = 2, pch = 2)
-#'
-#'
-fitted.fixest = fitted.values.fixest = function(object, type = c("response", "link"), na.rm = TRUE, ...){
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = "type")
-    }
-
-	type = match.arg(type)
-
-	fit = predict(object)
-
-	if(type == "response" || object$method_type == "feols"){
-		res = fit
-	} else if(!is.null(object$mu)){
-		res = object$mu
-	} else if(object$method == "femlm"){
-		family = object$family
-		famFuns = switch(family,
-							  poisson = ml_poisson(),
-							  negbin = ml_negbin(),
-							  logit = ml_logit(),
-							  gaussian = ml_gaussian())
-
-		res = famFuns$linearFromExpected(fit)
-	} else {
-		res = object$family$linkfun(fit)
-	}
-
-	# Nota: obs can be removed: either because of NA, either because perfect fit
-	# Shall I put perfect fit as NA since they're out of the estimation???
-	# Still pondering...
-	# Actually adding them means a lot of work to ensure consistency (also in predict...)
-	if(!na.rm) res = fill_with_na(res, object)
-
-	res
-}
-
-#' @rdname fitted.fixest
-#' @method fitted.values fixest
-fitted.values.fixest <- fitted.fixest
-
-#' Extracts residuals from a \code{fixest} object
-#'
-#' This function extracts residuals from a fitted model estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param type A character scalar, either \code{"response"} (default), \code{"deviance"}, \code{"pearson"}, or \code{"working"}. Note that the \code{"working"} corresponds to the residuals from the weighted least square and only applies to \code{\link[fixest]{feglm}} models.
-#' @param na.rm Logical, default is \code{TRUE}. Whether to remove the observations with NAs from the original data set. If \code{FALSE}, then the vector returned is always of the same length as the original data set.
-#' @param ... Not currently used.
-#'
-#'
-#' @return
-#' It returns a numeric vector of the length the number of observations used for the estimation (if \code{na.rm = TRUE}) or of the length of the original data set (if \code{na.rm = FALSE}).
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{fitted.fixest}}, \code{\link[fixest]{predict.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @examples
-#'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res_poisson = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'                     Petal.Width | Species, iris)
-#'
-#' # we plot the residuals
-#' plot(resid(res_poisson))
-#'
-resid.fixest = residuals.fixest = function(object, type = c("response", "deviance", "pearson", "working"), na.rm = TRUE, ...){
-
-    check_arg_plus(type, "match")
-    check_arg_plus(na.rm, "logical scalar")
-
-    method = object$method
-    family = object$family
-
-    r = object$residuals
-    w = object[["weights"]]
-
-    if(isTRUE(object$lean)){
-        stop("The method 'resid.fixest' cannot be applied to a 'lean' fixest object. Please apply reestimate with 'lean = FALSE'.")
-    }
-
-    if(method %in% c("feols", "feols.fit") || (method %in% c("feNmlm", "femlm") && family == "gaussian")){
-
-        if(type == "working") stop("Type 'working' only applies to models fitted via feglm (thus is not valid for feols).")
-
-        if(type %in% c("deviance", "pearson") && !is.null(w)){
-            res = r * sqrt(w)
-        } else {
-            res = r
-        }
-
-    } else if(method %in% c("fepois", "feglm")){
-
-        if(type == "response"){
-            res = r
-
-        } else if(type == "working"){
-            res = object$working_residuals
-
-        } else {
-            mu = object$fitted.values
-            if(is.null(w)) w = rep(1, length(r))
-
-            if(type == "deviance"){
-                y = r + mu
-
-                res = sqrt(pmax((object$family$dev.resids)(y, mu, w), 0))
-                qui = y < mu
-                res[qui] = -res[qui]
-
-            } else if(type == "pearson"){
-                res = r * sqrt(w)/sqrt(object$family$variance(object$fitted.values))
-
-            }
-        }
-
-
-    } else {
-
-        if(type == "working") stop("Type 'working' only applies to models fitted via feglm (thus is not valid for ", method, ").")
-
-        if(type == "response"){
-            res = r
-
-        } else {
-            # deviance or pearson
-            mu = object$fitted.values
-            if(is.null(w)) w = rep(1, length(r))
-
-            theta = ifelse(family == "negbin", object$theta, 1)
-
-            if(type == "deviance"){
-
-                # dev.resids function
-                if(family == "poisson"){
-                    dev.resids = poisson()$dev.resids
-
-                } else if(family == "logit"){
-                    dev.resids = binomial()$dev.resids
-
-                } else if(family == "negbin"){
-                    dev.resids = function(y, mu, wt) 2 * wt * (y * log(pmax(1, y)/mu) - (y + theta) * log((y + theta)/(mu + theta)))
-
-                }
-
-                y = object$residuals + mu
-
-                res = sqrt(pmax(dev.resids(y, mu, w), 0))
-                qui = y < mu
-                res[qui] = -res[qui]
-
-            } else if(type == "pearson"){
-
-                # variance function
-                if(family == "poisson"){
-                    variance = poisson()$variance
-
-                } else if(family == "logit"){
-                    variance = binomial()$variance
-
-                } else if(family == "negbin"){
-                    variance = function(mu) mu + mu^2/theta
-
-                }
-
-                res = r * sqrt(w)/sqrt(variance(mu))
-
-            }
-        }
-
-
-    }
-
-    if(!na.rm){
-        res = fill_with_na(res, object)
-    }
-
-    res
-}
-
-#' @rdname resid.fixest
-residuals.fixest <- resid.fixest
-
-#' Predict method for \code{fixest} fits
-#'
-#' This function obtains prediction from a fitted model estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @inheritParams nobs.fixest
-#' @inheritParams fitted.fixest
-#' @inheritParams summary.fixest
-#'
-#' @param newdata A data.frame containing the variables used to make the prediction. If not provided, the fitted expected (or linear if \code{type = "link"}) predictors are returned.
-#' @param sample Either "estimation" (default) or "original". This argument is only used when arg. 'newdata' is missing, and is ignored otherwise. If equal to "estimation", the vector returned matches the sample used for the estimation. If equal to "original", it matches the original data set (the observations not used for the estimation being filled with NAs).
-#' @param se.fit Logical, default is \code{FALSE}. If \code{TRUE}, the standard-error of the predicted value is computed and returned in a column named \code{se.fit}. This feature is only available for OLS models not containing fixed-effects.
-#' @param interval Either "none" (default), "confidence" or "prediction". What type of confidence interval to compute. Note that this feature is only available for OLS models not containing fixed-effects (GLM/ML models are not covered).
-#' @param level A numeric scalar in between 0.5 and 1, defaults to 0.95. Only used when the argument 'interval' is requested, it corresponds to the width of the confidence interval.
-#' @param fixef Logical scalar, default is \code{FALSE}. If \code{TRUE}, a data.frame is returned, with each column representing the fixed-effects coefficients for each observation in \code{newdata} -- with as many columns as fixed-effects. Note that when there are variables with varying slopes, the slope coefficients are returned (i.e. they are not multiplied by the variable).
-#' @param vs.coef Logical scalar, default is \code{FALSE}. Only used when \code{fixef = TRUE} and when variables with varying slopes are present. If \code{TRUE}, the coefficients of the variables with varying slopes are returned instead of the coefficient multiplied by the value of the variables (default).
-#' @param ... Not currently used.
-#'
-#'
-#' @return
-#' It returns a numeric vector of length equal to the number of observations in argument \code{newdata}.
-#' If \code{newdata} is missing, it returns a vector of the same length as the estimation sample, except if \code{sample = "original"}, in which case the length of the vector will match the one of the original data set (which can, but also cannot, be the estimation sample).
-#' If \code{fixef = TRUE}, a \code{data.frame} is returned.
-#' If \code{se.fit = TRUE} or \code{interval != "none"}, the object returned is a data.frame with the following columns: \code{fit}, \code{se.fit}, and, if CIs are requested, \code{ci_low} and \code{ci_high}.
-#'
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{update.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @examples
-#'
-#' # Estimation on iris data
-#' res = fepois(Sepal.Length ~ Petal.Length | Species, iris)
-#'
-#' # what would be the prediction if the data was all setosa?
-#' newdata = data.frame(Petal.Length = iris$Petal.Length, Species = "setosa")
-#' pred_setosa = predict(res, newdata = newdata)
-#'
-#' # Let's look at it graphically
-#' plot(c(1, 7), c(3, 11), type = "n", xlab = "Petal.Length",
-#'      ylab = "Sepal.Length")
-#'
-#' newdata = iris[order(iris$Petal.Length), ]
-#' newdata$Species = "setosa"
-#' lines(newdata$Petal.Length, predict(res, newdata))
-#'
-#' # versicolor
-#' newdata$Species = "versicolor"
-#' lines(newdata$Petal.Length, predict(res, newdata), col=2)
-#'
-#' # virginica
-#' newdata$Species = "virginica"
-#' lines(newdata$Petal.Length, predict(res, newdata), col=3)
-#'
-#' # The original data
-#' points(iris$Petal.Length, iris$Sepal.Length, col = iris$Species, pch = 18)
-#' legend("topleft", lty = 1, col = 1:3, legend = levels(iris$Species))
-#'
-#'
-#' #
-#' # Getting the fixed-effect coefficients for each obs.
-#' #
-#'
-#' data(trade)
-#' est_trade = fepois(Euros ~ log(dist_km) | Destination^Product +
-#'                                            Origin^Product + Year, trade)
-#' obs_fe = predict(est_trade, fixef = TRUE)
-#' head(obs_fe)
-#'
-#' # can we check we get the right sum of fixed-effects
-#' head(cbind(rowSums(obs_fe), est_trade$sumFE))
-#'
-#'
-#' #
-#' # Standard-error of the prediction
-#' #
-#'
-#' base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
-#'
-#' est = feols(y ~ x1 + species, base)
-#'
-#' head(predict(est, se.fit = TRUE))
-#'
-#' # regular confidence interval
-#' head(predict(est, interval = "conf"))
-#'
-#' # adding the residual to the CI
-#' head(predict(est, interval = "predi"))
-#'
-#' # You can change the type of SE on the fly
-#' head(predict(est, interval = "conf", vcov = ~species))
-#'
-#'
-#'
-predict.fixest = function(object, newdata, type = c("response", "link"), se.fit = FALSE,
-                          interval = "none", level = 0.95, fixef = FALSE,
-                          vs.coef = FALSE, sample = c("estimation", "original"),
-                          vcov = NULL, ssc = NULL, ...){
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = c("newdata", "type"))
-    }
-
-	# Controls
-	check_arg_plus(type, sample, "match")
-	check_arg(fixef, vs.coef, "logical scalar")
-	check_arg(se.fit, "logical scalar")
-	check_arg(level, "numeric scalar GT{.50} LT{1}")
-	check_arg_plus(interval, "match(none, confidence, prediction)")
-	if(!se.fit && interval != "none"){
-	    se.fit = TRUE
-	}
-
-	if(se.fit && object$method_type != "feols"){
-	    stop("The standard-error of the prediction is currently only available for OLS models, sorry.")
-	}
-
-	# renaming to clarify
-	fixef.return = fixef
-	do_anyway = fixef.return || se.fit
-
-	# if newdata is missing
-	is_original_data = FALSE
-	if(missing(newdata)){
-
-	    if(do_anyway || isTRUE(object$lean)){
-	        newdata = fetch_data(object, "In 'predict', ")
-	        is_original_data = TRUE
-	    } else {
-	        if(type == "response" || object$method_type == "feols"){
-	            res = object$fitted.values
-	        } else if(object$method == "femlm") {
-	            if("mu" %in% names(object)){
-	                res = object$mu
-	            } else {
-	                family = object$family
-	                famFuns = switch(family,
-	                                 poisson = ml_poisson(),
-	                                 negbin = ml_negbin(),
-	                                 logit = ml_logit(),
-	                                 gaussian = ml_gaussian())
-
-	                res = famFuns$linearFromExpected(object$fitted.values)
-	            }
-	        } else {
-	            res = object$family$linkfun(object$fitted.values)
-	        }
-
-	        if(sample == "original") res = fill_with_na(res, object)
-
-	        return(res)
-	    }
-
-	}
-
-	if(!is.matrix(newdata) && !"data.frame" %in% class(newdata)){
-		stop("Argument 'newdata' must be a data.frame.")
-	}
-
-	# we ensure it really is a clean data.frame
-	newdata = as.data.frame(newdata)
-
-	mc = match.call()
-	if(fixef.return){
-
-	    if(is.null(object$fixef_vars)){
-	        stop("The argument 'fixef=TRUE' cannot work since the estimation did not contain fixed-effects.")
-	    }
-
-	    if("type" %in% names(mc)){
-	        warning("Argument 'type' is ignored when fixef = TRUE.")
-	    }
-	}
-
-	# We deconstruct it in four steps:
-	# 1) cluster
-	# 2) linear
-	# 3) non-linear
-	# 4) offset
-
-	# + step 0: panel setup
-
-	n = nrow(newdata)
-
-	# NOTA 2019-11-26: I'm pondering whether to include NA-related messages
-	# (would it be useful???)
-
-
-	# STEP 0: panel setup
-
-	fml = object$fml
-	panel__meta__info = set_panel_meta_info(object, newdata)
-
-	#
-	# 1) Fixed-effects
-	#
-
-	# init fixed-effect values
-	value_fixef = 0
-
-	fixef_vars = object$fixef_vars
-	if(!is.null(fixef_vars)){
-
-		n_fe = length(fixef_vars)
-
-		# Extraction of the FEs
-		id_fixef = list()
-		for(i in 1:n_fe){
-			# checking if the variable is in the newdata
-		    fe_var = fixef_vars[i]
-			variable = all.vars(str2lang(fe_var))
-			isNotHere = !variable %in% names(newdata)
-			if(any(isNotHere)){
-				stop("The variable ", variable[isNotHere][1], " is absent from the 'newdata' but is needed for prediction (it is a fixed-effect variable).")
-			}
-
-			# The values taken by the FE variable
-			fixef_values_possible = attr(object$fixef_id[[i]], "fixef_names")
-
-			# Checking if ^ is present
-			if(grepl("\\^", fe_var)){
-			    # If fastCombine was used => we're screwed, impossible to recover
-			    if(!all(grepl("_", fixef_values_possible, fixed = TRUE))){
-			        stop("You cannot use predict() based on the initial regression since the fixed-effect '", fe_var, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'combine.quick=FALSE'.")
-			    }
-
-			    fe_var = fml_combine(fe_var, fastCombine = FALSE, vars = TRUE)
-			}
-
-			# Obtaining the vector of fixed-effect
-			fixef_current = eval(str2lang(fe_var), newdata)
-
-			fixef_current_num = unclass(factor(fixef_current, levels = fixef_values_possible))
-			id_fixef[[i]] = fixef_current_num
-		}
-
-		names(id_fixef) = fixef_vars
-
-		# Value of the fixef coefficients // we don't show the notes, it's inelegant
-		fixef_coef = fixef(object, sorted = FALSE, notes = FALSE)
-
-		# We create the DF to be returned
-		if(fixef.return){
-		    fixef_df = list()
-		}
-
-		# Adding the FEs and Slopes
-		if(!is.null(object$fixef_terms)){
-
-		    terms_full = extract_fe_slope(object$fixef_terms)
-		    fixef_vars = terms_full$fixef_vars
-		    slope_fe = terms_full$slope_fe
-		    slope_vars = terms_full$slope_vars
-		    slope_terms = terms_full$slope_terms
-
-		    # We extract the slope variables
-		    slope_vars_unik = unique(slope_vars)
-
-		    slope_var_list = list()
-		    for(i in 1:length(slope_vars_unik)){
-		        variable = all.vars(str2lang(slope_vars_unik[i]))
-		        isNotHere = !variable %in% names(newdata)
-		        if(any(isNotHere)){
-		            stop("The variable ", variable[isNotHere][1], " is absent from the 'newdata' but is needed for prediction (it is a variable with varying slope).")
-		        }
-
-		        slope_var_list[[slope_vars_unik[i]]] = eval(str2lang(slope_vars_unik[i]), newdata)
-		    }
-
-		    # Adding the FE values
-		    for(var in fixef_vars){
-		        fixef_current_num = id_fixef[[var]]
-		        fixef_coef_current = fixef_coef[[var]]
-
-		        if(fixef.return){
-		            fixef_df[[var]] = fixef_coef_current[fixef_current_num]
-
-		        } else {
-		            value_fixef = value_fixef + fixef_coef_current[fixef_current_num]
-		        }
-
-		    }
-
-		    # Adding the slopes
-		    for(i in seq_along(slope_vars)){
-
-		        fixef_current_num = id_fixef[[slope_fe[i]]]
-		        fixef_coef_current = fixef_coef[[slope_terms[i]]]
-
-		        if(fixef.return){
-		            vname = slope_terms[i]
-
-		            # We return only the coefs OR the coef * the variable
-		            if(vs.coef){
-		                fixef_df[[vname]] = fixef_coef_current[fixef_current_num]
-
-		            } else {
-		                fixef_df[[vname]] = fixef_coef_current[fixef_current_num] * slope_var_list[[slope_vars[i]]]
-		            }
-
-
-		        } else {
-		            value_fixef = value_fixef + fixef_coef_current[fixef_current_num] * slope_var_list[[slope_vars[i]]]
-		        }
-		    }
-
-
-		} else {
-		    # Adding only FEs
-		    for(i in 1:n_fe){
-		        fixef_current_num = id_fixef[[i]]
-		        fixef_coef_current = fixef_coef[[i]]
-
-		        if(fixef.return){
-		            fixef_df[[fixef_vars[i]]] = fixef_coef_current[fixef_current_num]
-
-		        } else {
-		            value_fixef = value_fixef + fixef_coef_current[fixef_current_num]
-		        }
-
-		    }
-		}
-
-		if(fixef.return){
-
-		    # putting the results into a DF
-		    res = fixef_df
-		    attr(res, "row.names") = .set_row_names(length(res[[1L]]))
-		    oldClass(res) = "data.frame"
-
-		    if(is_original_data && sample == "estimation"){
-		        # here we want the same nber of obs
-		        # as in the estimation sample
-	            for(i in seq_along(object$obs_selection)){
-	                res = res[object$obs_selection[[i]], , drop = FALSE]
-	            }
-		    }
-
-		    return(res)
-		}
-
-		# dropping names
-		value_fixef = as.vector(value_fixef)
-	}
-
-	#
-	# 2) Linear values
-	#
-
-	coef = object$coefficients
-
-	value_linear = 0
-	var_keep = NULL
-	rhs_fml = fml_split(fml, 1)
-	linear.varnames = all_vars_with_i_prefix(rhs_fml[[3]])
-
-	if(length(linear.varnames) > 0){
-		# Checking all variables are there
-
-	    if(isTRUE(object$iv) && object$iv_stage == 2){
-	        names(coef) = gsub("^fit_", "", names(coef))
-	        linear.varnames = c(linear.varnames, all_vars_with_i_prefix(object$fml_all$iv[[2]]))
-	        iv_fml = object$fml_all$iv
-	        rhs_fml = .xpd(..lhs ~ ..endo + ..rhs, ..lhs = rhs_fml[[2]], ..endo = iv_fml[[2]], ..rhs = rhs_fml[[3]])
-	    }
-
-		varNotHere = setdiff(linear.varnames, names(newdata))
-		if(length(varNotHere) > 0){
-			stop("The variable", enumerate_items(varNotHere, "s.quote"),
-			     " used to estimate the model (in fml) ", ifsingle(varNotHere, "is", "are"),
-			     " missing in the data.frame given by the argument 'newdata'.")
-		}
-
-		# we create the matrix
-		matrix_linear = error_sender(fixest_model_matrix_extra(object = object, newdata = newdata, original_data = FALSE, fml = rhs_fml, i_noref = TRUE), "Error when creating the linear matrix: ")
-
-		# Checking the levels created with i()
-		mm_info_new = attr(matrix_linear, "model_matrix_info")
-		if(!is.null(mm_info_new)){
-		    mm_info = object$model_matrix_info
-		    # The order of creation is exactly the same (same fun used),
-		    # so the two mm_info are identical in structure
-		    for(i in seq_along(mm_info)){
-		        mm_new_i = mm_info_new[[i]]
-		        mm_i = mm_info[[i]]
-		        if("coef_names_full" %in% names(mm_i)){
-		            pblm = setdiff(mm_new_i$coef_names_full, mm_i$coef_names_full)
-		            if(length(pblm) > 0){
-		                stop(dsb("In i(), predictions cannot be done for values that were not present at estimation time.",
-		                         " It concerns the value.[*s_, 3KO, C?pblm]."))
-		            }
-		        }
-		    }
-		}
-
-		var_keep = intersect(names(coef), colnames(matrix_linear))
-		value_linear = value_linear + as.vector(matrix_linear[, var_keep, drop = FALSE] %*% coef[var_keep])
-	}
-
-	#
-	# 3) Non linear terms
-	#
-
-	value_NL = 0
-	NL_fml = object$NL.fml
-	if(!is.null(NL_fml)){
-		# controlling that we can evaluate that
-		NL_vars = all.vars(NL_fml)
-		varNotHere = setdiff(NL_vars, c(names(coef), names(newdata)))
-		if(length(varNotHere) > 0){
-			stop("Some variables used to estimate the model (in the non-linear formula) are missing from argument 'newdata': ", enumerate_items(varNotHere), ".")
-		}
-
-		var2send = intersect(NL_vars, names(newdata))
-		env = new.env()
-		for(var in var2send){
-			assign(var, newdata[[var]], env)
-		}
-
-		coef2send = setdiff(NL_vars, names(newdata))
-		for(iter_coef in coef2send){
-			assign(iter_coef, coef[iter_coef], env)
-		}
-
-		# Evaluation of the NL part
-		value_NL = eval(NL_fml[[2]], env)
-	}
-
-	#
-	# 4) offset value
-	#
-
-	value_offset = 0
-	offset = object$call$offset
-	if(!is.null(offset)){
-		# evaluation of the offset
-
-		if(is.numeric(offset)){
-			# simple numeric offset
-			value_offset = offset
-
-		} else {
-			# offset valid only if formula
-			offset_char = as.character(offset)
-
-			if(length(offset_char) == 2 && offset_char[1] == "~"){
-				offset_fml = eval(offset)
-				varNotHere = setdiff(all.vars(offset_fml), names(newdata))
-				if(length(varNotHere) > 0){
-					stop("In the offset, the variable", enumerate_items(varNotHere, "s.is"), " not present in 'newdata'.")
-				}
-
-				value_offset = eval(offset_fml[[length(offset_fml)]], newdata)
-			} else {
-				stop("Predict can't be applied to this estimation because the offset (", deparse_long(offset), ") cannot be evaluated for the new data. Use a formula for the offset in the first estimation to avoid this.")
-			}
-
-		}
-
-	}
-
-	value_predicted = value_fixef + value_linear + value_NL + value_offset
-
-	if(type == "link" || object$method_type == "feols"){
-		res = value_predicted
-	} else if(object$method == "femlm") {
-		# Now the expected predictor
-		family = object$family
-		famFuns = switch(family,
-							  poisson = ml_poisson(),
-							  negbin = ml_negbin(),
-							  logit = ml_logit(),
-							  gaussian = ml_gaussian())
-
-		if(family == "gaussian"){
-			exp_value = 0
-		} else {
-			exp_value = exp(value_predicted)
-		}
-
-		res = famFuns$expected.predictor(value_predicted, exp_value)
-	} else {
-		res = object$family$linkinv(value_predicted)
-	}
-
-
-	#
-	# se.fit
-	#
-
-	if(se.fit){
-
-	    if(!is.null(object$fixef_vars)){
-	        stop("The standard-errors (SEs) of the prediction cannot be computed in the presence of fixed-effects. To obtain the SEs, you would need to include the FEs as standard factors in the model.")
-	    }
-
-	    if(!is.null(NL_fml)){
-	        stop("The standard-errors (SEs) of the prediction cannot be computed in models containing non-linear in parameter elements.")
-	    }
-
-	    # The matrix has been created already
-
-	    V_raw = vcov(object, attr = TRUE, vcov = vcov, ssc = ssc)
-	    V = V_raw[var_keep, var_keep, drop = FALSE]
-	    X = matrix_linear[, var_keep, drop = FALSE]
-
-	    var.fit = rowSums((X %*% V) * X)
-	    se.fit = sqrt(var.fit)
-
-	    res = data.frame(fit = res, se.fit = se.fit)
-
-	    if(interval != "none"){
-	        fact = fixest_CI_factor(object, level, V_raw)
-
-	        if(interval == "prediction"){
-	            w = object$weights
-
-	            if(!is.null(w)){
-	                var.u = cpp_ssq(resid(object), w) / w
-	            } else {
-	                var.u = cpp_ssq(resid(object))
-	            }
-	            var.u = var.u / degrees_freedom(object, "resid")
-
-	            se_obs = sqrt(var.fit + var.u)
-
-	        } else {
-	            se_obs = se.fit
-	        }
-
-	        res$ci_low  = res$fit + fact[1] * se_obs
-	        res$ci_high = res$fit + fact[2] * se_obs
-	    }
-
-	}
-
-	res
-}
-
-
-#' Confidence interval for parameters estimated with \code{fixest}
-#'
-#' This function computes the confidence interval of parameter estimates obtained from a model estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @inheritParams nobs.fixest
-#' @inheritParams vcov.fixest
-#'
-#' @param parm The parameters for which to compute the confidence interval (either an integer vector OR a character vector with the parameter name). If missing, all parameters are used.
-#' @param level The confidence level. Default is 0.95.
-#'
-#' @return
-#' Returns a data.frame with two columns giving respectively the lower and upper bound of the confidence interval. There is as many rows as parameters.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # Load trade data
-#' data(trade)
-#'
-#' # We estimate the effect of distance on trade (with 3 fixed-effects)
-#' est_pois = femlm(Euros ~ log(dist_km) + log(Year) | Origin + Destination +
-#'                  Product, trade)
-#'
-#' # confidence interval with "normal" VCOV
-#' confint(est_pois)
-#'
-#' # confidence interval with "clustered" VCOV (w.r.t. the Origin factor)
-#' confint(est_pois, se = "cluster")
-#'
-#'
-confint.fixest = function(object, parm, level = 0.95, vcov, se, cluster, ssc = NULL, ...){
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = c("parm", "level", "se", "cluster"),
-                      valid_args = c("forceCovariance", "keepBounded"))
-    }
-
-	# Control
-	if(!is.numeric(level) || !length(level) == 1 || level >= 1 || level <= .50){
-		stop("The argument 'level' must be a numeric scalar greater than 0.50 and strictly lower than 1.")
-	}
-
-	# The proper SE
-	sum_object = summary(object, vcov = vcov, se = se, cluster = cluster, ssc = ssc, ...)
-
-	se_all = sum_object$coeftable[, 2]
-	coef_all = sum_object$coeftable[, 1]
-
-	# the parameters for which we should compute the confint
-	all_params = names(coef_all)
-
-	if(missing(parm)){
-	    parm_use = all_params
-	} else if(is.numeric(parm)){
-	    if(any(parm %% 1 != 0)){
-	        stop("If the argument 'parm' is numeric, it must be integers.")
-	    }
-
-	    parm_use = unique(na.omit(all_params[parm]))
-	    if(length(parm_use) == 0){
-	        stop("There are ", length(all_params), " coefficients, the argument 'parm' does not correspond to any of them.")
-	    }
-	} else if(is.character(parm)){
-	    parm_pblm = setdiff(parm, all_params)
-	    if(length(parm_pblm) > 0){
-	        stop("some parameters of 'parm' have no estimated coefficient: ", paste0(parm_pblm, collapse=", "), ".")
-	    }
-
-	    parm_use = intersect(parm, all_params)
-	}
-
-	# multiplicative factor
-	fact = fixest_CI_factor(object, level, sum_object$cov.scaled)
-
-	# The confints
-	# Note that for glm models, there is no profiling
-	lower_bound = coef_all[parm_use] + fact[1] * se_all[parm_use]
-	upper_bound = coef_all[parm_use] + fact[2] * se_all[parm_use]
-
-	res = data.frame(lower_bound, upper_bound, row.names = parm_use)
-
-	val = (1 - level) / 2
-	names(res) = paste0(round(100*c(val, 1-val), 1), " %")
-
-	attr(res, "type") = attr(se_all, "type")
-
-	res
-}
-
-#' Updates a \code{fixest} estimation
-#'
-#' Updates and re-estimates a \code{fixest} model (estimated with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). This function updates the formulas and use previous starting values to estimate a new \code{fixest} model. The data is obtained from the original \code{call}.
-#'
-#' @method update fixest
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param fml.update Changes to be made to the original argument \code{fml}. See more information on \code{\link[stats]{update.formula}}. You can add/withdraw both variables and fixed-effects. E.g. \code{. ~ . + x2 | . + z2} would add the variable \code{x2} and the cluster \code{z2} to the former estimation.
-#' @param nframes (Advanced users.) Defaults to 1. Number of frames up the stack where to perform the evaluation of the updated call. By default, this is the parent frame.
-#' @param evaluate Logical, default is \code{TRUE}. If \code{FALSE}, only the updated call is returned.
-#' @param ... Other arguments to be passed to the functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#'
-#' @return
-#' It returns a \code{fixest} object (see details in \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}).
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{predict.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}, \code{\link[fixest]{fixef.fixest}}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # Example using trade data
-#' data(trade)
-#'
-#' # main estimation
-#' est_pois = fepois(Euros ~ log(dist_km) | Origin + Destination, trade)
-#'
-#' # we add the variable log(Year)
-#' est_2 = update(est_pois, . ~ . + log(Year))
-#'
-#' # we add another fixed-effect: "Product"
-#' est_3 = update(est_2, . ~ . | . + Product)
-#'
-#' # we remove the fixed-effect "Origin" and the variable log(dist_km)
-#' est_4 = update(est_3, . ~ . - log(dist_km) | . - Origin)
-#'
-#' # Quick look at the 4 estimations
-#' etable(est_pois, est_2, est_3, est_4)
-#'
-update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
-	# Update method
-	# fml.update: update the formula
-	# If 1) SAME DATA and 2) SAME dep.var, then we make initialisation
-
-
-	if(missing(fml.update)){
-		fml.update = . ~ .
-	} else {
-	    check_arg(fml.update, "formula")
-	}
-
-    check_arg(evaluate, "logical scalar")
-
-    if(isTRUE(object$is_fit)){
-        stop("update method not available for fixest estimations obtained from fit methods.")
-    }
-
-    if(!isScalar(nframes) || nframes < 1 || nframes %% 1 != 0){
-        stop("Argument 'nframes' must be a single integer greater than, or equal to, 1.")
-    }
-
-	call_new = match.call()
-	dots = list(...)
-
-	dot_names = names(dots)
-	if("fixef" %in% dot_names){
-		stop("Argument 'fixef' is not accepted in the 'update.fixest' method. Please make modifications to fixed-effects directly in the argument 'fml.update'. (E.g. .~.|.+v5 to add variable v5 as a fixed-effect.)")
-	}
-
-	if(any(dot_names == "")){
-		call_new_names = names(call_new)
-		problems = call_new[call_new_names == ""][-1]
-		stop("In 'update.fixest' the arguments of '...' are passed to the function ", object$method, ", and must be named. Currently there are un-named arguments (e.g. '", deparse_long(problems[[1]]), "').")
-	}
-
-	#
-	# I) Linear formula update
-	#
-
-	fml_old = object$fml
-	fml_linear = update(fml_old, fml_split(fml.update, 1))
-
-	# Family information
-	if(!is.null(dots$family)){
-	    if(object$method_type == "feols"){
-	        stop("'family' is not an argument of function feols().")
-	    } else if(object$method %in% c("femlm", "feNmlm", "fepois", "fenegbin")){
-			family_new = match.arg(dots$family, c("poisson", "negbin", "gaussian", "logit"))
-		}
-	}
-
-	#
-	# II) fixed-effects updates
-	#
-
-	fml_fixef = NULL
-
-	updt_fml_parts = fml_split(fml.update, raw = TRUE)
-	n_parts = length(updt_fml_parts)
-
-	if(n_parts > 2 + (object$method_type == "feols")){
-	    stop("The update formula cannot have more than ", 2 + (object$method_type == "feols"), " parts for the method ", object$method, ".")
-	}
-
-	is_fe = n_parts > 1 && !is_fml_inside(updt_fml_parts[[2]])
-
-	fixef_vars = object$fixef_vars
-
-	if(is_fe){
-
-	    fixef_old = object$fml_all$fixef
-
-	    # I use it as text to catch the var1^var2 FEs (update does not work)
-	    if(is.null(fixef_old)){
-	        fixef_old_text = "~ 1"
-	    } else {
-	        fixef_old_text = deparse_long(fixef_old)
-	    }
-
-	    fixef_new_fml = fml_maker(updt_fml_parts[[2]])
-	    fixef_new_text = deparse_long(fixef_new_fml)
-
-	    if(fixef_new_text == "~."){
-	        # nothing happens
-	        fixef_new = fixef_old
-
-	    } else if(fixef_new_text %in% c("~0", "~1")){
-	        fixef_new = ~1
-
-	    } else if(grepl("\\^", fixef_old_text) || grepl("\\^", fixef_new_text)){
-	        # we update manually.... dammmit
-	        # Note that what follows does not work ONLY when you have number^var or number^number
-	        # and both cases don't make much sense -- I need not control for them
-	        fml_text_old = gsub("\\^", "__666__", fixef_old_text)
-	        fml_text_new = gsub("\\^", "__666__", fixef_new_text)
-
-	        fixef_new_wip = update(as.formula(fml_text_old), as.formula(fml_text_new))
-
-	        fixef_new = as.formula(gsub("__666__", "^", fixef_new_wip))
-	    } else {
-	        fixef_new = update(fixef_old, fixef_new_fml)
-	    }
-
-		if(length(all.vars(fixef_new)) > 0){
-			# means there is a fixed-effect
-		    fml_fixef = fixef_new
-		}
-
-	} else if(!is.null(fixef_vars)){
-		# the formula updated:
-		fml_fixef = object$fml_all$fixef
-
-	}
-
-	#
-	# III) IV updates
-	#
-
-	if(n_parts > 2 || (n_parts == 2 && !is_fe)){
-
-	    iv_new_fml = fml_maker(updt_fml_parts[[n_parts]])
-
-	    if(!is_fml_inside(iv_new_fml)){
-	        stop("The third part of the update formula in 'feols' must be a formula.")
-	    }
-
-	    iv_old = object$fml_all$iv
-
-	    if(is.null(iv_old)){
-	        fml_iv = iv_new_fml
-
-	    } else {
-	        fml_iv = update(iv_old, iv_new_fml)
-	    }
-
-	} else {
-	    fml_iv = object$fml_all$iv
-	}
-
-
-	fml_new = merge_fml(fml_linear, fml_fixef, fml_iv)
-
-
-	#
-	# The call
-	#
-
-	call_old = object$call
-
-	# we drop the argument fixef from old call (now it's in the fml_new)
-	call_old$fixef = NULL
-
-	# We also drop the arguments for multiple estimations:
-	call_old$split = call_old$fsplit = NULL
-
-	# new call: call_clear
-	call_clear = call_old
-	for(arg in setdiff(names(call_new)[-1], c("fml.update", "nframes", "evaluate", "object"))){
-		call_clear[[arg]] = call_new[[arg]]
-	}
-
-	call_clear$fml = as.call(fml_new)
-
-	if(!evaluate) return(call_clear)
-
-	res = eval(call_clear, parent.frame(nframes))
-
-	res
-}
-
-
-#' Extract the formula of a \code{fixest} fit
-#'
-#' This function extracts the formula from a \code{fixest} estimation (obtained with \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}). If the estimation was done with fixed-effects, they are added in the formula after a pipe (\dQuote{|}). If the estimation was done with a non linear in parameters part, then this will be added in the formula in between \code{I()}.
-#'
-#'
-#' @param x An object of class \code{fixest}. Typically the result of a \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}} estimation.
-#' @param type A character scalar. Default is \code{type = "full"} which gives back a formula containing the linear part of the model along with the fixed-effects (if any) and the IV part (if any). If \code{type = "linear"} then only the linear formula is returned. If \code{type = "NL"} then only the non linear in parameters part is returned.
-#' @param ... Not currently used.
-#'
-#' @return
-#' It returns a formula.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{model.matrix.fixest}}, \code{\link[fixest]{update.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}.
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
-#'
-#' # formula with the fixed-effect variable
-#' formula(res)
-#'
-#' # linear part without the fixed-effects
-#' formula(res, "linear")
-#'
-#'
-formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
-	# Extract the formula from the object
-	# we add the clusters in the formula if needed
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = "type")
-    }
-
-    if(isTRUE(x$is_fit)){
-        stop("formula method not available for fixest estimations obtained from fit methods.")
-    }
-
-	check_arg_plus(type, "match")
-
-	if(type == "linear"){
-		return(x$fml)
-
-	} else if(type == "NL"){
-
-		if(!x$method == "feNmlm"){
-			stop("type = 'NL' is not valid for a ", x$method, " estimation.")
-		}
-
-		NL.fml = x$NL.fml
-		if(is.null(NL.fml)){
-			stop("There was no nonlinear part estimated, option type = 'NL' cannot be used.")
-		}
-
-		return(NL.fml)
-
-	} else if(type == "iv"){
-	    if(is.null(x$fml_all$iv)){
-	        stop("type = 'iv' is only available for feols estimations with IV.")
-	    }
-	}
-
-	# Shall I add LHS ~ RHS + NL(NL fml) | fe | iv ???
-    res = merge_fml(x$fml_all$linear, x$fml_all$fixef, x$fml_all$iv)
-
-	res
-}
-
-
-#' Design matrix of a \code{fixest} object
-#'
-#' This function creates the left-hand-side or the right-hand-side(s) of a \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}} estimation.
-#'
-#' @method model.matrix fixest
-#'
-#' @inheritParams nobs.fixest
-#'
-#' @param data If missing (default) then the original data is obtained by evaluating the \code{call}. Otherwise, it should be a \code{data.frame}.
-#' @param type Character vector or one sided formula, default is "rhs". Contains the type of matrix/data.frame to be returned. Possible values are: "lhs", "rhs", "fixef", "iv.rhs1" (1st stage RHS), "iv.rhs2" (2nd stage RHS), "iv.endo" (endogenous vars.), "iv.exo" (exogenous vars), "iv.inst" (instruments).
-#' @param na.rm Default is \code{TRUE}. Should observations with NAs be removed from the matrix?
-#' @param subset Logical or character vector. Default is \code{FALSE}. If \code{TRUE}, then the matrix created will be restricted only to the variables contained in the argument \code{data}, which can then contain a subset of the variables used in the estimation. If a character vector, then only the variables matching the elements of the vector via regular expressions will be created.
-#' @param as.matrix Logical scalar, default is \code{FALSE}. Whether to coerce the result to a matrix.
-#' @param as.df Logical scalar, default is \code{FALSE}. Whether to coerce the result to a data.frame.
-#' @param collin.rm Logical scalar, default is \code{TRUE}. Whether to remove variables that were found to be collinear during the estimation. Beware: it does not perform a collinearity check.
-#' @param ... Not currently used.
-#'
-#' @return
-#' It returns either a vector, a matrix or a data.frame. It returns a vector for the dependent variable ("lhs"), a data.frame for the fixed-effects ("fixef") and a matrix for any other type.
-#'
-#' @seealso
-#' See also the main estimation functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}. \code{\link[fixest]{formula.fixest}}, \code{\link[fixest]{update.fixest}}, \code{\link[fixest]{summary.fixest}}, \code{\link[fixest]{vcov.fixest}}.
-#'
-#'
-#' @author
-#' Laurent Berge
-#'
-#' @examples
-#'
-#' base = iris
-#' names(base) = c("y", "x1", "x2", "x3", "species")
-#'
-#' est = feols(y ~ poly(x1, 2) + x2, base)
-#' head(model.matrix(est))
-#'
-#' # Illustration of subset
-#'
-#' # subset => character vector
-#' head(model.matrix(est, subset = "x1"))
-#'
-#' # subset => TRUE, only works with data argument!!
-#' head(model.matrix(est, data = base[, "x1", drop = FALSE], subset = TRUE))
-#'
-#'
-#'
-model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset = FALSE,
-                               as.matrix = FALSE, as.df = FALSE, collin.rm = TRUE, ...){
-	# We evaluate the formula with the past call
-    # type: lhs, rhs, fixef, iv.endo, iv.inst, iv.rhs1, iv.rhs2
-    # if fixef => return a DF
-
-    # Checking the arguments
-    if(is_user_level_call()){
-        validate_dots(suggest_args = c("data", "type"))
-    }
-
-    # We allow type to be used in the location of data if data is missing
-    if(!missing(data) && missing(type)){
-        sc = sys.call()
-        if(!"data" %in% names(sc)){
-            if(!is.null(data) && (is.character(data) || "formula" %in% class(data))){
-                # data is in fact the type
-                type = data
-                data = NULL
-            }
-        }
-    }
-
-
-    type = check_set_types(type, c("lhs", "rhs", "fixef", "iv.endo", "iv.inst", "iv.exo", "iv.rhs1", "iv.rhs2"))
-
-    if(isTRUE(object$is_fit)){
-        stop("model.matrix method not available for fixest estimations obtained from fit methods.")
-    }
-
-    if(any(grepl("^iv", type)) && !isTRUE(object$iv)){
-        stop("The type", enumerate_items(grep("^iv", type, value = TRUE), "s.is"), " only valid for IV estimations.")
-    }
-
-    check_arg(subset, "logical scalar | character vector no na")
-
-    check_arg_plus(as.matrix, as.df, collin.rm, "logical scalar")
-
-	# The formulas
-	fml_full = formula(object, type = "full")
-	fml_linear = formula(object, type = "linear")
-
-	# Evaluation with the data
-	original_data = FALSE
-	if(missnull(data)){
-	    original_data = TRUE
-
-	    data = fetch_data(object, "To apply 'model.matrix.fixest', ")
-
-	}
-
-	# control of the data
-	if(is.matrix(data)){
-		if(is.null(colnames(data))){
-			stop("If argument 'data' is to be a matrix, its columns must be named.")
-		}
-		data = as.data.frame(data)
-	}
-
-	if(!"data.frame" %in% class(data)){
-		stop("The argument 'data' must be a data.frame or a matrix.")
-	}
-
-	data = as.data.frame(data)
-
-	# Panel setup
-	panel__meta__info = set_panel_meta_info(object, data)
-
-	res = list()
-
-	if("lhs" %in% type){
-	    lhs = list()
-
-	    namesLHS = all.vars(fml_linear[[2]])
-	    if(length(pblm <- setdiff(namesLHS, names(data)))){
-	        stop("In 'model.matrix', to create the LHS, the variable", enumerate_items(pblm, "s.is.quote"), " not in the data set.")
-	    }
-
-	    lhs_text = deparse_long(fml_linear[[2]])
-	    lhs[[lhs_text]] = eval(fml_linear[[2]], data)
-
-        res[["lhs"]] = as.data.frame(lhs)
-	}
-
-	if("rhs" %in% type && !isTRUE(object$onlyFixef)){
-	    # we kick out the intercept if there is presence of fixed-effects
-	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-
-	    fml = fml_linear
-	    if(isTRUE(object$iv)){
-	        fml_iv = object$fml_all$iv
-	        fml = .xpd(..lhs ~ ..endo + ..rhs, ..lhs = fml[[2]], ..endo = fml_iv[[2]], ..rhs = fml[[3]])
-	    }
-
-	    linear.mat = error_sender(fixest_model_matrix_extra(
-	        object = object, newdata = data, original_data = original_data,
-	        fml = fml, fake_intercept = fake_intercept,
-	        subset = subset),
-	        "In 'model.matrix', the RHS could not be evaluated: ")
-
-	    if(collin.rm){
-	        qui = which(colnames(linear.mat) %in% object$collin.var)
-	        if(length(qui) == ncol(linear.mat)){
-	            linear.mat = NULL
-	        } else if(length(qui) > 0){
-	            linear.mat =  linear.mat[, -qui, drop = FALSE]
-	        }
-
-	        coefs = object$coefficients
-	        if(length(coefs) == ncol(linear.mat) && any(colnames(linear.mat) != names(coefs))){
-	            # we reorder the matrix
-	            # This can happen in multiple estimations, where we respect the
-	            # order of the user
-
-	            if(all(names(coefs) %in% colnames(linear.mat))){
-	                linear.mat = linear.mat[, names(coefs), drop = FALSE]
-	            }
-	        }
-	    }
-
-        res[["rhs"]] = linear.mat
-	}
-
-	if("fixef" %in% type){
-
-	    if(is.null(object$fixef_vars)){
-	        stop("In model.matrix, the type 'fixef' is only valid for models with fixed-effects. This estimation does not contain fixed-effects.")
-	    }
-
-	    fixef_terms_full = fixef_terms(object$fml_all$fixef)
-	    fixef_terms = fixef_terms_full$fml_terms
-
-	    fixef_df = error_sender(prepare_df(fixef_terms_full$fe_vars, data, fastCombine = FALSE),
-	                             "In 'model.matrix', problem evaluating the fixed-effects part of the formula:\n")
-
-	    isSlope = any(fixef_terms_full$slope_flag != 0)
-	    if(isSlope){
-	        slope_df = error_sender(prepare_df(fixef_terms_full$slope_vars, data),
-	                                 "In 'model.matrix', problem evaluating the variables with varying slopes in the fixed-effects part of the formula:\n")
-
-	        fixef_df = cbind(fixef_df, slope_df)
-	    }
-
-	    res[["fixef"]] = fixef_df
-	}
-
-	if("iv.endo" %in% type){
-	    fml = object$iv_endo_fml
-
-	    endo.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = TRUE), "In 'model.matrix', the endogenous variables could not be evaluated: ")
-
-	    if(collin.rm){
-	        qui = which(colnames(endo.mat) %in% object$collin.var)
-	        if(length(qui) == ncol(endo.mat)){
-	            endo.mat = NULL
-	        } else if(length(qui) > 0){
-	            endo.mat =  endo.mat[, -qui, drop = FALSE]
-	        }
-	    }
-
-	    res[["iv.endo"]] = endo.mat
-	}
-
-	if("iv.inst" %in% type){
-	    fml = object$fml_all$iv
-
-	    inst.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = TRUE), "In 'model.matrix', the instruments could not be evaluated: ")
-
-	    if(collin.rm){
-	        qui = which(colnames(inst.mat) %in% object$collin.var)
-	        if(length(qui) == ncol(inst.mat)){
-	            inst.mat = NULL
-	        } else if(length(qui) > 0){
-	            inst.mat =  inst.mat[, -qui, drop = FALSE]
-	        }
-	    }
-
-	    res[["iv.inst"]] = inst.mat
-	}
-
-	if("iv.exo" %in% type){
-
-	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-	    fml = object$fml_all$linear
-
-	    exo.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = fake_intercept), "In 'model.matrix', the instruments could not be evaluated: ")
-
-	    if(is.atomic(exo.mat) && length(exo.mat) == 1){
-	        # This is the intercept only
-	        # Two cases:
-	        is_int = attr(terms(fml), "intercept")
-	        if(is_int && is.null(object$fixef_vars)){
-	            # Valid intercept
-	            exo.mat = matrix(1, nrow(data))
-	        } else {
-	            # should be NULL
-	            exo.mat = NULL
-	        }
-	    } else if(collin.rm){
-	        qui = which(colnames(exo.mat) %in% object$collin.var)
-	        if(length(qui) == ncol(exo.mat)){
-	            exo.mat = NULL
-	        } else if(length(qui) > 0){
-	            exo.mat =  exo.mat[, -qui, drop = FALSE]
-	        }
-	    }
-
-	    res[["iv.exo"]] = exo.mat
-	}
-
-	if("iv.rhs1" %in% type){
-	    # First stage
-
-	    if(!isTRUE(object$iv)){
-	        stop("In model.matrix, the type 'iv.rhs1' is only valid for IV models. This estimation is no IV.")
-	    }
-
-	    fml = object$fml
-	    if(object$iv_stage == 2){
-	        fml_iv = object$fml_all$iv
-	        fml = .xpd(..lhs ~ ..inst + ..rhs, ..lhs = fml[[2]], ..inst = fml_iv[[3]], ..rhs = fml[[3]])
-	    }
-
-	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-	    # iv_rhs1 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
-	    #                        "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
-	    iv_rhs1 = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
-
-	    if(collin.rm){
-	        qui = which(colnames(iv_rhs1) %in% object$collin.var)
-	        if(length(qui) == ncol(iv_rhs1)){
-	            iv_rhs1 = NULL
-	        } else if(length(qui) > 0){
-	            iv_rhs1 =  iv_rhs1[, -qui, drop = FALSE]
-	        }
-	    }
-
-	    res[["iv.rhs1"]] = iv_rhs1
-	}
-
-	if("iv.rhs2" %in% type){
-	    # Second stage
-
-	    if(!isTRUE(object$iv)){
-	        stop("In model.matrix, the type 'iv.rhs2' is only valid for second stage IV models. This estimation is not even IV.")
-	    }
-
-	    if(!object$iv_stage == 2){
-	        stop("In model.matrix, the type 'iv.rhs2' is only valid for second stage IV models. This estimation is the first stage.")
-	    }
-
-	    # I) we get the fit
-	    stage_1 = object$iv_first_stage
-
-	    fit_vars = c()
-	    for(i in seq_along(stage_1)){
-	        fit_vars[i] = v = paste0("fit_", names(stage_1)[i])
-	        data[[v]] = predict(stage_1[[i]], newdata = data, sample = "original")
-	    }
-
-	    # II) we create the variables
-
-	    fml = object$fml
-	    fml = .xpd(..lhs ~ ..fit + ..rhs, ..lhs = fml[[2]], ..fit = fit_vars, ..rhs = fml[[3]])
-
-	    fake_intercept = !is.null(object$fixef_vars) && !(!is.null(object$slope_flag) && all(object$slope_flag < 0))
-	    # iv_rhs2 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
-	    #                        "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
-	    iv_rhs2 = error_sender(fixest_model_matrix_extra(object = object, newdata = data, original_data = original_data, fml = fml, fake_intercept = fake_intercept, subset = subset), "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
-
-	    if(collin.rm){
-	        qui = which(colnames(iv_rhs2) %in% object$collin.var)
-	        if(length(qui) == ncol(iv_rhs2)){
-	            iv_rhs2 = NULL
-	        } else if(length(qui) > 0){
-	            iv_rhs2 =  iv_rhs2[, -qui, drop = FALSE]
-	        }
-	    }
-
-	    res[["iv.rhs2"]] = iv_rhs2
-	}
-
-	# Formatting res
-	if(length(res) == 0){
-	    return(NULL)
-	} else if(length(type) > 1){
-	    res = res[type]
-	    res = do.call(cbind, unname(res))
-	} else {
-	    res = res[[1]]
-	}
-
-	#
-	# Removing obs if needed
-	#
-
-	check_0 = FALSE
-	if(original_data){
-
-	    if(na.rm == FALSE){
-	        # We do nothing. Or shall I add NA values for obs not
-	        # included in the estimation?
-	        if(FALSE && length(object$obs_selection) > 0){
-
-	            # we reconstruct the full vector of obs
-	            # and we fill with NA
-	            obs_id = 1:nrow(data)
-	            for(i in seq_along(object$obs_selection)){
-	                obs_id = select_obs(obs_id, object$obs_selection[[i]])
-	            }
-
-	            res[!1:nrow(res) %in% obs_id, ] = NA
-
-	        }
-
-	    } else {
-	        for(i in seq_along(object$obs_selection)){
-	            check_0 = TRUE
-	            res = select_obs(res, object$obs_selection[[i]])
-	        }
-        }
-
-
-
-	    na.rm = FALSE
-	}
-
-	if(na.rm){
-
-	    if(is.numeric(res) || all(sapply(res, is.numeric))){
-	        info = cpp_which_na_inf(res, nthreads = 1)
-	    } else {
-	        info = list(any_na_inf = anyNA(res))
-	        if(info$any_na_inf) info$is_na_inf = !complete.cases(res)
-	    }
-
-	    if(info$any_na_inf){
-	        check_0 = TRUE
-	        isNA_L = info$is_na_inf
-
-	        if(sum(isNA_L) == nrow(res)){
-	            warning("All observations contain NA values.")
-	            return(res[-which(isNA_L), , drop = FALSE])
-	        }
-
-	        res = select_obs(res, -which(isNA_L))
-	    }
-	}
-
-
-	if(as.matrix){
-	    res = as.matrix(res)
-	} else if(as.df){
-	    res = as.data.frame(res)
-	} else if(identical(type, "lhs")){
-	    res = res[[1]]
-	}
-
-	if(check_0 && !"fixef" %in% type){
-	    only_0 = cpppar_check_only_0(base::as.matrix(res), nthreads = 1)
-	    if(all(only_0 == 1)){
-	        stop("After removing NAs, not a single explanatory variable is different from 0.")
-
-	    } else if(any(only_0 == 1)){
-	        # At that point it must be either a matrix or a DF
-	        # (can't be a vector)
-	        res = res[, only_0 == 0, drop = FALSE]
-	    }
-	}
-
-    res
-}
-
-
-#' Extract the terms
-#'
-#' This function extracts the terms of a \code{fixest} estimation, excluding the fixed-effects part.
-#'
-#' @param x A \code{fixest} object. Obtained using the functions \code{\link[fixest]{femlm}}, \code{\link[fixest]{feols}} or \code{\link[fixest]{feglm}}.
-#' @param ... Not currently used.
-#'
-#' @return
-#' An object of class \code{c("terms", "formula")} which contains the terms representation of a symbolic model.
-#'
-#'
-#' @examples
-#'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res = feols(Sepal.Length ~ Sepal.Width*Petal.Length +
-#'             Petal.Width | Species, iris)
-#'
-#' # Terms of the linear part
-#' terms(res)
-#'
-#'
-terms.fixest = function(x, ...){
-    terms(formula(x, type = "linear"))
-}
 
 #### ............... ####
 #### Setters/Getters ####
 ####
 
-#' Sets/gets whether to display notes in \code{fixest} estimation functions
+#' Sets/gets whether to display notes in `fixest` estimation functions
 #'
-#' Sets/gets the default values of whether notes (informing for NA and observations removed) should be displayed in \code{fixest} estimation functions.
+#' Sets/gets the default values of whether notes (informing for NA and observations removed) should be displayed in `fixest` estimation functions.
 #'
-#' @param x A logical. If \code{FALSE}, then notes are permanently removed.
+#' @param x A logical. If `FALSE`, then notes are permanently removed.
 #'
 #' @author
 #' Laurent Berge
@@ -11334,14 +6774,14 @@ getFixest_notes = function(){
     x
 }
 
-#' Sets/gets the number of threads to use in \code{fixest} functions
+#' Sets/gets the number of threads to use in `fixest` functions
 #'
-#' Sets/gets the default number of threads to used in \code{fixest} estimation functions. The default is the maximum number of threads minus two.
+#' Sets/gets the default number of threads to used in `fixest` estimation functions. The default is the maximum number of threads minus two.
 #'
 #'
 #'
-#' @param nthreads The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. If missing, the default is to use 50\% of all threads.
-#' @param save Either a logical or equal to \code{"reset"}. Default is \code{FALSE}. If \code{TRUE} then the value is set permanently at the project level, this means that if you restart R, you will still obtain the previously saved defaults. This is done by writing in the \code{".Renviron"} file, located in the project's working directory, hence we must have write permission there for this to work, and only works with Rstudio. If equal to "reset", the default at the project level is erased. Since there is writing in a file involved, permission is asked to the user.
+#' @param nthreads The number of threads. Can be: a) an integer lower than, or equal to, the maximum number of threads; b) 0: meaning all available threads will be used; c) a number strictly between 0 and 1 which represents the fraction of all threads to use. If missing, the default is to use 50% of all threads.
+#' @param save Either a logical or equal to `"reset"`. Default is `FALSE`. If `TRUE` then the value is set permanently at the project level, this means that if you restart R, you will still obtain the previously saved defaults. This is done by writing in the `".Renviron"` file, located in the project's working directory, hence we must have write permission there for this to work, and only works with Rstudio. If equal to "reset", the default at the project level is erased. Since there is writing in a file involved, permission is asked to the user.
 #'
 #' @author
 #' Laurent Berge
@@ -11418,12 +6858,76 @@ getFixest_nthreads = function(){
     x
 }
 
+
+
+#' Transforms a character string into a dictionary
+#'
+#' Transforms a single character string containing a dictionary in a textual format into a proper dictionary, that is a named character vector
+#'
+#' @param x A character scalar of the form `"variable 1: definition \n variable 2: definition"` etc. Each line of this character must contain at most one definition with, on the left the variable name, and on the right its definition. The separation between the variable and its definition must be a colon followed with a single space (i.e. ": "). You can stack definitions within a single line by making use of a semi colon: `"var1: def; var2: def"`. White spaces on the left and right are ignored. You can add commented lines with a `"#"`. Non-empty, non-commented lines that don't have the proper format witll raise an error.
+#'
+#' @details
+#' This function is mostly used in combination with [`setFixest_dict`] to set the dictionary to be used in the function [`etable`].
+#'
+#' @return
+#' It returns a named character vector.
+#'
+#' @author
+#' Laurent Berge
+#'
+#' @seealso
+#' [`etable`], [`setFixest_dict`]
+#'
+#' @examples
+#'
+#' x = "# Main vars
+#'      mpg: Miles per gallon
+#'      hp: Horsepower
+#'
+#'      # Categorical variables
+#'      cyl: Number of cylinders; vs: Engine"
+#'
+#' as.dict(x)
+#'
+#'
+#'
+as.dict = function(x){
+    check_arg(x, "character scalar")
+
+    text_split = strsplit(x, ";|\n")[[1]]
+
+    text_clean = trimws(text_split)
+    text_clean = text_clean[nchar(text_clean) > 0 & !grepl("^#", text_clean)]
+
+    if(any(!grepl(": ", text_clean))){
+        stop("All definitions must be of the form 'variable: definition', the colon and space are indispensible. Currently the following line is not valid:\n", text_clean[!grepl(": ", text_clean)][1])
+    }
+
+    dict_names = sapply(strsplit(text_clean, ": ", fixed = TRUE), `[[`, 1)
+    if(anyDuplicated(dict_names)){
+        tb = sort(table(dict_names), decreasing = TRUE)[1]
+        stop("The names contain duplicate entries: this is not allowed. The value ",
+             names(tb), " appears ", dreamerr::n_times(tb), ".")
+    }
+
+    values = substr(text_clean, nchar(dict_names) + 3, nchar(text_clean))
+
+    setNames(values, dict_names)
+}
+
 #' Sets/gets the dictionary relabeling the variables
 #'
-#' Sets/gets the default dictionary used in the function \code{\link[fixest]{etable}}, \code{\link[fixest]{did_means}} and \code{\link[fixest]{coefplot}}. The dictionaries are used to relabel variables (usually towards a fancier, more explicit formatting) when exporting them into a Latex table or displaying in graphs. By setting the dictionary with \code{setFixest_dict}, you can avoid providing the argument \code{dict}.
+#' Sets/gets the default dictionary used in the function [`etable`], [`did_means`] and [`coefplot`]. The dictionaries are used to relabel variables (usually towards a fancier, more explicit formatting) when exporting them into a Latex table or displaying in graphs. By setting the dictionary with `setFixest_dict`, you can avoid providing the argument `dict`.
 #'
 #'
-#' @param dict A named character vector. E.g. to change my variable named "a" and "b" to (resp.) "$log(a)$" and "$bonus^3$", then use \code{dict = c(a="$log(a)$", b3="$bonus^3$")}. This dictionary is used in Latex tables or in graphs by the function \code{\link[fixest]{coefplot}}. If you want to separate Latex rendering from rendering in graphs, use an ampersand first to make the variable specific to \code{coefplot}.
+#' @param dict A named character vector or a character scalar. E.g. to change my variable named "a" and "b" to (resp.) "$log(a)$" and "$bonus^3$", then use `dict = c(a="$log(a)$", b3="$bonus^3$")`. Alternatively you can feed a character scalar containing the dictionary in the form `"variable 1: definition \n variable 2: definition"`. In that case the function [`as.dict`] will be applied to get a proper dictionary. This dictionary is used in Latex tables or in graphs by the function [`coefplot`]. If you want to separate Latex rendering from rendering in graphs, use an ampersand first to make the variable specific to `coefplot`.
+#' @param ... You can add arguments of the form: `variable_name = "Definition"`. This is an alternative to using a named vector in the argument `dict`.
+#' @param reset Logical, default is `FALSE`. If `TRUE`, then the dictionary is reset. Note that the default dictionary always relabels the variable "(Intercept)" in to "Constant". To overwrite it, you need to add "(Intercept)" explicitly in your dictionary.
+#'
+#' @details
+#' By default the dictionary only grows. This means that successive calls with not erase the previous definitions unless the argument `reset` has been set to `TRUE`.
+#'
+#' The default dictionary is equivalent to having `setFixest_dict("(Intercept)" = "Constant")`. To change this default, you need to provide a new definition to `"(Intercept)"` explicitly.
 #'
 #' @author
 #' Laurent Berge
@@ -11434,46 +6938,55 @@ getFixest_nthreads = function(){
 #' data(trade)
 #' est = feols(log(Euros) ~ log(dist_km)|Origin+Destination+Product, trade)
 #' # we export the result & rename some variables
-#' esttex(est, dict = c("log(Euros)"="Euros (ln)", Origin="Country of Origin"))
+#' etable(est, dict = c("log(Euros)"="Euros (ln)", Origin="Country of Origin"))
 #'
 #' # If you export many tables, it can be more convenient to use setFixest_dict:
 #' setFixest_dict(c("log(Euros)"="Euros (ln)", Origin="Country of Origin"))
-#' esttex(est) # variables are properly relabeled
+#' etable(est) # variables are properly relabeled
 #'
-setFixest_dict = function(dict){
+#' # The dictionary only 'grows'
+#' # Here you get the previous two variables + the new one that are relabeled
+#' # Btw you set the dictionary directly using the argument names:
+#' setFixest_dict(Destination = "Country of Destination")
+#' etable(est)
+#'
+#' # Another way to set a dictionary: with a character string:
+#' # See the help page of as.dict
+#' dict = "log(dist_km): Distance (ln); Product: Type of Good"
+#' setFixest_dict(dict)
+#' etable(est)
+#'
+#' # And now we reset:
+#' setFixest_dict(reset = TRUE)
+#' etable(est)
+#'
+setFixest_dict = function(dict = NULL, ..., reset = FALSE){
 
-	if(missing(dict) || is.null(dict)){
-		options("fixest_dict" = NULL)
-		return(invisible())
-	}
+    check_arg(dict, "NULL named character vector no na | character scalar")
 
-	#
-	# Controls
-	#
+    if(is.null(names(dict)) && !is.null(dict)){
+        dict = error_sender(as.dict(dict), "In setFixest_dict, problem when coercing the dictionay with as.dict().")
+    }
 
-	if(!is.character(dict) || !isVector(dict)){
-		stop("Argument 'dict' must be a character vector.")
-	}
+    check_arg(..., "dotnames character scalar",
+              .message = .dsb("In '...', each argument must be named. ",
+                              "The argument name corresponds to the variable to be renamed while",
+                              " the value must be a character scalar (how the variable should be renamed)."))
 
-	if(anyNA(dict)){
-		stop("Argument 'dict' must be a character vector without NAs.")
-	}
+    dots = list(...)
+    dict = as.list(dict)
+    dict[names(dots)] = dots
 
-	# Formatting the names
-	dict_names = names(dict)
-	if(is.null(dict_names)){
-		stop("Argument 'dict', the dictionary, must be a named vector. Currently it has no names.")
-	}
+    if(reset){
+        core_dict = list("(Intercept)" = "Constant")
+    } else {
+        core_dict = getOption("fixest_dict")
+        if(is.null(core_dict)) core_dict = list()
+    }
 
-	dict_names = gsub(" +", "", dict_names)
-	td = table(dict_names)
-	if(any(td > 1)){
-		qui = which(dict_names %in% names(td)[td > 1])
-		name_dup = unique(names(dict)[qui])
-		stop("Argument 'dict' contains duplicated names: ", enumerate_items(name_dup))
-	}
+    core_dict[names(dict)] = dict
 
-	options("fixest_dict" = dict)
+	options("fixest_dict" = unlist(core_dict))
 }
 
 #' @rdname setFixest_dict
@@ -11537,23 +7050,23 @@ getFixest_print = function(){
 
 #' Sets/gets formula macros
 #'
-#' You can set formula macros globally with \code{setFixest_fml}. These macros can then be used in \code{fixest} estimations or when using the function \code{\link[fixest:setFixest_fml]{xpd}}.
+#' You can set formula macros globally with `setFixest_fml`. These macros can then be used in `fixest` estimations or when using the function [`xpd`][fixest::setFixest_fml].
 #'
 #' @inherit xpd examples
 #'
-#' @param ... Definition of the macro variables. Each argument name corresponds to the name of the macro variable. It is required that each macro variable name starts with two dots (e.g. \code{..ctrl}). The value of each argument must be a one-sided formula or a character vector, it is the definition of the macro variable. Example of a valid call: \code{setFixest_fml(..ctrl = ~ var1 + var2)}. In the function \code{xpd}, the default macro variables are taken from \code{getFixest_fml}, any variable in \code{...} will replace these values. You can enclose values in \code{.[]}, if so they will be evaluated from the current environment. For example \code{..ctrl = ~ x.[1:2] + .[z]} will lead to \code{~x1 + x2 + var} if \code{z} is equal to \code{"var"}.
-#' @param reset A logical scalar, defaults to \code{FALSE}. If \code{TRUE}, all macro variables are first reset (i.e. deleted).
+#' @param ... Definition of the macro variables. Each argument name corresponds to the name of the macro variable. It is required that each macro variable name starts with two dots (e.g. `..ctrl`). The value of each argument must be a one-sided formula or a character vector, it is the definition of the macro variable. Example of a valid call: `setFixest_fml(..ctrl = ~ var1 + var2)`. In the function `xpd`, the default macro variables are taken from `getFixest_fml`, any variable in `...` will replace these values. You can enclose values in `.[]`, if so they will be evaluated from the current environment. For example `..ctrl = ~ x.[1:2] + .[z]` will lead to `~x1 + x2 + var` if `z` is equal to `"var"`.
+#' @param reset A logical scalar, defaults to `FALSE`. If `TRUE`, all macro variables are first reset (i.e. deleted).
 #'
 #' @details
-#' In \code{xpd}, the default macro variables are taken from \code{getFixest_fml}. Any value in the \code{...} argument of \code{xpd} will replace these default values.
+#' In `xpd`, the default macro variables are taken from `getFixest_fml`. Any value in the `...` argument of `xpd` will replace these default values.
 #'
-#' The definitions of the macro variables will replace in verbatim the macro variables. Therefore, you can include multipart formulas if you wish but then beware of the order the the macros variable in the formula. For example, using the airquality data, say you want to set as controls the variable \code{Temp} and \code{Day} fixed-effects, you can do \code{setFixest_fml(..ctrl = ~Temp | Day)}, but then \code{feols(Ozone ~ Wind + ..ctrl, airquality)} will be quite different from \code{feols(Ozone ~ ..ctrl + Wind, airquality)}, so beware!
+#' The definitions of the macro variables will replace in verbatim the macro variables. Therefore, you can include multipart formulas if you wish but then beware of the order the the macros variable in the formula. For example, using the airquality data, say you want to set as controls the variable `Temp` and `Day` fixed-effects, you can do `setFixest_fml(..ctrl = ~Temp | Day)`, but then `feols(Ozone ~ Wind + ..ctrl, airquality)` will be quite different from `feols(Ozone ~ ..ctrl + Wind, airquality)`, so beware!
 #'
 #' @return
-#' The function \code{getFixest_fml()} returns a list of character strings, the names corresponding to the macro variable names, the character strings corresponding to their definition.
+#' The function `getFixest_fml()` returns a list of character strings, the names corresponding to the macro variable names, the character strings corresponding to their definition.
 #'
 #' @seealso
-#' \code{\link[fixest]{xpd}} to make use of formula macros.
+#' [`xpd`] to make use of formula macros.
 #'
 #'
 #'
@@ -11592,10 +7105,10 @@ getFixest_fml = function(){
 #' @inheritParams feNmlm
 #' @inheritParams feglm
 #'
-#' @param reset Logical, default to \code{FALSE}. Whether to reset all values.
+#' @param reset Logical, default to `FALSE`. Whether to reset all values.
 #'
 #' @return
-#' The function \code{getFixest_estimation} returns the currently set global defaults.
+#' The function `getFixest_estimation` returns the currently set global defaults.
 #'
 #' @examples
 #'
@@ -11625,7 +7138,11 @@ getFixest_fml = function(){
 #'
 #'
 #'
-setFixest_estimation = function(data = NULL, panel.id = NULL, fixef.rm = "perfect", fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10, lean = FALSE, verbose = 0, warn = TRUE, combine.quick = NULL, demeaned = FALSE, mem.clean = FALSE, glm.iter = 25, glm.tol = 1e-8, reset = FALSE){
+setFixest_estimation = function(data = NULL, panel.id = NULL, fixef.rm = "perfect",
+                                fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10,
+                                lean = FALSE, verbose = 0, warn = TRUE, combine.quick = NULL,
+                                demeaned = FALSE, mem.clean = FALSE, glm.iter = 25,
+                                glm.tol = 1e-8, reset = FALSE){
 
     check_arg_plus(fixef.rm, "match(none, perfect, singleton, both)")
     check_arg(fixef.tol, collin.tol, glm.tol, "numeric scalar GT{0}")
@@ -11671,454 +7188,6 @@ getFixest_estimation = function(){
     getOption("fixest_estimation")
 }
 
-#### ............... ####
-#### Startup         ####
-####
-
-
-
-#' Permanently removes the fixest package startup message
-#'
-#' Package startup messages can be very annoying, although sometimes they can be necessary. Use this function to prevent \code{fixest}'s package startup message from popping when loading. This will be specific to your current project.
-#'
-#' @param x Logical, no default. If \code{FALSE}, the package startup message is removed.
-#'
-#' @details
-#' Note that this function is introduced to cope with the first \code{fixest} startup message (in version 0.9.0).
-#'
-#' This function works only with R >= 4.0.0. There are no startup messages for R < 4.0.0.
-#'
-fixest_startup_msg = function(x){
-
-    check_arg(x, "logical scalar mbt")
-
-    config_update("fixest_startup_msg", x)
-
-}
-
-initialize_startup_msg = function(startup_msg){
-    # When new versions of the package are installed => we reset the display of the startup message
-    # we need to keep track of the versions for which this default has been set
-
-    # NOTA:
-    # - the variable fixest_version is written when the user uses fixest_startup_msg()
-    # - if this function returns TRUE, then it forces the msg to pop
-
-    # NOTA:
-    # - one problem is that I check the version using a local variable
-    # specific to a project.
-    # - this means that when one creates a new project, the message will necessarily pop!
-    # - so I MUST turn off the message for newly created projects.
-    # otherwise it would be so annoying.
-    # - still => this is a problem if the person uses fixest for the first time
-    # -> the project can be deemed old, while in fact fixest was never used
-    # so startup messages weren't necessary (bc it would break nothing in the existing code)
-    # -> new way: I look at the R files to check whether fixest is used:
-    # - if TRUE: startup message
-    # - if FALSE: nothing
-    # - that's quite costly, but should happen only the very first time the package is attached
-
-    # Note that we must return the value of 'fixest_startup_msg' since these are
-    # updated only at session restart (and hence are not directly accessible)
-
-    # message("fixest_startup_msg")
-
-    if(getRversion() < "4.0.0"){
-        # No startup message for version < 4.0
-        # because there's no way to monitor the messages
-        return(FALSE)
-    }
-
-    if(is_Rmarkdown()){
-        # Never in Rmarkdown: too ugly
-        return(FALSE)
-    }
-
-    if(is.null(find_project_path())){
-        return(FALSE)
-    }
-
-    # message("getting version")
-
-    previous_version = config_get("fixest_version")
-    is_corrupt_version = !is.null(previous_version) && !is_pkg_version(previous_version)
-
-    # message("version is ", previous_version)
-
-    if(is.null(previous_version)){
-        # compatibility with previous versions
-        # message("trying to get version from renviron")
-        previous_version = renvir_get("fixest_version")
-    }
-
-    current_version = fixest_version()
-
-    if(!is_pkg_version(current_version)){
-        # If we're here, it's a bug: this should NEVER happen
-        return(FALSE)
-    }
-
-    if(!is_pkg_version(previous_version)){
-        # We first update the version
-        # message("updating the version")
-        config_update("fixest_version", current_version)
-
-        # message("Is fixest used? ", is_fixest_used())
-
-        # Is it a new project? Or was fixest simply never used before?
-        if(!is_corrupt_version && is_fixest_used()){
-            # => message
-            # Since I register versions since 0.9.0, this means that the
-            # version of fixest used was anterior => all msgs should pop
-
-            config_update("fixest_startup_msg", TRUE)
-            return(TRUE)
-        } else {
-            # fixest was never used or the version was corrupt
-            # => we don't show any message since it will not break any existing code
-            config_update("fixest_startup_msg", FALSE)
-            return(FALSE)
-        }
-
-        # message("updating done ")
-
-    } else if(!identical(previous_version, current_version)){
-
-        if(version2num(current_version) < version2num(previous_version)){
-            # Can happen in projects shared in the cloud
-            # In that case, we don't touch the startup message
-
-            msg = paste0("The current project used 'fixest' version ", previous_version, ", but the current version is only ", current_version, ". Maybe update the package?")
-            packageStartupMessage(fit_screen(msg, 1))
-
-        } else {
-
-            # A) we update the version
-            config_update("fixest_version", current_version)
-
-            # B) we reset the value of fixest_startup_msg
-            #    only if the previous_version is anterior to the version that introduced the
-            #    message (means the message SHOULD pop since it would be the first time)
-
-            max_version_msg = names(startup_msg)[1]
-
-            if(version2num(previous_version) < version2num(max_version_msg)){
-                # You force a startup message even if it was turned off in a previous version
-
-                # use case:
-                # - v0.9.0: startup message, user uses fixest_startup_msg(FALSE)
-                # - v0.10.0: new breaking changes, you want to inform the user even if he had set
-                # fixest_startup_msg(FALSE) in v0.9.0
-                #
-
-                config_update("fixest_startup_msg", previous_version)
-                return(previous_version)
-
-            } else {
-                # The previous version is already posterior to the last message
-                # => no startup message any more
-
-                config_update("fixest_startup_msg", FALSE)
-                return(FALSE)
-            }
-        }
-    }
-
-    # If null, we'll get the value thanks to renvir_get("fixest_startup_msg")
-    # but in some instances, it may be corrupt, so we fix it
-    res = config_get("fixest_startup_msg")
-    if(is.null(res)){
-        # corrupt situation (can occur in dev)
-        config_update("fixest_startup_msg", FALSE)
-        return(FALSE)
-    }
-
-    return(res)
-}
-
-version2num = function(x){
-    sum(as.numeric(strsplit(x, "\\.")[[1]]) * c(1e6, 1e3, 1))
-}
-
-fixest_version = function(){
-    as.character(packageVersion("fixest"))
-}
-
-is_pkg_version = function(x){
-    length(x) == 1 && is.character(x) && length(strsplit(x, "\\.")[[1]]) == 3
-}
-
-is_fixest_used = function(){
-    # To return TRUE:
-    # - fixest in the files
-    # - + file saved > 7 days
-    #
-    # - if fixest but file saved < 7 days, very likely a new project
-
-    # Only level 1 recursivity
-    files = list.files(pattern = "\\.(r|R)$")
-    dirs = c("./", list.dirs(recursive = FALSE))
-    sub_files = unlist(lapply(dirs, list.files, pattern = "\\.(r|R)$", full.names = TRUE))
-    file_extra = if(file.exists(".Rprofile")) ".Rprofile" else NULL
-
-    files = c(files, file_extra, sub_files)
-    files = files[!dir.exists(files)]
-
-    if(length(files) == 0) return(FALSE)
-
-    big_text = lapply(files, readLines, warn = FALSE)
-
-    # we get the files that have fixest in them
-    id_fixest = which(sapply(big_text, function(x) any(grepl("fixest", x, fixed = TRUE))))
-
-    fixest_files = files[id_fixest]
-    if(length(fixest_files) == 0) return(FALSE)
-
-    now = Sys.time()
-
-    for(f in fixest_files){
-        f_created = file.mtime(f)
-        if("POSIXt" %in% class(f_created)){
-            d = as.numeric(difftime(now, f_created, units = "days"))
-            if(d > 7){
-                return(TRUE)
-            }
-        }
-    }
-
-    return(FALSE)
-}
-
-renvir_get = function(key){
-    # Get the values of envir variables
-    # we also evaluate them
-
-    value_raw = Sys.getenv(key)
-
-    if(value_raw == ""){
-        return(NULL)
-    }
-
-    # Any default value should be able to be evaluated "as such"
-    value_clean = gsub("__%%;;", "\n", value_raw)
-    value_clean = gsub("&quot;", '"', value_clean)
-    value_clean = gsub("&apos;", "'", value_clean)
-
-    value = eval(str2lang(value_clean))
-
-    return(value)
-}
-
-find_project_path = function(force = FALSE){
-    # finds the root directory
-    # we just look up the search path to find the root
-    # Only works for Rstudio projects!
-
-    past_path = "init"
-    path = normalizePath(".", "/")
-
-    is_found = FALSE
-    i = 1
-    nmax = 10
-    while(past_path != path && i <= nmax){
-        i = i + 1
-        if(length(list.files(path, pattern = "Rproj$")) > 0){
-            is_found = TRUE
-            break
-        } else {
-            past_path = path
-            path = dirname(path)
-        }
-    }
-
-    proj_path = NULL
-    if(is_found){
-        proj_path = path
-    }
-
-    if(force && is.null(proj_path)){
-        proj_path = normalizePath(".", "/")
-    }
-
-    proj_path
-}
-
-find_renviron = function(path = NULL){
-    # Simply attaches .Renviron to the project path
-
-    if(is.null(path)){
-        proj_path = find_project_path()
-        if(is.null(proj_path)) return(NULL)
-    } else {
-        if(!dir.exists(path)){
-            if(file.exists(path)){
-                path = dirname(path)
-            } else {
-                stop_up("The path provided in 'save' does not exist.", .up = 2)
-            }
-        }
-
-        proj_path = path
-    }
-
-    file.path(proj_path, ".Renviron")
-}
-
-renvir_update = function(key, value){
-    # Updates the .Renviron file
-    # asks permission to the user => avoids messing up their workspace!
-    # I was thinking to add an argument path, given by the user... but in fact no
-    # the .Renviron works only at the Rstudio project level so making the user think
-    # that giving a path for saving would help is misleading, since the .Renviron from
-    # that path very likely wouldn't be loaded
-
-    check_arg(key, "character scalar mbt")
-    check_arg(value, "NULL mbt")
-
-    renv_path = find_renviron()
-
-    if(is.null(renv_path)){
-        message("The 'save' feature only works with Rstudio projects. The root directory of the Rstudio project could not be found: settings cannot be saved at the project level, sorry.")
-        return(NULL)
-    }
-
-    message("To save the settings at the project level 'fixest' needs to update the '.Renviron' file, currently located at:\n\n ", renv_path, "\n\n If the path indeed leads to your current project, do you give persmission? ")
-
-    consent = readline("ok/y/yes to consent:")
-    consent = tolower(trimws(consent))
-
-    if(!consent %in% c("ok", "y", "ye", "yes")){
-        message("aborting save")
-        return(NULL)
-    }
-
-    if(file.exists(renv_path)){
-        file = file(renv_path, "r", encoding = "UTF-8")
-
-        renvir_raw = readLines(file)
-
-        close(file)
-    } else {
-        renvir_raw = ""
-    }
-
-    all_keys = trimws(gsub("=.*", "", renvir_raw))
-
-    do_write = TRUE
-    if(is.null(value)){
-
-        line_to_drop = all_keys == key
-        if(any(line_to_drop)){
-            renvir_raw = renvir_raw[!line_to_drop]
-        } else {
-            do_write = TRUE
-        }
-
-    } else {
-
-        # we need to do some extra legwork... => sys env don't do quotes
-        value_text = paste(deparse(value, width.cutoff = 500), collapse = "\n")
-        value_text = gsub("\n", "__%%;;", value_text)
-        value_text = gsub("\"", "&quot;", value_text)
-        value_text = gsub("'", "&apos;", value_text)
-
-        key_line = all_keys == key
-        renvir_raw = c(renvir_raw[!key_line], paste0(key, " = ", value_text))
-    }
-
-    if(do_write){
-        file = file(renv_path, "w", encoding = "UTF-8")
-
-        renvir_raw = writeLines(renvir_raw, file)
-
-        close(file)
-    }
-
-
-}
-
-find_config_path = function(){
-
-    if(getRversion() < "4.0.0"){
-        return(NULL)
-    }
-
-    dir = tools::R_user_dir("fixest", "config")
-
-    # We create the directory if needed
-    if(!dir.exists(dir)){
-        dir.create(dir, recursive = TRUE)
-    }
-
-    dir = normalizePath(dir, "/")
-
-    file.path(dir, "fixest_config.csv")
-}
-
-
-config_update = function(key, value){
-
-    if(getRversion() < "4.0.0"){
-        return(NULL)
-    }
-
-    path = find_config_path()
-    proj = find_project_path(force = TRUE)
-
-    if(file.exists(path)){
-        data = read.csv(path)
-    } else {
-        data = data.frame(proj = proj, fixest_version = fixest_version(), stringsAsFactors = FALSE)
-    }
-
-    if(!key %in% names(data)){
-        data[[key]] = NA_character_
-    }
-
-    if(!proj %in% data$proj){
-        row = data[1, , drop = FALSE]
-        for(i in 1:ncol(row)) row[1, i] = NA
-        row[1, 1] = proj
-        data = rbind(data, row)
-    }
-
-    i = which(data$proj %in% proj)
-
-    data[["fixest_version"]][i] = fixest_version()
-
-    if(is.null(value)) value = "NULL"
-    data[[key]][i] = as.character(value)
-
-    write.csv(data, path, row.names = FALSE)
-}
-
-config_get = function(key){
-
-    path = find_config_path()
-
-    if(is.null(path) || !file.exists(path)){
-        return(NULL)
-    }
-
-    data = read.csv(path)
-
-    proj = find_project_path(force = TRUE)
-
-    if(!proj %in% data$proj){
-        return(NULL)
-    }
-
-    i = which(data$proj %in% proj)
-
-    value = data[[key]][i]
-
-    if(is.character(value) && value %in% c("NULL", "TRUE", "FALSE")){
-        value = str2lang(value)
-    }
-
-    value
-}
-
 
 #### .................. ####
 #### DOCUMENTATION DATA ####
@@ -12134,7 +7203,7 @@ config_get = function(key){
 #' data(trade)
 #'
 #' @format
-#' \code{trade} is a data frame with 38,325 observations and 6 variables named \code{Destination}, \code{Origin}, \code{Product}, \code{Year}, \code{dist_km} and \code{Euros}.
+#' `trade` is a data frame with 38,325 observations and 6 variables named `Destination`, `Origin`, `Product`, `Year`, `dist_km` and `Euros`.
 #'
 #' \itemize{
 #' \item{Origin: 2-digits codes of the countries of origin of the trade flow.}

@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2022-03-31" />
+<meta name="date" content="2022-10-19" />
 
 <title>Exporting estimation tables</title>
 
@@ -309,13 +309,20 @@ code span.wa { color: #008000; font-weight: bold; } /* Warning */
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -438,7 +445,7 @@ pre code {
 
 <h1 class="title toc-ignore">Exporting estimation tables</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2022-03-31</h4>
+<h4 class="date">2022-10-19</h4>
 
 </div>
 
@@ -490,7 +497,7 @@ standard-errors by <code>Day</code>:</p>
 function <code>etable</code> returns a <code>data.frame</code>. Let’s
 see the output of the previous estimations:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est)</span></code></pre></div>
-<pre><code>#&gt;                                     model 1          model 2         model 3
+<pre><code>#&gt;                                       est.1            est.2           est.3
 #&gt; Dependent Var.:                 Ozone (ppb)      Ozone (ppb)     Ozone (ppb)
 #&gt;                                                                             
 #&gt; Solar Radiation (Langleys) 0.115*** (0.023)   0.052* (0.020) 0.108** (0.033)
@@ -505,7 +512,7 @@ see the output of the previous estimations:</p>
 #&gt; R2                                  0.31974          0.63686         0.58018
 #&gt; Within R2                           0.12245          0.53154         0.12074
 #&gt; 
-#&gt;                                     model 4
+#&gt;                                       est.4
 #&gt; Dependent Var.:                 Ozone (ppb)
 #&gt;                                            
 #&gt; Solar Radiation (Langleys)   0.051* (0.024)
@@ -537,7 +544,7 @@ argument <code>style.df</code> whose input must come from the function
 particular the titles of the sections. Let’s have an example:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est, <span class="at">style.df =</span> <span class="fu">style.df</span>(<span class="at">depvar.title =</span> <span class="st">&quot;&quot;</span>, <span class="at">fixef.title =</span> <span class="st">&quot;&quot;</span>, </span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>                                <span class="at">fixef.suffix =</span> <span class="st">&quot; fixed effect&quot;</span>, <span class="at">yesNo =</span> <span class="st">&quot;yes&quot;</span>))</span></code></pre></div>
-<pre><code>#&gt;                                     model 1          model 2         model 3
+<pre><code>#&gt;                                       est.1            est.2           est.3
 #&gt;                                 Ozone (ppb)      Ozone (ppb)     Ozone (ppb)
 #&gt;                                                                             
 #&gt; Solar Radiation (Langleys) 0.115*** (0.023)   0.052* (0.020) 0.108** (0.033)
@@ -551,7 +558,7 @@ particular the titles of the sections. Let’s have an example:</p>
 #&gt; R2                                  0.31974          0.63686         0.58018
 #&gt; Within R2                           0.12245          0.53154         0.12074
 #&gt; 
-#&gt;                                     model 4
+#&gt;                                       est.4
 #&gt;                                 Ozone (ppb)
 #&gt;                                            
 #&gt; Solar Radiation (Langleys)   0.051* (0.024)
@@ -585,41 +592,41 @@ leveraged. It is then very easy to integrate it into
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est, <span class="at">postprocess.df =</span> pandoc.table.return, <span class="at">style =</span> <span class="st">&quot;rmarkdown&quot;</span>)</span></code></pre></div>
 <pre><code>#&gt; 
 #&gt; 
-#&gt; |             &amp;nbsp;             |     model 1      |     model 2      |
-#&gt; |:------------------------------:|:----------------:|:----------------:|
-#&gt; |      **Dependent Var.:**       |   Ozone (ppb)    |   Ozone (ppb)    |
-#&gt; |                                |                  |                  |
-#&gt; | **Solar Radiation (Langleys)** | 0.115*** (0.023) |  0.052* (0.020)  |
-#&gt; |      **Wind Speed (mph)**      |                  | -3.11*** (0.799) |
-#&gt; |        **Temperature**         |                  | 1.88*** (0.367)  |
-#&gt; |       **Fixed-Effects:**       | ---------------- | ---------------- |
-#&gt; |           **Month**            |       Yes        |       Yes        |
-#&gt; |            **Day**             |        No        |        No        |
-#&gt; | **__________________________** | ________________ | ________________ |
-#&gt; |      **S.E.: Clustered**       |     by: Day      |     by: Day      |
-#&gt; |        **Observations**        |       111        |       111        |
-#&gt; |             **R2**             |     0.31974      |     0.63686      |
-#&gt; |         **Within R2**          |     0.12245      |     0.53154      |
+#&gt; |           &amp;nbsp;           |      est.1       |      est.2       |
+#&gt; |:--------------------------:|:----------------:|:----------------:|
+#&gt; |      Dependent Var.:       |   Ozone (ppb)    |   Ozone (ppb)    |
+#&gt; |                            |                  |                  |
+#&gt; | Solar Radiation (Langleys) | 0.115*** (0.023) |  0.052* (0.020)  |
+#&gt; |      Wind Speed (mph)      |                  | -3.11*** (0.799) |
+#&gt; |        Temperature         |                  | 1.88*** (0.367)  |
+#&gt; |       Fixed-Effects:       | ---------------- | ---------------- |
+#&gt; |           Month            |       Yes        |       Yes        |
+#&gt; |            Day             |        No        |        No        |
+#&gt; | __________________________ | ________________ | ________________ |
+#&gt; |      S.E.: Clustered       |     by: Day      |     by: Day      |
+#&gt; |        Observations        |       111        |       111        |
+#&gt; |             R2             |     0.31974      |     0.63686      |
+#&gt; |         Within R2          |     0.12245      |     0.53154      |
 #&gt; 
 #&gt; Table: Table continues below
 #&gt; 
 #&gt;  
 #&gt; 
-#&gt; |             &amp;nbsp;             |     model 3     |     model 4      |
-#&gt; |:------------------------------:|:---------------:|:----------------:|
-#&gt; |      **Dependent Var.:**       |   Ozone (ppb)   |   Ozone (ppb)    |
-#&gt; |                                |                 |                  |
-#&gt; | **Solar Radiation (Langleys)** | 0.108** (0.033) |  0.051* (0.024)  |
-#&gt; |      **Wind Speed (mph)**      |                 | -3.29*** (0.778) |
-#&gt; |        **Temperature**         |                 | 2.05*** (0.242)  |
-#&gt; |       **Fixed-Effects:**       | --------------- | ---------------- |
-#&gt; |           **Month**            |       Yes       |       Yes        |
-#&gt; |            **Day**             |       Yes       |       Yes        |
-#&gt; | **__________________________** | _______________ | ________________ |
-#&gt; |      **S.E.: Clustered**       |     by: Day     |     by: Day      |
-#&gt; |        **Observations**        |       111       |       111        |
-#&gt; |             **R2**             |     0.58018     |     0.81604      |
-#&gt; |         **Within R2**          |     0.12074     |     0.61471      |</code></pre>
+#&gt; |      est.3      |      est.4       |
+#&gt; |:---------------:|:----------------:|
+#&gt; |   Ozone (ppb)   |   Ozone (ppb)    |
+#&gt; |                 |                  |
+#&gt; | 0.108** (0.033) |  0.051* (0.024)  |
+#&gt; |                 | -3.29*** (0.778) |
+#&gt; |                 | 2.05*** (0.242)  |
+#&gt; | --------------- | ---------------- |
+#&gt; |       Yes       |       Yes        |
+#&gt; |       Yes       |       Yes        |
+#&gt; | _______________ | ________________ |
+#&gt; |     by: Day     |     by: Day      |
+#&gt; |       111       |       111        |
+#&gt; |     0.58018     |     0.81604      |
+#&gt; |     0.12074     |     0.61471      |</code></pre>
 <p>What did it do? First, it called the function
 <code>pandoc.table.return</code> from within <code>etable</code>.
 Second, the argument <code>style</code> is not from <code>etable</code>
@@ -646,20 +653,20 @@ from <code>etable</code>:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est[<span class="at">rhs =</span> <span class="dv">2</span>], <span class="at">style =</span> <span class="st">&quot;rmarkdown&quot;</span>, <span class="at">caption =</span> <span class="st">&quot;New default values&quot;</span>)</span></code></pre></div>
 <pre><code>#&gt; 
 #&gt; 
-#&gt; |             &amp;nbsp;             |     model 1      |     model 2      |
-#&gt; |:------------------------------:|:----------------:|:----------------:|
-#&gt; |                                |   Ozone (ppb)    |   Ozone (ppb)    |
-#&gt; |                                |                  |                  |
-#&gt; | **Solar Radiation (Langleys)** |  0.052* (0.020)  |  0.051* (0.024)  |
-#&gt; |      **Wind Speed (mph)**      | -3.11*** (0.799) | -3.29*** (0.778) |
-#&gt; |        **Temperature**         | 1.88*** (0.367)  | 2.05*** (0.242)  |
-#&gt; |     **Month fixed effect**     |       yes        |       yes        |
-#&gt; |      **Day fixed effect**      |                  |       yes        |
-#&gt; | **__________________________** | ________________ | ________________ |
-#&gt; |      **S.E.: Clustered**       |     by: Day      |     by: Day      |
-#&gt; |        **Observations**        |       111        |       111        |
-#&gt; |             **R2**             |     0.63686      |     0.81604      |
-#&gt; |         **Within R2**          |     0.53154      |     0.61471      |
+#&gt; |           &amp;nbsp;           |  est[rhs = 2].1  |  est[rhs = 2].2  |
+#&gt; |:--------------------------:|:----------------:|:----------------:|
+#&gt; |                            |   Ozone (ppb)    |   Ozone (ppb)    |
+#&gt; |                            |                  |                  |
+#&gt; | Solar Radiation (Langleys) |  0.052* (0.020)  |  0.051* (0.024)  |
+#&gt; |      Wind Speed (mph)      | -3.11*** (0.799) | -3.29*** (0.778) |
+#&gt; |        Temperature         | 1.88*** (0.367)  | 2.05*** (0.242)  |
+#&gt; |     Month fixed effect     |       yes        |       yes        |
+#&gt; |      Day fixed effect      |                  |       yes        |
+#&gt; | __________________________ | ________________ | ________________ |
+#&gt; |      S.E.: Clustered       |     by: Day      |     by: Day      |
+#&gt; |        Observations        |       111        |       111        |
+#&gt; |             R2             |     0.63686      |     0.81604      |
+#&gt; |         Within R2          |     0.53154      |     0.61471      |
 #&gt; 
 #&gt; Table: New default values</code></pre>
 </div>
@@ -805,7 +812,7 @@ compute the VCOV matrix.</p>
 <span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a><span class="fu">setFixest_etable</span>(<span class="at">reset =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Now we display the results with the new fit statistics</span></span>
 <span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(est, <span class="at">fitstat =</span> <span class="sc">~</span> . <span class="sc">+</span> p_s <span class="sc">+</span> p_h <span class="sc">+</span> p_day <span class="sc">+</span> p_month)</span></code></pre></div>
-<pre><code>#&gt;                                       model 1            model 2
+<pre><code>#&gt;                                         est.1              est.2
 #&gt; Dependent Var.:                   Ozone (ppb)        Ozone (ppb)
 #&gt;                                                                 
 #&gt; Solar Radiation (Langleys) 0.1148*** (0.0234)   0.0522* (0.0202)
@@ -824,7 +831,7 @@ compute the VCOV matrix.</p>
 #&gt; pvalue (Day)                             3e-5            0.01468
 #&gt; pvalue (Month)                        0.06066            0.26992
 #&gt; 
-#&gt;                                      model 3            model 4
+#&gt;                                        est.3              est.4
 #&gt; Dependent Var.:                  Ozone (ppb)        Ozone (ppb)
 #&gt;                                                                
 #&gt; Solar Radiation (Langleys) 0.1078** (0.0329)   0.0509* (0.0236)

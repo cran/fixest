@@ -1,7 +1,7 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.10.4
+Version: 0.11.0
 Authors@R: 
     c(person(given = "Laurent",
              family = "Berge",
@@ -31,13 +31,13 @@ URL: https://lrberge.github.io/fixest/,
 SystemRequirements: C++11
 VignetteBuilder: knitr
 LazyData: true
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.0
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2022-03-31 13:01:23 UTC; berge028
+Packaged: 2022-10-19 20:48:08 UTC; lrberge
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb],
   Grant McDermott [ctb] (<https://orcid.org/0000-0001-7883-8573>)
 Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2022-03-31 23:10:02 UTC
+Date/Publication: 2022-10-19 21:25:06 UTC
