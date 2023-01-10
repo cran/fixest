@@ -1,4 +1,4 @@
-## ----setup, include=FALSE-----------------------------------------------------
+## ----setup, include = FALSE---------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, 
                       eval = TRUE,
                       comment = "#>")
@@ -17,7 +17,7 @@ summary(gravity, vcov = "twoway")
 # Two-way clustered SEs, without small sample correction
 summary(gravity, vcov = "twoway", ssc = ssc(adj = FALSE, cluster.adj = FALSE))
 
-## ---- echo = FALSE------------------------------------------------------------
+## ---- include = FALSE---------------------------------------------------------
 is_plm = requireNamespace("plm", quietly = TRUE)
 
 if(!is_plm){
@@ -25,6 +25,9 @@ if(!is_plm){
     cat("Evaluation of the next chunks requires 'plm' which is not installed.")
 } else {
     knitr::opts_chunk$set(eval = TRUE)
+    
+    library(plm)
+    library(sandwich)
 }
 
 
@@ -112,17 +115,16 @@ rbind(se_plm_DK,
       se(est_feols, vcov = DK ~ ssc(adj = FALSE, cluster.adj = FALSE)))
 
 
-## ---- eval = TRUE, echo = FALSE-----------------------------------------------
+## ---- include = FALSE---------------------------------------------------------
 is_lfe = requireNamespace("lfe", quietly = TRUE)
 if(!is_lfe){
   cat("The evaluation of the next chunks of code require the package 'lfe' which is not available.")
+} else {
+    # avoids ugly startup messages popping + does not require the use of the not very elegant suppressPackageStartupMessages
+    library(lfe)
 }
 
-## ---- eval = is_lfe, include = FALSE------------------------------------------
-# avoids ugly startup messages popping + does not require the use of the not very elegant suppressPackageStartupMessages
-library(lfe)
-
-## ---- eval = is_lfe && is_plm, warning = FALSE--------------------------------
+## ---- eval = is_lfe, warning = FALSE------------------------------------------
 library(lfe)
 
 # lfe: clustered by firm
