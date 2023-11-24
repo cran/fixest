@@ -37,10 +37,8 @@
 #' To add only the variables with varying slopes and not the fixed-effect, use double square brackets: `fixef_var[[var1, var2]]`.
 #'
 #' In other words:
-#' \itemize{
-#'   \item `fixef_var[var1, var2]` is equivalent to `fixef_var + fixef_var[[var1]] + fixef_var[[var2]]`
-#'   \item `fixef_var[[var1, var2]]` is equivalent to `fixef_var[[var1]] + fixef_var[[var2]]`
-#' }
+#' * `fixef_var[var1, var2]` is equivalent to `fixef_var + fixef_var[[var1]] + fixef_var[[var2]]`
+#' * `fixef_var[[var1, var2]]` is equivalent to `fixef_var[[var1]] + fixef_var[[var2]]`
 #'
 #' In general, for convergence reasons, it is recommended to always add the fixed-effect and avoid using only the variable with varying slope (i.e. use single square brackets).
 #'
@@ -167,7 +165,7 @@
 #'
 #' @references
 #'
-#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13)).
+#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://github.com/lrberge/fixest/blob/master/_DOCS/FENmlm_paper.pdf)).
 #'
 #' For models with multiple fixed-effects:
 #'
@@ -2140,7 +2138,7 @@ feols.fit = function(y, X, fixef_df, vcov, offset, split, fsplit, split.keep, sp
 #'
 #' @references
 #'
-#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13)).
+#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://github.com/lrberge/fixest/blob/master/_DOCS/FENmlm_paper.pdf)).
 #'
 #' For models with multiple fixed-effects:
 #'
@@ -3091,7 +3089,7 @@ feglm.fit = function(y, X, fixef_df, family = "gaussian", vcov, offset, split,
 #'
 #' @references
 #'
-#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13)).
+#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://github.com/lrberge/fixest/blob/master/_DOCS/FENmlm_paper.pdf)).
 #'
 #' For models with multiple fixed-effects:
 #'
@@ -3389,7 +3387,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit, split
 #'
 #' @references
 #'
-#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://wwwen.uni.lu/content/download/110162/1299525/file/2018_13)).
+#' Berge, Laurent, 2018, "Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package FENmlm." CREA Discussion Papers, 13 ([](https://github.com/lrberge/fixest/blob/master/_DOCS/FENmlm_paper.pdf)).
 #'
 #' For models with multiple fixed-effects:
 #'
@@ -3946,7 +3944,7 @@ feNmlm = function(fml, data, family=c("poisson", "negbin", "logit", "gaussian"),
 #' Instead of `est_env`, you could use directly `fixest` estimations too, like `feols`, since they accept the `env` argument. The function `est_env` is only here to add a bit of generality to avoid the trouble to the user to write conditions (look at the source, it's just a one liner).
 #'
 #' Objects of main interest in the environment are:
-#' \itemize{
+#' \describe{
 #' \item{lhs}{The left hand side, or dependent variable.}
 #' \item{linear.mat}{The matrix of the right-hand-side, or explanatory variables.}
 #' \item{iv_lhs}{The matrix of the endogenous variables in IV regressions.}

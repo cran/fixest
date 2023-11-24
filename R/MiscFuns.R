@@ -3011,9 +3011,11 @@ rep.fixest_list = function(x, times = 1, each = 1, vcov, ...){
 }
 
 
-#### ................. ####
-#### Internal Funs     ####
+#### ------------- ####
+#### Internal Funs ####
 ####
+
+
 
 as.character.formula = function(x, ...) as.character.default(x, ...)
 
@@ -5214,26 +5216,36 @@ fixest_pvalue = function(x, zvalue, vcov){
     pvalue
 }
 
-fixest_CI_factor = function(x, level, vcov){
+fixest_CI_factor = function(x, level, vcov = NULL, df.t = NULL){
 
     val = (1 - level) / 2
     val = c(val, 1 - val)
 
     if(use_t_distr(x)){
+        
+        if(missing(vcov) && missing(df.t)){
+            stop("Internal error (=bug): the arguments `vcov` and `df.t` ",
+                 "should not be both missing in fixest_CI_factor().")
 
-        if(missing(vcov)) {
-            stop("Internal error (=bug): the argument `vcov` should not be missing in fixest_CI_factor().")
+        } 
+        
+        if(!missing(df.t)){
+            if(!is.numeric(df.t) && !length(df.t) == 1){
+                stop("Internal error (=bug): the arguments `df.t` ",
+                     "should be numeric in fixest_CI_factor().")
+            }
+        } else {
+            if(is.null(attr(vcov, "dof.K"))){
+                stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
+            }
 
-        } else if(is.null(attr(vcov, "dof.K"))){
-            stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
+            # df.t is always an attribute of the vcov
+            df.t = attr(vcov, "df.t")
+            if(is.null(df.t)){
+                df.t = max(nobs(x) - attr(vcov,"dof.K"), 1)
+            }
         }
-
-        # df.t is always an attribute of the vcov
-        df.t = attr(vcov, "df.t")
-        if(is.null(df.t)){
-            df.t = max(nobs(x) - attr(vcov,"dof.K"), 1)
-        }
-
+        
         fact = qt(val, df.t)
 
     } else {
@@ -5244,9 +5256,11 @@ fixest_CI_factor = function(x, level, vcov){
 }
 
 
-#### ................. ####
+#### --------------- ####
 #### Small Utilities ####
 ####
+
+
 
 escape_regex = function(x){
     # escape special characters in regular expressions => to make it as "fixed"
@@ -6733,10 +6747,29 @@ char_to_vars = function(x){
     rev(res)
 }
 
+not_too_many_messages = function(key){
+    # we don't proc in less than 2 seconds
+    # avoid ugly looping issues
+    all_times = getOption("fixest_all_timings")
+    old_time = all_times[[key]]
+    if(is.null(old_time) || as.numeric(Sys.time() - old_time) > 2){
+        if(is.null(all_times)){
+            all_times = list()
+        }
+        all_times[[key]] = Sys.time()
+        options(fixest_all_timings = all_times)
+        return(TRUE)
+    }
+    
+    FALSE
+}
 
-#### ............... ####
+
+#### --------------- ####
 #### Setters/Getters ####
 ####
+
+
 
 #' Sets/gets whether to display notes in `fixest` estimation functions
 #'
@@ -6790,13 +6823,16 @@ getFixest_notes = function(){
 #' @examples
 #'
 #' # Gets the current number of threads
-#' getFixest_nthreads()
+#' (nthreads_origin = getFixest_nthreads())
 #'
 #' # To set multi-threading off:
 #' setFixest_nthreads(1)
 #'
-#' # To set it back to default:
+#' # To set it back to default at startup:
 #' setFixest_nthreads()
+#' 
+#' # And back to the original value
+#' setFixest_nthreads(nthreads_origin)
 #'
 #'
 setFixest_nthreads = function(nthreads, save = FALSE){
@@ -7105,7 +7141,7 @@ getFixest_fml = function(){
 #' @inheritParams feNmlm
 #' @inheritParams feglm
 #'
-#' @param reset Logical, default to `FALSE`. Whether to reset all values.
+#' @param reset Logical scalar, default is `FALSE`. Whether to reset all values.
 #'
 #' @return
 #' The function `getFixest_estimation` returns the currently set global defaults.
@@ -7205,15 +7241,13 @@ getFixest_estimation = function(){
 #' @format
 #' `trade` is a data frame with 38,325 observations and 6 variables named `Destination`, `Origin`, `Product`, `Year`, `dist_km` and `Euros`.
 #'
-#' \itemize{
-#' \item{Origin: 2-digits codes of the countries of origin of the trade flow.}
-#' \item{Destination: 2-digits codes of the countries of destination of the trade flow.}
-#' \item{Products: Number representing the product categories (from 1 to 20).}
-#' \item{Year: Years from 2007 to 2016}
-#' \item{dist_km: Geographic distance in km between the centers of the countries of origin and destination.}
-#' \item{Euros: The total amount in euros of the trade flow for the specific year/product category/origin-destination country pair.}
+#' * Origin: 2-digits codes of the countries of origin of the trade flow.
+#' * Destination: 2-digits codes of the countries of destination of the trade flow.
+#' * Products: Number representing the product categories (from 1 to 20).
+#' * Year: Years from 2007 to 2016
+#' * dist_km: Geographic distance in km between the centers of the countries of origin and destination.
+#' * Euros: The total amount in euros of the trade flow for the specific year/product category/origin-destination country pair.
 #'
-#' }
 #'
 #' @source
 #' This data has been extrated from Eurostat on October 2017.

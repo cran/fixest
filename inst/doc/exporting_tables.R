@@ -28,6 +28,12 @@ etable(est)
 etable(est, style.df = style.df(depvar.title = "", fixef.title = "", 
                                 fixef.suffix = " fixed effect", yesNo = "yes"))
 
+## ---- eval = !is_pander, include = !is_pander---------------------------------
+#  # NOTE:
+#  # The evaluation of the code of this section requires the
+#  #   package 'pander' which is not installed.
+#  # The code output is not reported.
+
 ## ---- eval = is_pander--------------------------------------------------------
 library(pander)
 
@@ -49,11 +55,11 @@ etable(est, est_slopes, tex = TRUE)
 
 ## ---- include = FALSE---------------------------------------------------------
 # etable(est, est_slopes, file = "../_VIGNETTES/vignette_etable.tex", replace = TRUE)
-# etable(est, est_slopes, file = "../_VIGNETTES/vignette_etable.tex", style.tex = style.tex("aer"), fitstat = ~ r2 + n, signifCode = NA)
+# etable(est, est_slopes, file = "../_VIGNETTES/vignette_etable.tex", style.tex = style.tex("aer"), fitstat = ~ r2 + n, signif.code = NA)
 
 ## ---- results = 'hide'--------------------------------------------------------
 etable(est, est_slopes, style.tex = style.tex("aer"), 
-       signifCode = NA, fitstat = ~ r2 + n, tex = TRUE)
+       signif.code = NA, fitstat = ~ r2 + n, tex = TRUE)
 
 ## -----------------------------------------------------------------------------
 set_rules = function(x, heavy, light){
