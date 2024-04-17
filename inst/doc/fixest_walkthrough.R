@@ -18,7 +18,7 @@ library(fixest)
 data(trade)
 
 
-## ---- echo=FALSE, results='asis'----------------------------------------------
+## ----echo=FALSE, results='asis'-----------------------------------------------
 tab = head(trade)
 knitr::kable(tab)
 
@@ -31,13 +31,13 @@ print(gravity_pois)
 ## -----------------------------------------------------------------------------
 summary(gravity_pois, vcov = "twoway")
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  # Three ways to summon clustering on the Product variable
 #  summary(gravity_pois, vcov = ~Product)
 #  summary(gravity_pois, cluster = "Product")
 #  summary(gravity_pois, cluster = ~Product)
 
-## ---- eval = TRUE-------------------------------------------------------------
+## ----eval = TRUE--------------------------------------------------------------
 summary(gravity_pois, cluster = ~Product)
 
 ## -----------------------------------------------------------------------------
@@ -56,11 +56,11 @@ gravity_ols = feols(log(Euros) ~ log(dist_km) | Origin + Destination + Product +
 gravity_negbin = fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product + Year, trade)
 
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  etable(gravity_pois, gravity_negbin, gravity_ols,
 #           vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
 
-## ---- echo=FALSE, results='asis'----------------------------------------------
+## ----echo=FALSE, results='asis'-----------------------------------------------
 tab = etable(gravity_pois, gravity_negbin, gravity_ols, vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
 # problem to display the second empty line in markdown
 knitr::kable(tab[-2, ])
@@ -72,10 +72,10 @@ for(i in 0:3){
 	gravity_subfe[[i+1]] = fepois(Euros ~ log(dist_km), trade, fixef = all_FEs[0:i])
 }
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  etable(gravity_subfe, cluster = ~Origin+Destination)
 
-## ---- echo=FALSE, results='asis'----------------------------------------------
+## ----echo=FALSE, results='asis'-----------------------------------------------
 tab = etable(gravity_subfe, cluster = ~Origin+Destination)
 knitr::kable(tab)
 
@@ -86,7 +86,7 @@ res_multi = fepois(Euros ~ log(dist_km) | csw0(Year, Destination, Origin), trade
 # with two-way clustered SEs
 etable(res_multi, cluster = ~Origin+Destination, tex = TRUE)
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  # we set the dictionary once and for all
 #  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
 #  # 1st export: we change the signif code and drop the intercept
@@ -106,7 +106,7 @@ summary(fixedEffects)
 ## -----------------------------------------------------------------------------
 fixedEffects$Year
 
-## ---- fig.width=7-------------------------------------------------------------
+## ----fig.width=7--------------------------------------------------------------
 plot(fixedEffects)
 
 ## -----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ est = feols(y ~ x1, base_did)
 # Note that there is partial matching enabled (newey = newey_west)
 summary(est, newey ~ id + period)
 
-## ---- error=TRUE--------------------------------------------------------------
+## ----error=TRUE---------------------------------------------------------------
 summary(est, "newey_west")
 
 ## -----------------------------------------------------------------------------
@@ -237,18 +237,18 @@ res_i3 = feols(Ozone ~ Solar.R + i(Month, keep = 5:6), airquality)
 etable(res_i1, res_i2, res_i3, dict = c("6" = "June", "Month::5" = "May"), 
        order = c("Int|May", "Mon"))
 
-## ---- eval = TRUE-------------------------------------------------------------
+## ----eval = TRUE--------------------------------------------------------------
 # Sample data illustrating the DiD
 data(base_did)
 head(base_did)
 
-## ---- eval = TRUE-------------------------------------------------------------
+## ----eval = TRUE--------------------------------------------------------------
 # Estimation of treatment × period effects
 # We also add individual and period fixed-effects:
 est_did = feols(y ~ x1 + i(period, treat, 5) | id + period, base_did)
 est_did
 
-## ---- fig.width=7-------------------------------------------------------------
+## ----fig.width=7--------------------------------------------------------------
 iplot(est_did)
 
 ## -----------------------------------------------------------------------------
@@ -256,9 +256,9 @@ data(base_stagg)
 
 head(base_stagg)
 
-## ---- echo=FALSE--------------------------------------------------------------
+## ----echo=FALSE---------------------------------------------------------------
 if(requireNamespace("ggplot2", quietly = TRUE)){
-  library(ggplot2)
+  suppressWarnings(library(ggplot2))
   ggplot(aggregate(base_stagg[, c('year_treated', 'treatment_effect_true')], 
                    by = list(year = base_stagg$year, group = to_integer(base_stagg$year_treated)), 
                    mean), 
@@ -358,7 +358,7 @@ est2 = feols(f(y) ~ l(x1, -1:1), pdat)
 est_sub = feols(y ~ l(x1, 0:1), pdat[!pdat$period %in% c(2, 4)])
 etable(est1, est2, est_sub, order = "f", drop = "Int")
 
-## ---- eval = is_DT------------------------------------------------------------
+## ----eval = is_DT-------------------------------------------------------------
 library(data.table)
 pdat_dt = panel(as.data.table(base_did), ~id+period)
 # we create a lagged value of the variable x1
@@ -373,7 +373,7 @@ base_lag = base_did
 base_lag$x1.l1 = lag(x1 ~ id + period, 1, base_lag)
 head(base_lag)
 
-## ---- eval = is_DT------------------------------------------------------------
+## ----eval = is_DT-------------------------------------------------------------
 library(data.table)
 base_lag_dt = as.data.table(base_did)
 # we create a lagged value of the variable x1
@@ -414,7 +414,7 @@ coef(result_NL_fe)
 rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  # Sample of results:
 #  # 1 nthreads: 3.13s
 #  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 1))

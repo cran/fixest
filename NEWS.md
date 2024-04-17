@@ -1,4 +1,87 @@
 
+# fixest 0.12.0
+
+## New features
+
+- **the demeaning algorithm has been reworked!** The code has been condensed and four new parameters have been introduced to control the details of how the algorithm works. The new default values should lead to quicker convergence in general (for difficult cases). The new function `demeaning_algo` gives the user fine control over the internal parameters of the algorithm.
+
+- all estimation functions gain the argument `data.save`. If `TRUE`, the data set used for the estimation is saved in the returned object. This ensures the consistency of post-processing (like fit statistics, predict, update, etc) even if the original data has been modified in the meantime. Suggestion by Vincent Arel-Bundock, #340
+
+- new function `fixest_data` to access the original data set used at estimation-time. Suggestion by Kyle Butts, #465
+
+- new method `df.residual.fixest`. Suggestion by @rferrali, #455
+
+- now the `vcov` method inherits the small sample correction and type of VCOV used in the original estimation. Thanks to @mgoplerud, #356
+
+- new function `n_models` to identify the length of a dimension of a multiple estimation. This facilitates the manipulation of multiple estimations programmatically:
+```R
+base = setNames(iris, c("y", "x1", "x2", "x3", "species"))
+est = feols(y ~ csw(x1, x2, x3), base, fsplit = ~species)
+
+# We can obtain the unique number of RHSs/samples with `n_models`
+n_models(est, rhs = TRUE)
+#> [1] 3
+n_models(est, sample = TRUE)
+#> [1] 4
+
+all_tables = list()
+for(i in 1:n_models(est, sample = TRUE)){
+  all_tables[[i]] = etable(est[sample = i])
+}
+do.call(rbind, all_tables)
+# ... the output is too long to be displayed here
+```
+
+- `fixest` is now compatible with [`emmeans`](https://github.com/rvlenth/emmeans) thanks to the contribution of Russell Lenth (#454).
+
+## Bugs
+
+- fix bug when the covariance matrix was *very* ill-defined. Thanks to Gianluca Russo.
+
+- pass correctly `nthreads` to `summary` when the VCOV is provided at estimation time. Thanks to @arcruz0, #379.
+
+- fix bug in the function `demean` when a formula is passed as argument and the data was in the form of a `data.table`. Reported by Patrick Baylis, with help from Kyle Butts, #433
+
+- fix bug when an `offset` was used in the context of multiple outcomes. Reported by @etiennebacher, #405
+
+- fix bug in the `collinearity` function. Reported by @grlju, #412
+
+- fix bug which allowed the estimation of models with variables from the environment while it shouldn't
+
+- fix bug in the demeaning code when the data set in input is of length 1. Reported by @da-zar with help of @etiennebacher, #283
+
+- fix bug in `predict` when the `offset` was placed in a formula and not passed as a regular argument. Reported by @jl-flores, #309
+
+- fix bug in TSLS estimations when the formula contained multiple LHS to be expanded with the dot square bracket operator. Reported by @svraka, #395
+
+- fix bug leading to the absence of warning when the convergence of the demeaning algorithm failed. Thanks to @ja-ortiz-uniandes, #323
+
+- fix bug in IV estimation when all exogenous variables were removed because of collinearity with the fixed-effects. Thanks to @Oravishayrizi, #371
+
+- fix bug in `update.fixest` when no FEs were used in the initial estimation and one wanted to add FEs. Reported by @hughjonesd, #475
+
+- fix bug `update.fixest`: single estimations extracted from multiple estimations can now be updated individually. Note however that if `split` was used in the main estimation, the subsample does not carry trhough (this limitation will be fixed later).
+ 
+## Improvements
+
+- functions `vcov` gains the argument `vcov_fix` to monitor whether to fix the covariance matrix with an eigenvalue decomposition (previously this was always turned on).
+
+- in estimations, the algorithm now allows to use scalars from the environment which are non numeric. Thanks to @kennchua and @kylebutts, #426
+
+- improve error messages in `iplot`. 
+
+- improve speed of the function `fixef.fixest` in the presence of varying slopes. PR of @etiennebacher, #390
+
+- the subsetting of multiple estimations does not error any more when the index used was not relevant in the multiple estimation (provided its value is equal to 1)
+
+- new method `update.fixest_multi`.
+
+## Documentation
+
+- fix typos and display issues thanks to: @statzhero, @eyayaw, @etiennebacher, @raffaem.
+
+- add missing documentation of `mvsw`, thanks to @grantmcdermott, #425
+
 # fixest 0.11.2
 
 ## Bugs
@@ -1034,7 +1117,7 @@ Common methods have been extended to `fixest_multi` objects.
 
   - Improve error messages. 
   
-  - `hatvalues.fixest`: now returns an error instead of a message when fixed-effects are present (it makes the interplay with `sadnwich` 'nicer').
+  - `hatvalues.fixest`: now returns an error instead of a message when fixed-effects are present (it makes the interplay with `sandwich` 'nicer').
 
 # fixest 0.8.4
 

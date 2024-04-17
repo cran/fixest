@@ -17,7 +17,7 @@ summary(gravity, vcov = "twoway")
 # Two-way clustered SEs, without small sample correction
 summary(gravity, vcov = "twoway", ssc = ssc(adj = FALSE, cluster.adj = FALSE))
 
-## ---- eval = TRUE, include = FALSE--------------------------------------------
+## ----eval = TRUE, include = FALSE---------------------------------------------
 is_plm = requireNamespace("plm", quietly = TRUE)
 
 if(!is_plm){
@@ -31,7 +31,7 @@ if(!is_plm){
 }
 
 
-## ---- eval = !is_plm, include = !is_plm---------------------------------------
+## ----eval = !is_plm, include = !is_plm----------------------------------------
 #  # NOTE:
 #  # Evaluation of the next chunks requires the package 'plm' which is not installed.
 #  # The code output is not reported.
@@ -120,7 +120,7 @@ rbind(se_plm_DK,
       se(est_feols, vcov = DK ~ ssc(adj = FALSE, cluster.adj = FALSE)))
 
 
-## ---- eval = TRUE, include = FALSE--------------------------------------------
+## ----eval = TRUE, include = FALSE---------------------------------------------
 is_lfe = requireNamespace("lfe", quietly = TRUE)
 is_lfe_plm = is_lfe && is_plm
 if(is_lfe){
@@ -128,7 +128,7 @@ if(is_lfe){
     library(lfe)
 }
 
-## ---- eval = !is_lfe_plm, include = !is_lfe_plm, echo = FALSE-----------------
+## ----eval = !is_lfe_plm, include = !is_lfe_plm, echo = FALSE------------------
 #  if(!is_lfe){
 #    cat("The evaluation of the next chunks of code requires the package 'lfe' which is not installed")
 #  } else {
@@ -136,7 +136,7 @@ if(is_lfe){
 #      "\nThe code output is not reported.")
 #  }
 
-## ---- eval = is_lfe_plm, warning = FALSE--------------------------------------
+## ----eval = is_lfe_plm, warning = FALSE---------------------------------------
 library(lfe)
 
 # lfe: clustered by firm
