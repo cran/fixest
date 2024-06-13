@@ -4020,7 +4020,6 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
 
   # Are there factors NOT in i()? If so => model.matrix is used
   dataNames = names(data)
-
   if(!is.null(mf)){
     useModel.matrix = TRUE
   } else {
@@ -4050,6 +4049,13 @@ fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALS
       # case i() + anything that requires evaluation based on the raw data (poly, factor, etc)
       # is there any drawback?
       fml = formula(mf)
+      if(length(fml) == 3){
+        # bug R 3.5.0
+        fml_new = update(fml, .~xxxxxx + .)
+        fml_new[[3]][[2]] = fml[[2]]
+        fml_new[[2]] = NULL
+        fml = fml_new
+      }
     }
 
     linear.mat = stats::model.matrix(fml, mf)
@@ -4187,6 +4193,10 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml,
   I_IGNORE_ERRORS = TRUE
 
   new_matrix = fixest_model_matrix(fml, newdata, fake_intercept, i_noref, mf = mf)
+  
+  if(R.Version()$major == "3"){
+    colnames(new_matrix) = gsub("`", "", colnames(new_matrix), fixed = TRUE)
+  }
 
   if(length(GLOBAL_fixest_mm_info) > 0){
     attr(new_matrix, "model_matrix_info") = GLOBAL_fixest_mm_info
@@ -5780,7 +5790,7 @@ format_nber_single = function(x, digits, round = FALSE, pow_above = 10, pow_belo
     }
   }
 
-  exponent = floor(log10(abs(x)))
+  exponent = if(x == 0) -16 else floor(log10(abs(x)))
 
   if(exponent >= pow_above || exponent <= pow_below){
     left_value = round(x*10**-exponent, min(digits, 2))
@@ -6441,8 +6451,11 @@ error_sender = function(expr, ..., clean, up = 0, arg_name){
           from = clean
           to = ""
         }
+        
+        err = gsub(from, to, err)
+        call_error = gsub(from, to, call_error)
 
-        stop_up(msg, "\n  ", call_error, gsub(from, to, err))
+        stop_up(msg, "\n  ", call_error, err)
       } else {
         stop_up(msg, "\n  ", call_error, err)
       }
@@ -6527,7 +6540,8 @@ fixest_fml_rewriter = function(fml){
     }
 
     lhs_all = error_sender(expand_lags_internal(lhs_names),
-                 "Problem in the formula regarding lag/leads: ", clean = "__expand")
+                           "Problem in the formula regarding lag/leads: ", 
+                           clean = "__expand")
 
     if(length(lhs_all) > 1){
       lhs_fml = paste("c(", paste(lhs_all, collapse = ","), ")")
@@ -6564,7 +6578,8 @@ fixest_fml_rewriter = function(fml){
       rhs_text = "1"
     } else {
       rhs_terms = error_sender(expand_lags_internal(rhs_terms),
-                   "Problem in the formula regarding lag/leads: ", clean = "__expand")
+                               "Problem in the formula regarding lag/leads: ", 
+                               clean = "__expand")
 
       if(attr(terms(fml_rhs), "intercept") == 0){
         rhs_terms = c("-1", rhs_terms)
@@ -6612,7 +6627,8 @@ fixest_fml_rewriter = function(fml){
 
             fixef_terms = attr(terms(fml_fixef), "term.labels")
             fixef_text = error_sender(expand_lags_internal(fixef_terms),
-                          "Problem in the formula regarding lag/leads: ", clean = "__expand")
+                                      "Problem in the formula regarding lag/leads: ", 
+                                      clean = "__expand")
 
             if(do_sub){
               fixef_text = gsub(" %^% ", "^", fixef_text, fixed = TRUE)

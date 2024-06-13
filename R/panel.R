@@ -229,13 +229,13 @@ panel_setup = function(data, panel.id, time.step = NULL, duplicate.method = "non
 
 
 #' @describeIn l Forwards a variable (inverse of lagging) in a `fixest` estimation
-f = function(x, lead = 1, fill = NA){
-  l(x, -lead, fill)
+f = function(x, k = 1, fill = NA){
+  l(x, -k, fill)
 }
 
 #' @describeIn l Creates differences (i.e. x - lag(x)) in a `fixest` estimation
-d = function(x, lag = 1, fill = NA){
-  x - l(x, lag, fill)
+d = function(x, k = 1, fill = NA){
+  x - l(x, k, fill)
 }
 
 
@@ -246,10 +246,9 @@ d = function(x, lag = 1, fill = NA){
 #' the function [`panel`] or with the argument `panel.id` in the estimation).
 #'
 #' @param x The variable.
-#' @param lag A vector of integers giving the number of lags. Negative values lead to leads. 
-#' This argument can be a vector when using it in fixest estimations. When creating variables in 
-#' a [`data.table::data.table`], it **must** be of length one.
-#' @param lead A vector of integers giving the number of leads. Negative values lead to lags. 
+#' @param k A vector of integers giving the number of lags (for `l()` and `d()`) or 
+#' leads (for `f()`). For `l()` and `d()` negative values lead to leads. For `f()` 
+#' negative values lead to lags.
 #' This argument can be a vector when using it in fixest estimations. When creating variables in 
 #' a [`data.table::data.table`], it **must** be of length one.
 #' @param fill A scalar, default is `NA`. How to fill the missing values due to the lag/lead? 
@@ -295,7 +294,7 @@ d = function(x, lag = 1, fill = NA){
 #'
 #'
 #'
-l = function(x, lag = 1, fill = NA){
+l = function(x, k = 1, fill = NA){
 
   value = x
 
@@ -318,7 +317,7 @@ l = function(x, lag = 1, fill = NA){
 
     if(fl_authorized){
       # Further control
-      check_arg(lag, "integer scalar", 
+      check_arg(k, "integer scalar", 
                 .message = "When creating lags (or leads) within a data.table with l() (or f()), the argument 'lag' must be a single integer.")
 
       check_arg(fill, "NA | scalar")
@@ -340,7 +339,8 @@ l = function(x, lag = 1, fill = NA){
       # we fetch the panel information
       i = 2
       sysEval = sys.parent(i)
-      while(sysEval != 0 && !grepl("[.data.table", deparse(sys.call(sysEval)[[1]])[1], fixed = TRUE)){
+      while(sysEval != 0 && !grepl("[.data.table", deparse(sys.call(sysEval)[[1]])[1], 
+                                   fixed = TRUE)){
         i = i + 1
         sysEval = sys.parent(i)
       }
@@ -354,12 +354,22 @@ l = function(x, lag = 1, fill = NA){
       # I don't understand why but the frame numbers got messed up when
       # variables are created within a function
 
-      var = sys.call(sysEval)$x
+      # I need deparse for it to work with R 3.5.0
+      var = deparse(sys.call(sysEval)$x)[1]
 
-      m = NULL
+      data_fixest_panel = NULL
       up = 0
-      while(is.null(m) && sys.parent(i + up) != 0){
-        try(m <- eval(var, parent.frame(i + up)), silent = TRUE)
+      while(!inherits(data_fixest_panel, "fixest_panel") && 
+              sys.parent(i + up) != 0){
+        if(exists(var, envir = parent.frame(i + up), mode = "list")){
+          # bug #500 => more robust way to get the panel data set
+          data_fixest_panel = get(var, envir = parent.frame(i + up), 
+                                  mode = "list")
+        } else {
+          try(data_fixest_panel <- eval(var, parent.frame(i + up)), 
+              silent = TRUE)
+        }
+        
         up = up + 1
       }
 
@@ -367,11 +377,11 @@ l = function(x, lag = 1, fill = NA){
         stop("We tried to lag a variable but the data set could not be fetched. This is an internal error to 'fixest'. It could be interesting to report this bug.")
       }
 
-      if(!"fixest_panel" %in% class(m)){
-        stop("You can use l() or f() only when the data set is of class 'fixest_panel', you can use function panel() to set it.")
+      if(!"fixest_panel" %in% class(data_fixest_panel)){
+        stopi("It seems l(), d() or f() has been called within a `fixest_panel` which is also a `data_table`.\nUnfortunately we could not get the data set.\nThis is an internal error: Could you report?")
       }
 
-      meta_info = attr(m, "panel_info")
+      meta_info = attr(data_fixest_panel, "panel_info")
     } else {
       stop("Function l() (or f()) is only callable within 'fixest' estimations or within a variable creation with data.table (i.e. using ':=') where the data set is a 'fixest_panel' (obtained from panel()). Alternatively, you can use lag.formula().")
     }
@@ -383,7 +393,7 @@ l = function(x, lag = 1, fill = NA){
     stop("Internal error: lengths of the individuals and the time vectors are different.")
   }
 
-  obs_lagged = cpp_lag_obs(id = meta_info$id_sorted, time = meta_info$time_sorted, nlag = lag)
+  obs_lagged = cpp_lag_obs(id = meta_info$id_sorted, time = meta_info$time_sorted, nlag = k)
 
   # the lagged value => beware of NAs in IDs!
   if(meta_info$na_flag){
@@ -925,14 +935,14 @@ unpanel = function(x){
 #' }
 #'
 #'
-"[.fixest_panel" = function(x, i, j, ...){
+`[.fixest_panel` = function(x, i, j, ...){
   # we need to perform proper bookkeeping
 
   info = attr(x, "panel_info")
   mc = match.call()
 
   IS_DT = FALSE
-  if("data.table" %in% class(x) && requireNamespace("data.table", quietly=TRUE)){
+  if("data.table" %in% class(x) && requireNamespace("data.table", quietly = TRUE)){
     IS_DT = TRUE
     # data.table is really hard to handle....
     # Not very elegant... but that's life!
@@ -964,7 +974,10 @@ unpanel = function(x){
       assign("[.data.table", asNamespace("data.table")[["[.data.table"]], my_frame)
       eval(mc_new, my_frame)
 
-      return(invisible(TRUE))
+      # what a pain...
+      out = TRUE
+      class(out) = c("fixest", "dummy_print")
+      return(out)
     } else {
 
       x_dt = data.table::copy(x)

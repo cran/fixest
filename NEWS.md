@@ -1,4 +1,28 @@
 
+# fixest 0.12.1
+
+## Major bugs affecting R versions <= 4.1.2
+
+- require `stringmagic` version >= 1.1.2 to fix several major bugs affecting R versions <= 4.1.2
+
+## Bugs
+
+- fix bug leading to CRAN error (in IV with fixed-effects and no exogenous variable)
+
+- fix display bug in errors regarding lead/lag problems in fixest estimations.
+
+- fix bug when arguments lead or lag in functions l/f were given explicitly in fixest estimations. Reported by @MaelAstruc, #499
+
+- remove the diplay of `TRUE` when creating lags/leads in `data.table`.
+
+- fix bug when creating lead/lags in `data.table`s and the name of the data set was equal to the name of a function. Reported by @kmfrick, #500
+
+- fix several bugs affecting R version 3.5.0
+
+- fix bug in `etable` when variables appeared in the statistics and those variables contained invalid Latex characters. PR by @MaelAstruc, #508
+
+- fix formatting for coefficients/statistics equal to 0. Reported by @MaelAstruc, #504
+
 # fixest 0.12.0
 
 ## New features

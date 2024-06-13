@@ -91,7 +91,13 @@
 #'
 #'
 print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
-
+  
+  if(inherits(x, "dummy_print")){
+    # This is a hack to avoid print when lags are created in data.tables
+    # ex: pdat_dt[, x1_l1 := d(x1)]
+    return(invisible())
+  }
+  
   # checking the arguments
   if(is_user_level_call()){
     validate_dots(suggest_args = c("n", "type", "vcov"),
@@ -206,7 +212,6 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
   }
 
   if(isTRUE(x$iv)){
-    glue = function(...) paste(..., collapse = ", ")
     first_line = sma("TSLS estimation - Dep. Var.: {as.character(x$fml)[[2]]}\n",
                      "                  Endo.    : {', 'c ? get_vars(x$iv_endo_fml)}\n",
                      "                  Instr.   : {', 'c ? x$iv_inst_names}\n")
@@ -217,7 +222,6 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
     sep_value = if(nchar(half_line) + nchar(depvar_name) <= 60) ", " else "\n"
     cat(half_line, sep_value, "Dep. Var.: ", depvar_name, "\n", sep="")
   }
-
 
   catma("Observations: {n ? x$nobs}\n")
 
@@ -2798,6 +2802,7 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
         }
       }
     }
+    
 
     var_keep = intersect(names(coef), colnames(matrix_linear))
     value_linear = value_linear + as.vector(matrix_linear[, var_keep, drop = FALSE] %*% coef[var_keep])
