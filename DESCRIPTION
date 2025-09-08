@@ -1,7 +1,7 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.12.1
+Version: 0.13.2
 Authors@R: 
     c(person(given = "Laurent",
              family = "Berge",
@@ -18,12 +18,16 @@ Authors@R:
        person(given = "Russell",
              family = "Lenth",
              role = "ctb",
-             email = "russell-lenth@uiowa.edu"))
+             email = "russell-lenth@uiowa.edu"),
+      person(given = "Kyle",
+             family = "Butts",
+             role = "ctb",
+             email = "buttskyle96@gmail.com"))
 Imports: stats, graphics, grDevices, tools, utils, methods, numDeriv,
         nlme, sandwich, Rcpp(>= 1.0.5), dreamerr(>= 1.4.0),
-        stringmagic(>= 1.1.2)
+        stringmagic(>= 1.2.0)
 Suggests: knitr, rmarkdown, data.table, plm, MASS, pander, ggplot2,
-        lfe, tinytex, pdftools, emmeans, estimability, AER
+        lfe, tinytex, pdftools, emmeans, estimability, AER, Matrix
 LinkingTo: Rcpp
 Depends: R(>= 3.5.0)
 Description: Fast and user-friendly estimation of econometric models with multiple fixed-effects. Includes ordinary least squares (OLS), generalized linear models (GLM) and the negative binomial.
@@ -35,14 +39,15 @@ URL: https://lrberge.github.io/fixest/,
         https://github.com/lrberge/fixest
 VignetteBuilder: knitr
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2.9000
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2024-06-12 06:31:49 UTC; lrberge
+Packaged: 2025-09-05 09:44:37 UTC; berge028
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb],
-  Grant McDermott [ctb] (<https://orcid.org/0000-0001-7883-8573>),
-  Russell Lenth [ctb]
+  Grant McDermott [ctb] (ORCID: <https://orcid.org/0000-0001-7883-8573>),
+  Russell Lenth [ctb],
+  Kyle Butts [ctb]
 Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2024-06-13 07:40:02 UTC
+Date/Publication: 2025-09-08 07:30:02 UTC

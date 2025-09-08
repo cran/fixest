@@ -1,4 +1,4 @@
-## ----setup, include=FALSE-----------------------------------------------------
+## ----setup, include=FALSE---------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, comment = "#>")
 
 is_pander = requireNamespace("pander", quietly = TRUE)
@@ -8,7 +8,7 @@ library(fixest)
 setFixest_notes(FALSE)
 setFixest_etable(digits = 3)
 
-## ----eval = TRUE, results = "hide"--------------------------------------------
+## ----eval = TRUE, results = "hide"------------------------------------------------------
 library(fixest)
 data(airquality)
 
@@ -16,52 +16,52 @@ data(airquality)
 setFixest_dict(c(Ozone = "Ozone (ppb)", Solar.R = "Solar Radiation (Langleys)",
                  Wind = "Wind Speed (mph)", Temp = "Temperature"))
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 # On multiple estimations: see the dedicated vignette
 est = feols(Ozone ~ Solar.R + sw0(Wind + Temp) | csw(Month, Day), 
             airquality, cluster = ~Day)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 etable(est)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 etable(est, style.df = style.df(depvar.title = "", fixef.title = "", 
                                 fixef.suffix = " fixed effect", yesNo = "yes"))
 
-## ----eval = !is_pander, include = !is_pander----------------------------------
-#  # NOTE:
-#  # The evaluation of the code of this section requires the
-#  #   package 'pander' which is not installed.
-#  # The code output is not reported.
+## ----eval = !is_pander, include = !is_pander--------------------------------------------
+# NOTE:
+# The evaluation of the code of this section requires the 
+#   package 'pander' which is not installed.
+# The code output is not reported.
 
-## ----eval = is_pander---------------------------------------------------------
-library(pander)
+## ----eval = is_pander-------------------------------------------------------------------
+#  library(pander)
+#  
+#  etable(est, postprocess.df = pandoc.table.return, style = "rmarkdown")
 
-etable(est, postprocess.df = pandoc.table.return, style = "rmarkdown")
+## ----eval = is_pander-------------------------------------------------------------------
+#  my_style = style.df(depvar.title = "", fixef.title = "",
+#                      fixef.suffix = " fixed effect", yesNo = "yes")
+#  setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)
 
-## ----eval = is_pander---------------------------------------------------------
-my_style = style.df(depvar.title = "", fixef.title = "", 
-                    fixef.suffix = " fixed effect", yesNo = "yes")
-setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)
+## ----eval = is_pand, eval = is_pander---------------------------------------------------
+#  etable(est[rhs = 2], style = "rmarkdown", caption = "New default values")
 
-## ----eval = is_pand, eval = is_pander-----------------------------------------
-etable(est[rhs = 2], style = "rmarkdown", caption = "New default values")
-
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 est_slopes = feols(Ozone ~ Solar.R + Wind | Day + Month[Temp], airquality)
 
-## ----results = 'hide'---------------------------------------------------------
+## ----results = 'hide'-------------------------------------------------------------------
 etable(est, est_slopes, tex = TRUE)
 
-## ----include = FALSE----------------------------------------------------------
+## ----include = FALSE--------------------------------------------------------------------
 # etable(est, est_slopes, file = "../_VIGNETTES/vignette_etable.tex", replace = TRUE)
 # etable(est, est_slopes, file = "../_VIGNETTES/vignette_etable.tex", style.tex = style.tex("aer"), fitstat = ~ r2 + n, signif.code = NA)
 
-## ----results = 'hide'---------------------------------------------------------
+## ----results = 'hide'-------------------------------------------------------------------
 etable(est, est_slopes, style.tex = style.tex("aer"), 
        signif.code = NA, fitstat = ~ r2 + n, tex = TRUE)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 set_rules = function(x, heavy, light){
   # x: the character vector returned by etable
   
@@ -80,17 +80,17 @@ set_rules = function(x, heavy, light){
   x
 }
 
-## ----results = 'hide'---------------------------------------------------------
+## ----results = 'hide'-------------------------------------------------------------------
 etable(est, est_slopes, postprocess.tex = set_rules, heavy = "0.14em", tex = TRUE)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 setFixest_etable(style.tex = style.tex("aer", signif.code = NA), postprocess.tex = set_rules, 
                  fitstat = ~ r2 + n)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 etable(est, heavy = "0.14em", tex = TRUE)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------
 fitstat_register(type = "p_s", alias = "pvalue (standard)",
                  fun = function(x) pvalue(x, vcov = "iid")["Solar.R"])
 
@@ -108,6 +108,6 @@ setFixest_etable(reset = TRUE)
 # Now we display the results with the new fit statistics
 etable(est, fitstat = ~ . + p_s + p_h + p_day + p_month)
 
-## ----eval = FALSE-------------------------------------------------------------
+## ----eval = FALSE-----------------------------------------------------------------------
 #  summary(.l(est, est_slopes), cluster = ~ Month)
 

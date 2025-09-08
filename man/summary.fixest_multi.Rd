@@ -6,12 +6,11 @@
 \usage{
 \method{summary}{fixest_multi}(
   object,
-  type = "short",
+  type = "etable",
   vcov = NULL,
   se = NULL,
   cluster = NULL,
   ssc = NULL,
-  .vcov = NULL,
   stage = 2,
   lean = FALSE,
   n = 1000,
@@ -22,8 +21,10 @@
 \item{object}{A \code{fixest_multi} object, obtained from a \code{fixest} estimation leading to
 multiple results.}
 
-\item{type}{A character either equal to \code{"short"}, \code{"long"}, \code{"compact"}, \code{"se_compact"}
-or \code{"se_long"}. If \code{short}, only the table of coefficients is displayed for each estimation.
+\item{type}{A character either equal to \code{"etable"}, \code{"short"}, \code{"long"},
+\code{"compact"}, \code{"se_compact"} or \code{"se_long"}.
+If \code{etable}, the function \code{\link{etable}} is used to print the result.
+If \code{short}, only the table of coefficients is displayed for each estimation.
 If \code{long}, then the full results are displayed for each estimation. If \code{compact},
 a \code{data.frame} is returned with one line per model and the formatted
 coefficients + standard-errors in the columns. If \code{se_compact}, a \code{data.frame} is
@@ -31,7 +32,7 @@ returned with one line per model, one numeric column for each coefficient and on
 column for each standard-error. If \code{"se_long"}, same as \code{"se_compact"} but the data is in a
 long format instead of wide.}
 
-\item{vcov, .vcov}{Versatile argument to specify the VCOV. In general, it is either a character
+\item{vcov}{Versatile argument to specify the VCOV. In general, it is either a character
 scalar equal to a VCOV type, either a formula of the form: \code{vcov_type ~ variables}. The
 VCOV types implemented are: "iid", "hetero" (or "HC1"), "cluster", "twoway",
 "NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley". It also accepts
@@ -61,8 +62,8 @@ the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{stage}{Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object
 is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1}
@@ -95,7 +96,7 @@ names(base) = c("y", "x1", "x2", "x3", "species")
 # Multiple estimation
 res = feols(y ~ csw(x1, x2, x3), base, split = ~species)
 
-# By default, the type is "short"
+# By default, the type is "etable"
 # You can still use the arguments from summary.fixest
 summary(res, se = "hetero")
 

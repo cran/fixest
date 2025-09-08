@@ -241,7 +241,7 @@ collinearity = function(x, verbose){
 
     } else {
 
-      isIntercept = attr(terms(x$fml),"intercept")
+      isIntercept = attr(terms(x$fml), "intercept")
 
       if(isIntercept && any(constant_id[-1])){
         var_problem = colnames(linear_mat_noIntercept)[constant_id[-1]]
@@ -752,7 +752,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
       if(all(!is_num)){
         stop("Function cannot be performed: not any numeric variable.")
       } else if(length(pblm) > 0){
-        message("NOTE: The variable", enumerate_items(pblm, "s.is"), " removed because they are non-numeric.")
+        mema("NOTE: The variable{$s, enum.bq, is ? pblm} removed because {$(it;they), is} non-numeric.")
       }
 
       mat_vars = as.matrix(mat_vars[, is_num, FALSE])
@@ -764,7 +764,7 @@ did_means = function(fml, base, treat_var, post_var, tex = FALSE, treat_dict,
       all_vars = all.vars(fml_x)
       pblm = setdiff(all_vars, names(base))
       if(length(pblm) > 0){
-        stop("The variable", enumerate_items(pblm, "s.is"), " not in the data set (", deparse_short(substitute(base)), ").")
+        stopi("The variable{$s, enum.bq, is ? pblm} not in the data set (", deparse_short(substitute(base)), ").")
       }
 
       # Evaluation control
@@ -1336,7 +1336,7 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
   }
 
   #
-  # QUFing + NA
+  # Indexing + NA
   #
 
   if(IS_INTER){
@@ -1450,7 +1450,7 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
     items_name = items
   }
 
-  if(FROM_FIXEST){
+  if(FROM_FIXEST || is_sparse){
     # Pour avoir des jolis noms c'est un vrai gloubiboulga,
     # mais j'ai pas trouve plus simple...
     if(IS_INTER_FACTOR){
@@ -1475,6 +1475,7 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
   }
 
   if(is_sparse){
+    
     # Internal call: we return the row ids + the values + the indexes + the names
 
     if(length(who_is_dropped) > 0){
@@ -1487,8 +1488,18 @@ i = function(factor_var, var, ref, keep, bin, ref2, keep2, bin2, ...){
     fe_colid = to_integer(fe_num[valid_row], sorted = TRUE)
 
     values = if(length(var) == 1) rep(1, length(valid_row)) else var
+
+    # Clean names
+    
+    # make it compatible with did2s < 1.0.2
+    old_did2s = isNamespaceLoaded("did2s") && packageVersion("did2s") <= package_version("1.0.2")
+    if(!old_did2s){
+      col_names = sub("^.*__CLEAN__", "", col_names)
+    }
+    
+
     res = list(rowid = which(valid_row), values = values,
-           colid = fe_colid, col_names = col_names)
+               colid = fe_colid, col_names = col_names)
 
     class(res) = "i_sparse"
 
@@ -1580,36 +1591,48 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #'
 #' @inheritParams setFixest_fml
 #'
-#' @param fml A formula containing macros variables. Each macro variable must start with two dots. 
+#' @param fml A formula containing macros variables. Each macro variable must start 
+#' with two dots. 
 #' The macro variables can be set globally using `setFixest_fml`, or can be defined in `...`. 
 #' Special macros of the form `..("regex")` can be used to fetch, through a regular expression, 
-#' variables directly in a character vector (or in column names) given in the argument `data` (note 
-#' that the algorithm tries to "guess" the argument data when nested in function calls \[see 
-#' example\]). You can negate the regex by starting with a `"!"`. Square brackets have a special 
-#' meaning: Values in them are evaluated and parsed accordingly. Example: `y~x.[1:2] + z.[i]` will 
-#' lead to `y~x1+x2+z3` if `i==3`. You can trigger the auto-completion of variables by using the 
-#' `'..'` suffix, like in `y ~ x..` which would include `x1` and `x2`, etc. See examples.
-#' @param add Either a character scalar or a one-sided formula. The elements will be added to the 
-#' right-hand-side of the formula, before any macro expansion is applied.
-#' @param lhs If present then a formula will be constructed with `lhs` as the full left-hand-side. 
+#' variables directly in a character vector (or in column names) given in the 
+#' argument `data` (note that the algorithm tries to "guess" the argument data when 
+#' nested in function calls \[see example\]). 
+#' You can negate the regex by starting with a `"!"`. Square brackets have a special 
+#' meaning: Values in them are evaluated and parsed accordingly. 
+#' Example: `y~x.[1:2] + z.[i]` will 
+#' lead to `y~x1+x2+z3` if `i==3`. You can trigger the auto-completion of variables 
+#' by using the `'..'` suffix, like in `y ~ x..` 
+#' which would include `x1` and `x2`, etc. See examples.
+#' @param add A character vector or a one-sided formula. 
+#' The elements will be added to the right-hand-side of the formula, 
+#' before any macro expansion is applied.
+#' @param add.after_pipe A character vector or a one-sided or two-sided formula. 
+#' The elements will be added to the right-hand-side of the formula, just after a pipe (`|`), 
+#' before any macro expansion is applied.
+#' @param lhs If present then a formula will be constructed with `lhs` as 
+#' the full left-hand-side. 
 #' The value of `lhs` can be a one-sided formula, a call, or a character vector. Note that the 
 #' macro variables wont be applied. You can use it in combination with the argument `rhs`. Note 
 #' that if `fml` is not missing, its LHS will be replaced by `lhs`.
 #' @param rhs If present, then a formula will be constructed with `rhs` as the full 
-#' right-hand-side. The value of `rhs` can be a one-sided formula, a call, or a character vector. 
-#' Note that the macro variables wont be applied. You can use it in combination with the argument 
+#' right-hand-side. The value of `rhs` can be a one-sided formula, a call, 
+#' or a character vector. 
+#' Note that the macro variables wont be applied. You can use it in combination 
+#' with the argument 
 #' `lhs`. Note that if `fml` is not missing, its RHS will be replaced by `rhs`.
 #' @param data Either a character vector or a data.frame. This argument will only be used if a 
 #' macro of the type `..("regex")` is used in the formula of the argument `fml`. If so, any 
 #' variable name from `data` that matches the regular expression will be added to the formula.
-#' @param frame The environment containing the values to be expanded with the dot square bracket 
-#' operator. Default is `parent.frame()`.
+#' @param frame The environment containing the values to be expanded with the 
+#' dot square bracket operator. Default is `parent.frame()`.
 #'
 #' @details
 #' In `xpd`, the default macro variables are taken from `getFixest_fml`. Any value in the `...` 
 #' argument of `xpd` will replace these default values.
 #'
-#' The definitions of the macro variables will replace in verbatim the macro variables. Therefore, 
+#' The definitions of the macro variables will replace in verbatim the macro variables. 
+#' Therefore, 
 #' you can include multi-part formulas if you wish but then beware of the order of the macros 
 #' variable in the formula. For example, using the `airquality` data, say you want to set as 
 #' controls the variable `Temp` and `Day` fixed-effects, you can do 
@@ -1619,26 +1642,29 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #'
 #' @section Dot square bracket operator in formulas:
 #'
-#' In a formula, the dot square bracket (DSB) operator can: i) create manifold variables at once, 
-#' or ii) capture values from the current environment and put them verbatim in the formula.
+#' In a formula, the dot square bracket (DSB) operator can: i) create manifold variables 
+#' at once, or ii) capture values from the current environment and put them 
+#' verbatim in the formula.
 #'
 #' Say you want to include the variables `x1` to `x3` in your formula. You can use 
 #' `xpd(y ~ x.[1:3])` and you'll get `y ~ x1 + x2 + x3`.
 #'
-#' To summon values from the environment, simply put the variable in square brackets. For example: 
-#' `for(i in 1:3) xpd(y.[i] ~ x)` will create the formulas `y1 ~ x` to `y3 ~ x` depending on the 
-#' value of `i`.
+#' To summon values from the environment, simply put the variable in square brackets. 
+#' For example: 
+#' `for(i in 1:3) xpd(y.[i] ~ x)` will create the formulas `y1 ~ x` to `y3 ~ x` 
+#' depending on the value of `i`.
 #'
 #' You can include a full variable from the environment in the same way: 
 #' `for(y in c("a", "b")) xpd(.[y] ~ x)` will create the two formulas `a ~ x` and `b ~ x`.
 #'
 #' The DSB can even be used within variable names, but then the variable must be nested in 
 #' character form. For example `y ~ .["x.[1:2]_sq"]` will create `y ~ x1_sq + x2_sq`. Using the 
-#' character form is important to avoid a formula parsing error. Double quotes must be used. Note 
-#' that the character string that is nested will be parsed with the function [`dsb`], and thus it 
-#' will return a vector.
+#' character form is important to avoid a formula parsing error. 
+#' Double quotes must be used. Note that the character string that is nested will 
+#' be parsed with the function [`dsb`], and thus it will return a vector.
 #'
-#' By default, the DSB operator expands vectors into sums. You can add a comma, like in `.[, x]`, 
+#' By default, the DSB operator expands vectors into sums. You can add a comma, 
+#' like in `.[, x]`, 
 #' to expand with commas--the content can then be used within functions. For instance: 
 #' `c(x.[, 1:2])` will create `c(x1, x2)` (and *not* `c(x1 + x2)`).
 #'
@@ -1647,33 +1673,36 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #' One-sided formulas can be expanded with the DSB operator: let `x = ~sepal + petal`, then 
 #' `xpd(y ~ .[x])` leads to `color ~ sepal + petal`.
 #'
-#' You can even use multiple square brackets within a single variable, but then the use of nesting 
-#' is required. For example, the following `xpd(y ~ .[".[letters[1:2]]_.[1:2]"])` will create
+#' You can even use multiple square brackets within a single variable, 
+#' but then the use of nesting is required. 
+#' For example, the following `xpd(y ~ .[".[letters[1:2]]_.[1:2]"])` will create
 #'  `y ~ a_1 + b_2`. Remember that the nested character string is parsed with [`dsb`], 
 #' which explains this behavior.
 #'
-#' When the element to be expanded i) is equal to the empty string or, ii) is of length 0, it is 
-#' replaced with a neutral element, namely `1`. For example, `x = "" ; xpd(y ~ .[x])` leads to
-#'  `y ~ 1`.
+#' When the element to be expanded i) is equal to the empty string or, 
+#' ii) is of length 0, it is replaced with a neutral element, namely `1`. 
+#' For example, `x = "" ; xpd(y ~ .[x])` leads to `y ~ 1`.
 #'
 #' @section Regular expressions:
 #'
 #' You can catch several variable names at once by using regular expressions. To use regular 
 #' expressions, you need to enclose it in the dot-dot or the regex function: `..("regex")` or 
-#' `regex("regex")`. For example, `regex("Sepal")` will catch both the variables `Sepal.Length` and 
-#' `Sepal.Width` from the `iris` data set. In a `fixest` estimation, the variables names from which 
-#' the regex will be applied come from the data set. If you use `xpd`, you need to provide either a 
-#' data set or a vector of names in the argument `data`.
+#' `regex("regex")`. For example, `regex("Sepal")` will catch both the variables 
+#' `Sepal.Length` and `Sepal.Width` from the `iris` data set. 
+#' In a `fixest` estimation, the variables names from which the regex will 
+#' be applied come from the data set. If you use `xpd`, you need to provide 
+#' either a data set or a vector of names in the argument `data`.
 #'
-#' By default the variables are aggregated with a sum. For example in a data set with the variables 
-#' x1 to x10, `regex("x(1|2)"` will yield `x1 + x2 + x10`. You can instead ask for "comma" 
+#' By default the variables are aggregated with a sum. For example in a data set 
+#' with the variables x1 to x10, `regex("x(1|2)"` will yield 
+#' `x1 + x2 + x10`. You can instead ask for "comma" 
 #' aggregation by using a comma first, just before the regular expression: 
 #' `y ~ sw(regex(,"x(1|2)"))` would lead to `y ~ sw(x1, x2, x10)`.
 #'
 #' Note that the dot square bracket operator (DSB, see before) is applied before the regular 
-#' expression is evaluated. This means that `regex("x.[3:4]_sq")` will lead, after evaluation of 
-#' the DSB, to `regex("x3_sq|x4_sq")`. It is a handy way to insert range of numbers in a regular 
-#' expression.
+#' expression is evaluated. This means that `regex("x.[3:4]_sq")` will lead, 
+#' after evaluation of the DSB, to `regex("x3_sq|x4_sq")`. 
+#' It is a handy way to insert range of numbers in a regular expression.
 #'
 #'
 #' @return
@@ -1804,6 +1833,16 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #'
 #' # only adds to the RHS
 #' xpd(y ~ x, add = ~bon + jour)
+#' 
+#' #
+#' # argument add.after_pipe
+#' #
+#' 
+#' xpd(~x1, add.after_pipe = ~ x2 + x3)
+#' 
+#' # we can add a two sided formula
+#' xpd(~x1, add.after_pipe = x2 ~ x3)
+#' 
 #'
 #' #
 #' # Dot square bracket operator
@@ -1886,7 +1925,8 @@ i_noref = function(factor_var, var, ref, bin, keep, ref2, keep2, bin2){
 #' lm(xpd(Armed.Forces ~ Population + GN..), longley)
 #'
 #'
-xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame()){
+xpd = function(fml, ..., add = NULL, lhs = NULL, rhs = NULL, add.after_pipe = NULL, 
+               data = NULL, frame = parent.frame()){
 
   if(MISSNULL(data)){
     # We "guess" the data
@@ -1900,15 +1940,17 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
     }
   }
 
-  .xpd(fml = fml, ..., add = add, lhs = lhs, rhs = rhs, data = data, 
+  .xpd(fml = fml, ..., add = add, lhs = lhs, rhs = rhs, 
+       add.after_pipe = add.after_pipe, data = data, 
        check = TRUE, macro = TRUE, frame = frame)
 }
 
-.xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, check = FALSE, 
+.xpd = function(fml, ..., add = NULL, lhs = NULL, rhs = NULL, 
+                add.after_pipe = NULL, data = NULL, check = FALSE, 
                 macro = FALSE, frame = .GlobalEnv){
 
-  is_lhs = !missing(lhs)
-  is_rhs = !missing(rhs)
+  is_lhs = !missnull(lhs)
+  is_rhs = !missnull(rhs)
   if(is_lhs || is_rhs){
 
     if(check) check_arg(fml, .type = "formula", .up = 1)
@@ -1947,7 +1989,7 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
     # Now, without macro variables, speed is at 30us while it was 20us before
     # so in .xpd => macro argument
 
-  } else if(!missing(add)){
+  } else if(!missnull(add) || !missnull(add.after_pipe)){
 
     if(check){
       check_arg(fml, .type = "NULL formula", .up = 1)
@@ -1955,8 +1997,11 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
 
     if(missnull(fml)){
       fml = ~ 1
-      fml[[2]] = value2stringCall(add, call = TRUE, check = check)
-      add = NULL
+      
+      if(!missnull(add)){
+        fml[[2]] = value2stringCall(add, call = TRUE, check = check)
+        add = NULL
+      }
 
       attr(fml, ".Environment") = frame
     }
@@ -1966,15 +2011,34 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
   }
 
 
-  if(!missnull(add)){
+  if(!missnull(add) || !missnull(add.after_pipe)){
     # Direct formula manipulation is too complicated (and I want to avoid ugly parentheses)
     # by string it's easy
     fml_dp = deparse_long(fml)
-
-    add_txt = value2stringCall(add, call = FALSE, check = check)
-    add_txt = gsub("^~", "", add_txt)
-
-    fml = as.formula(paste0(fml_dp, "+", add_txt), frame)
+    
+    add_txt = ""
+    if(!missnull(add)){
+      add = value2stringCall(add, call = FALSE, check = check)
+      if(grepl("^~", add)){
+        add = gsub("^~", "", add)
+      }
+      
+      add_txt = paste0(" + ", add)
+    }
+    
+    if(!missnull(add.after_pipe)){
+      if(inherits(add.after_pipe, "formula") && length(add.after_pipe) == 3){
+        add.after_pipe = deparse_long(add.after_pipe)
+      } else {
+        add.after_pipe = value2stringCall(add.after_pipe, call = FALSE, check = check)
+      }
+      
+      add_txt = paste0(add_txt, " | ", add.after_pipe)
+    }
+    
+    
+    fml = as.formula(paste0(fml_dp, add_txt), frame)
+    
   }
 
   macros = parse_macros(..., from_xpd = TRUE, check = check, frame = frame)
@@ -2155,6 +2219,7 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
 #' User-level access to internal demeaning algorithm of `fixest`.
 #' 
 #' @inheritParams feols
+#' @inheritParams model.matrix.fixest
 #' @inheritSection feols Varying slopes
 #'
 #' @param X A matrix, vector, data.frame or a list OR a formula OR a [`feols`] estimation. If equal 
@@ -2180,6 +2245,15 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
 #' formula, in which case `data` is mandatory.
 #' @param weights Vector, can be missing or NULL. If present, it must contain the same number of 
 #' observations as in `X`.
+#' @param sample Character scalar equal to "estimation" (default) or "original". Only
+#' used when the argument `X` is a `fixest` estimation. 
+#' 
+#' By default, only the observations used in the estimation are demeaned. This will 
+#' return a matrix with the same number of rows as the number of observations in
+#' the estimation. You can safely use the resulting matrix to recompute the coefficients 
+#' from the estimation 'by hand'.
+#' 
+#' To demean all the observations of the original sample, use `sample="original"`.
 #' @param nthreads Number of threads to be used. By default it is equal to `getFixest_nthreads()`.
 #' @param notes Logical, whether to display a message when NA values are removed. By default it is 
 #' equal to `getFixest_notes()`.
@@ -2294,6 +2368,7 @@ xpd = function(fml, ..., add = NULL, lhs, rhs, data = NULL, frame = parent.frame
 #'
 #'
 demean = function(X, f, slope.vars, slope.flag, data, weights,
+                  sample = "estimation",
                   nthreads = getFixest_nthreads(), notes = getFixest_notes(),
                   iter = 2000, tol = 1e-6, 
                   fixef.reorder = TRUE, fixef.algo = NULL,
@@ -2330,6 +2405,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
     check_arg(iter, "integer scalar GE{1}")
     check_arg(tol, "numeric scalar GT{0}")
     check_arg(notes, "logical scalar")
+    check_set_arg(sample, "match(original, estimation)")
     check_arg("NULL class(demeaning_algo)", fixef.algo)
 
     validate_dots(valid_args = "fe_info", stop = TRUE)
@@ -2360,6 +2436,13 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
       # Otherwise => we create data and X: formula
       data = fetch_data(X)
+      
+      if(sample == "estimation"){
+        for(obs in X$obs_selection){
+          data = data[obs, , drop = FALSE]
+        }
+      }
+      
       fml_linear = X$fml_all$linear
       fml_fixef = X$fml_all$fixef
 
@@ -2647,13 +2730,12 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
   # Unclassing fes
   #
 
-  quf_info_all = cpp_quf_table_sum(x = f, y = 0, do_sum_y = FALSE, rm_0 = FALSE,
-                                      rm_1 = FALSE, rm_single = FALSE, do_refactor = FALSE,
-                                      r_x_sizes = 0, obs2keep = 0, only_slope = slope.flag < 0L,
-                                      nthreads = nthreads)
+  all_index_info = cpp_index_table_sum(fixef_list = f, y = 0, save_sum_y = FALSE, rm_0 = FALSE,
+                                       rm_1 = FALSE, rm_single = FALSE, 
+                                       only_slope = slope.flag < 0L, nthreads = nthreads)
 
   # table/sum_y/sizes
-  fixef_table = quf_info_all$table
+  fixef_table = all_index_info$table
   fixef_sizes = lengths(fixef_table)
 
   if(fixef.reorder){
@@ -2661,7 +2743,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
     if(is.unsorted(new_order)){
       fixef_table = fixef_table[new_order]
       fixef_sizes = fixef_sizes[new_order]
-      quf_info_all$quf = quf_info_all$quf[new_order]
+      all_index_info$index = all_index_info$index[new_order]
 
       # We reorder slope.vars only if needed (because it is a pain)
       if(sum(slope.flag != 0) >= 2){
@@ -2728,7 +2810,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
   vars_demean = cpp_demean(y, X, weights, iterMax = iter,
                            diffMax = tol, r_nb_id_Q = fixef_sizes,
-                           fe_id_list = quf_info_all$quf, table_id_I = fixef_table_vector,
+                           fe_id_list = all_index_info$index, table_id_I = fixef_table_vector,
                            slope_flag_Q = slope.flag, slope_vars_list = slope.vars,
                            r_init = 0, nthreads = nthreads, 
                            algo_extraProj = fixef.algo$extraProj, 
@@ -2740,7 +2822,7 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
   if(fe_info){
 
     res = list(y = vars_demean$y_demean, X = vars_demean$X_demean,
-               weights = weights, fixef_id_list = quf_info_all$quf,
+               weights = weights, fixef_id_list = all_index_info$index,
                slope_vars = slope.vars, slope_flag = slope.flag, varnames = colnames(X))
 
     return(res)
@@ -2783,7 +2865,8 @@ demean = function(X, f, slope.vars, slope.flag, data, weights,
 
 #' Extracts the observations used for the estimation
 #'
-#' This function extracts the observations used in `fixest` estimation.
+#' This function extracts the observations used in `fixest` estimation. 
+#' The `stats::case.names` S3 method calls this function
 #'
 #' @param x A `fixest` object.
 #'
@@ -2823,6 +2906,27 @@ obs = function(x){
 
   return(id)
 }
+
+#' @rdname obs
+#' @param object A `fixest` object.
+#' @param ... Ignored
+#'
+case.names.fixest = function(object, ...){
+  check_arg(object, "class(fixest)")
+
+  if(isTRUE(object$lean)){
+    stop("obs() does not work with models estimated with 'lean = TRUE'.")
+  }
+
+  id = 1:object$nobs_origin
+
+  for(i in seq_along(object$obs_selection)){
+    id = id[object$obs_selection[[i]]]
+  }
+
+  return(id)
+}
+
 
 
 
@@ -3364,8 +3468,13 @@ demeaning_algo = function(extraProj = 0, iter_warmup = 15, iter_projAfterAcc = 4
 ####
 
 
-
+# to avoid issues with packages redefining as.character.formula
 as.character.formula = function(x, ...) as.character.default(x, ...)
+
+
+is_error = function(x){
+  inherits(x, "try-error")
+}
 
 parse_macros = function(..., reset = FALSE, from_xpd = FALSE, check = TRUE, frame = NULL){
   set_up(1)
@@ -3408,11 +3517,11 @@ parse_macros = function(..., reset = FALSE, from_xpd = FALSE, check = TRUE, fram
 
 value2stringCall = function(value_raw, call = FALSE, check = FALSE, frame = NULL){
 
-  if(any(c("call", "name") %in% class(value_raw))){
-    res = if(call) value_raw else deparse_long(value_raw)
-
-  } else if(inherits(value_raw, "formula")){
+  if(inherits(value_raw, "formula")){
     res = if(call) value_raw[[2]] else as.character(value_raw)[[2]]
+
+  } else if(any(c("call", "name") %in% class(value_raw))){
+    res = if(call) value_raw else deparse_long(value_raw)
 
   } else {
 
@@ -3427,8 +3536,10 @@ value2stringCall = function(value_raw, call = FALSE, check = FALSE, frame = NULL
 
         value_raw = paste(value_raw, collapse = " + ")
 
-        my_call = error_sender(str2lang(value_raw), "The value '", value_raw, 
-                               "' does not lead to a valid formula: ", up = 2)
+        my_call = error_sender(str2lang(value_raw), 
+                               "Text values should form a valid R expression.\n",
+                               "Problem: the value '", value_raw, 
+                               "' is not a valid expression. See error: ", up = 2)
         res = if(call) my_call else value_raw
 
       } else {
@@ -3789,8 +3900,8 @@ print_coeftable = function(coeftable, lastLine = "", show_signif = TRUE){
   names(ct)[5] = ""
 
   print(ct)
-
-  cat(lastLine)
+  
+  catma(lastLine)
 
   if(show_signif){
     cat("---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
@@ -3941,7 +4052,8 @@ prepare_matrix = function(fml, base, fake_intercept = FALSE){
 }
 
 
-fixest_model_matrix = function(fml, data, fake_intercept = FALSE, i_noref = FALSE, mf = NULL){
+fixest_model_matrix = function(fml, data, fake_intercept = FALSE, 
+                               i_noref = FALSE, mf = NULL){
   # This functions takes in the formula of the linear part and the
   # data
   # It reformulates the formula (ie with lags and interactions)
@@ -4166,23 +4278,67 @@ fixest_model_matrix_extra = function(object, newdata, original_data, fml,
 
     # if lean = TRUE, we should be avoiding that
     # => I don't know of a solution yet...
+    
+    # April 2025:
+    # For predict to work on estimations which:
+    #   * had poly(x, k) or similar as variables
+    #   * the original data does not exist any more
+    # it would be nice to plug in the attributes of the model.frame directly
+    # into the estimation object.
+    # Problme: it will add some run time at the data creation step
+    # 
+    # Current solution: make `newdata` work when `data` does not exist.
+    # but error when it contains "predvars" variables
+    #   
 
     if(length(fml) == 3) fml = fml[c(1, 3)]
 
     # We apply model.frame to the original data
-    data = fetch_data(object, "To apply `model.matrix.fixest`, ")
+    data = fetch_data(object, no_error = TRUE)
+    
+    was_error = FALSE
+    error_msg = ""
+    if(inherits(data, "error")){
+      # we try again and diagnose if it's important or not
+      error_msg = data
+      was_error = TRUE
+      data = newdata
+    }
 
     panel__meta__info = set_panel_meta_info(object, data)
 
     mf = model.frame(fml, data, na.action = na.pass)
 
-    rm(panel__meta__info) # needed, so that when the data is recreated for real
+    # needed, so that the data is recreated for real
+    # (note: when creating the lags, l() and co fetch panel__meta__info in the upper frames)
+    rm(panel__meta__info)
 
     t_mf = terms(mf)
     xlev = .getXlevels(t_mf, mf)
-
-    if(!identical(attr(t_mf,"variables"), attr(t_mf,"predvars")) || length(xlev) > 0){
-      mf = model.frame(t_mf, newdata, xlev = xlev, na.action = na.pass)
+    
+    has_special_vars = !identical(attr(t_mf,"variables"), attr(t_mf,"predvars"))
+    if(has_special_vars || length(xlev) > 0){
+      
+      if(was_error && has_special_vars){
+        
+        call_var = attr(t_mf,"variables")
+        call_predvar = attr(t_mf,"predvars")
+        
+        all_pblm = c()
+        for(i in seq_along(call_var)){
+          if(!identical(call_var[[i]], call_predvar[[i]])){
+            fun_call = call_var[[i]]
+            all_pblm = c(all_pblm, as.character(fun_call[[1]])[[1]])
+          }
+        }
+        
+        all_pblm = unique(all_pblm)
+        
+        stop_up("The estimation contained variables based on functions which require information on the original data set to be constructed (the function{$s, enum.bq ? all_pblm}).\n", error_msg)
+      } else {
+        mf = model.frame(t_mf, newdata, xlev = xlev, na.action = na.pass)
+      }
+      
     } else {
       mf = NULL
     }
@@ -4375,23 +4531,22 @@ fixef_terms = function(fml, stepwise = FALSE, origin_type = "feols"){
   res
 }
 
-prepare_df = function(vars, data, fastCombine = NA){
+prepare_df = function(vars, data, fixef.keep_names = NA_integer_){
   # vars: vector of variables to evaluate
   # data: a data.frame#
   # note that this is an internal function and the data should be checked beforehand
-
+  
   # we drop NAs and make it unique
   vars = unique(vars[!is.na(vars)])
   all_var_names = vars
 
-  do_combine = !is.na(fastCombine)
+  do_combine = !identical(fixef.keep_names, NA_integer_)
 
   changeNames = FALSE
   if(do_combine && any(grepl("^", vars, fixed = TRUE))){
     # special indicator to combine factors
     # ^ is a special character: only used to combine variables!!!
-
-    vars = fml_combine(vars, fastCombine, vars = TRUE)
+    vars = fml_combine(vars, fixef.keep_names, vars = TRUE)
 
     changeNames = TRUE
   }
@@ -4429,68 +4584,14 @@ prepare_df = function(vars, data, fastCombine = NA){
 }
 
 
-# fml_char = "x + y + u^factor(v1, v2) + x5"
-fml_combine = function(fml_char, fastCombine, vars = FALSE){
-  # function that transforms "hat" interactions into a proper function call:
-  # Origin^Destination^Product + Year becomes ~combine_clusters(Origin, Destination, Product) + Year
-
-  fun2combine = ifelse(fastCombine, "combine_clusters_fast", "combine_clusters")
-
-  # we need to change ^ into %^% otherwise terms sends error
-  labels = attr(terms(.xpd(rhs = gsub("\\^(?=[^0-9])", "%^%", fml_char, perl = TRUE))), 
-                "term.labels")
-
-  # now we work this out
-  for(i in seq_along(labels)){
-    lab = labels[i]
-    if(grepl("^", lab, fixed = TRUE)){
-      lab_split = trimws(strsplit(lab, "%^%", fixed = TRUE)[[1]])
-      if(grepl("(", lab, fixed = TRUE)){
-        # we add some error control -- imperfect, but... it's enough
-        lab_collapsed = gsub("\\([^\\)]+\\)", "", lab)
-        if(length(lab_split) != length(strsplit(lab_collapsed, "%^%", fixed = TRUE)[[1]])){
-          msg = "Wrong formatting of the fixed-effects interactions. The `^` operator should not be within parentheses."
-          stop(msg)
-        }
-      }
-      labels[i] = paste0(fun2combine, "(", paste0(lab_split, collapse = ", "), ")")
-    }
-  }
-
-  if(vars){
-    return(labels)
-  }
-
-  fml = .xpd(rhs = labels)
-
-  fml
-}
-
-# x = c('combine_clusters(bin(fe1, "!bin::2"), fe2)', 'fe3')
-rename_hat = function(x){
-
-  qui = grepl("combine_clusters", x, fixed = TRUE)
-  if(!any(qui)) return(x)
-
-  for(i in which(qui)){
-    xi_new = gsub("combine_clusters(_fast)?", "sw", x[i])
-    sw_only = extract_fun(xi_new, "sw")
-    sw_eval = eval(str2lang(sw_only$fun))
-    new_var = paste0(sw_only$before, paste0(sw_eval, collapse = "^"), sw_only$after)
-    x[i] = new_var
-  }
-
-  x
-}
-
-prepare_cluster_mat = function(fml, data, fastCombine){
+prepare_cluster_mat = function(fml, data, fixef.keep_names){
   # prepares the data.frame of the cluster variables
 
   fml_char = as.character(fml[2])
   changeNames = FALSE
   if(grepl("^", fml_char, fixed = TRUE)){
     # special indicator to combine factors
-    fml = fml_combine(fml_char, fastCombine)
+    fml = fml_combine(fml_char, fixef.keep_names)
     changeNames = TRUE
   }
 
@@ -4523,80 +4624,43 @@ prepare_cluster_mat = function(fml, data, fastCombine){
   res
 }
 
-combine_clusters_fast = function(...){
-  # This functions creates a new cluster from several clusters
-  # basically: paste(cluster1, cluster2, ... etc, sep = "__")
-  # but it tries to be faster than that because paste is very slow on large datasets
 
-  cluster = list(...)
-  Q = length(cluster)
-
-  # The problem is that the clusters can be of ANY type...
-  # So too much of a pain to take care of them in c++
-  # => when I have time I'll do it, but pfff...
-
-  # Not super efficient, but that's life
-  ANY_NA = FALSE
-  if(any(who_NA <- sapply(cluster, anyNA))){
-    ANY_NA = TRUE
-    who_NA = which(who_NA)
-    IS_NA = is.na(cluster[[who_NA[1]]])
-    for(i in who_NA[-1]){
-      IS_NA = IS_NA | is.na(cluster[[i]])
+combine_fixef = function(..., keep_names = NULL){
+  # we combine several variables into a single one and try to keep the information
+  # on the values we've combined
+  
+  multi.df = is.null(keep_names) || isFALSE(keep_names)
+  
+  index_info = to_integer(..., add_items = TRUE, items.list = TRUE, na.valid = FALSE, 
+                          multi.df = multi.df, internal = TRUE)
+  
+  index = index_info$x
+  items = index_info$items
+  
+  if(is.null(keep_names)){
+    if(nrow(items) < 50000){
+      arg_list = items
+      arg_list$sep = "_"
+      items = do.call("paste", arg_list)
+    } else {
+      items = 1:length(items[[1]])
     }
-
-    # Nice error message comes later
-    if(all(IS_NA)) return(rep(NA, length(IS_NA)))
-
-    # we recreate the clusters
-    for(i in 1:Q){
-      cluster[[i]] = cluster[[i]][!IS_NA]
-    }
+    
+  } else if(isFALSE(keep_names)){
+    items = 1:length(items[[1]])
   }
-
-  # First we unclass
-  for(i in 1:Q){
-    cluster[[i]] = quickUnclassFactor(cluster[[i]])
-  }
-
-  # Then we combine
-  power = floor(1 + log10(sapply(cluster, max)))
-
-  if(sum(power) > 14){
-    order_index = do.call(order, cluster)
-    index = cpp_combine_clusters(cluster, order_index)
-  } else {
-    # quicker, but limited by the precision of doubles
-    index = cluster[[1]]
-    for(q in 2:Q){
-      index = index + cluster[[q]]*10**sum(power[1:(q-1)])
-    }
-  }
-
-  if(ANY_NA){
-    # we recreate the return vector with appropriate NAs
-    res = rep(NA_real_, length(IS_NA))
-    res[!IS_NA] = index
-  } else {
-    res = index
-  }
-
-  return(res)
+  
+  items[index]
 }
 
-combine_clusters = function(...){
-  # This functions creates a new cluster from several clusters
-  # basically: paste(cluster1, cluster2, ... etc, sep = "_")
-  # No, it's mow much more fatser than that!!!! Thanks for my new algo
-  # => the paste only applies to the unique number of items
-
-
-  clusters = to_integer(..., add_items = TRUE, items.list = TRUE, internal = TRUE)
-
-  res = clusters$items[clusters$x]
-
-  return(res)
+combine_fixef_keep_names = function(...){
+  combine_fixef(..., keep_names = TRUE)
 }
+
+combine_fixef_drop_names = function(...){
+  combine_fixef(..., keep_names = FALSE)
+}
+
 
 listDefault = function(x, variable, value){
   # This function puts 'value' into the element 'variable' of list 'x'
@@ -4797,7 +4861,7 @@ set_defaults = function(opts_name){
 
 }
 
-fetch_data = function(x, prefix = "", suffix = ""){
+fetch_data = function(x, prefix = "", suffix = "", no_error = FALSE){
   # x: fixest estimation
   # We try different strategies:
   # 0) the data has been saved at estimation time with `data.save = TRUE`
@@ -4850,7 +4914,7 @@ fetch_data = function(x, prefix = "", suffix = ""){
 
   # 3) Global environment
 
-  if(!identical(parent.env(x$call_env), .GlobalEnv)){
+  if(isTRUE(x$lean) || !identical(parent.env(x$call_env), .GlobalEnv)){
     # ...and again
     try(data <- eval(x$call$data, .GlobalEnv), silent = TRUE)
 
@@ -4862,15 +4926,21 @@ fetch_data = function(x, prefix = "", suffix = ""){
   # => Error message
   
   begin = sma(prefix, " we", .last = "ws, upper.sentence")
-
+  
   if(nchar(suffix) > 0){
     suffix = gsub("^ +", "", suffix)
   }
 
   data_name = charShorten(deparse(x$call$data)[1], 15)
-  stop_up(begin, " fetch the data in the enviroment where the estimation was made, but the data does not seem to be there any more (btw it was {bq ? data_name}). ", suffix)
-
-
+  
+  msg = sma(begin, " fetch the data in the enviroment where the estimation was made, but the data does not seem to be there any more (btw it was {bq ? data_name}). ", suffix)
+  
+  if(no_error){
+    class(msg) = "error"
+    return(msg)
+  }
+  
+  stop_up(msg)
 }
 
 is_large_object = function(x){
@@ -5592,14 +5662,14 @@ fixest_pvalue = function(x, zvalue, vcov){
     if(missing(vcov)) {
       stop("Internal error (=bug): the argument `vcov` should not be missing in fixest_pvalue().")
 
-    } else if(is.null(attr(vcov, "dof.K"))){
-      stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
+    } else if(is.null(attr(vcov, "df.K"))){
+      stop("Internal error (=bug): the attribute `df.K` from `vcov` should not be NULL.")
     }
 
     # df.t is always an attribute of the vcov
     df.t = attr(vcov, "df.t")
     if(is.null(df.t)){
-      df.t = max(nobs(x) - attr(vcov, "dof.K"), 1)
+      df.t = max(nobs(x) - attr(vcov, "df.K"), 1)
     }
 
     pvalue = 2*pt(-abs(zvalue), df.t)
@@ -5630,14 +5700,14 @@ fixest_CI_factor = function(x, level, vcov = NULL, df.t = NULL){
            "should be numeric in fixest_CI_factor().")
       }
     } else {
-      if(is.null(attr(vcov, "dof.K"))){
-        stop("Internal error (=bug): the attribute `dof.K` from `vcov` should not be NULL.")
+      if(is.null(attr(vcov, "df.K"))){
+        stop("Internal error (=bug): the attribute `df.K` from `vcov` should not be NULL.")
       }
 
       # df.t is always an attribute of the vcov
       df.t = attr(vcov, "df.t")
       if(is.null(df.t)){
-        df.t = max(nobs(x) - attr(vcov,"dof.K"), 1)
+        df.t = max(nobs(x) - attr(vcov,"df.K"), 1)
       }
     }
 
@@ -5651,6 +5721,153 @@ fixest_CI_factor = function(x, level, vcov = NULL, df.t = NULL){
 }
 
 
+flatten_list_of_models = function(dots, dots_call = NULL, accept_non_fixest = FALSE){
+  # dots = list(...) obtained in the upper function
+  
+  n_dots = length(dots)
+  if(n_dots == 0){
+    return(list(all_models = list(), model_names = list(), model_id = NULL))
+  }
+  
+  build_model_names = !is.null(dots_call)
+  
+  all_models = list()
+  model_names = list()
+  model_id = NULL
+  k = 1
+  for(i in 1:n_dots){
+    di = dots[[i]]
+    
+    if(inherits(di, "fixest")){
+      all_models[[k]] = di
+      
+      if(build_model_names){
+        if(any(class(dots_call[[i]]) %in% c("call", "name"))){
+          model_names[[k]] = deparse(dots_call[[i]], nlines = 1)[1]
+        } else {
+          model_names[[k]] = as.character(dots_call[[i]])
+        }
+      }
+
+      k = k + 1
+    } else if(inherits(di, c("list", "fixest_list", "fixest_multi"))){
+      # we get into this list to get the fixest objects
+      types = sapply(di, function(x) class(x)[1])
+      qui = which(types %in% c("fixest", "fixest_multi"))
+      is_multi = inherits(di, "fixest_multi")
+
+      for(m in qui){
+        mod = di[[m]]
+
+        # handling names
+        if(build_model_names){
+          if(is_multi){
+            if(any(class(dots_call[[i]]) %in% c("call", "name"))){
+              mod_name = deparse_long(dots_call[[i]])
+            } else {
+              mod_name = as.character(dots_call[[i]])
+            }
+            mod_name = paste0(mod_name, ".", m)
+          } else {
+            if(n_dots > 1){
+              if(is.null(names(di)[m]) || names(di)[m] == ""){
+                
+                if(length(dots_call[[i]]) == 1){
+                  mod_name = paste0(dots_call[[i]], "[[", m, "]]")
+                } else {
+                  mod_name = paste0("arg", i, "[[", m, "]]")
+                }
+                
+              } else {
+                mod_name = names(di)[m]
+              }
+            } else {
+              mod_name = as.character(names(di)[m])
+            }
+          }
+        }
+
+        if(inherits(mod, "fixest_multi")){
+
+          for(j in seq_along(mod)){
+            all_models[[k]] = mod[[j]]
+            
+            if(build_model_names){
+              model_names[[k]] = paste0(mod_name, ".", j)
+            }
+
+            k = k + 1
+          }
+
+        } else {
+          # regular fixest or from fixest_list
+          all_models[[k]] = mod
+          
+          if(build_model_names){
+            model_names[[k]] = mod_name
+          }
+
+          id = di[[m]]$model_id
+          if(!is.null(id)){
+            model_id[k] = id
+          }
+
+          k = k + 1
+        }
+      }
+      
+    } else if(accept_non_fixest){
+      all_models[[k]] = di
+            
+      if(build_model_names){
+        if(any(class(dots_call[[i]]) %in% c("call", "name"))){
+          model_names[[k]] = deparse(dots_call[[i]], nlines = 1)[1]
+        } else {
+          model_names[[k]] = as.character(dots_call[[i]])
+        }
+      }
+
+      k = k + 1
+    }
+  }
+  
+  list(all_models = all_models, model_names = model_names, model_id = model_id)
+}
+
+setup_dict = function(dict, check = FALSE){
+  
+  if(check){
+    check_arg(dict, "NULL logical scalar | named character vector no na")
+  }
+  
+  dict_global = getFixest_dict()
+  
+  if(missnull(dict) || isTRUE(dict)) {
+    dict = dict_global
+    
+  } else if(isFALSE(dict)) {
+    dict = NULL
+    
+  } else {
+    # dict changes the values set in the global dict
+
+    if(dict[1] == "reset"){
+      dict_global = c()
+      dict = dict[-1]
+    }
+
+    if(length(dict) > 0){
+      dict_global[names(dict)] = dict
+    }
+
+    dict = dict_global
+  }
+  
+  dict
+}
+
+
+
 #### --------------- ####
 #### Small Utilities ####
 ####
@@ -5662,9 +5879,9 @@ fixest_CI_factor = function(x, level, vcov = NULL, df.t = NULL){
 
 sma = string_magic_alias(.check = FALSE)
 
-catma = cat_magic_alias(.check = FALSE)
+catma = cat_magic_alias(.check = FALSE, .width = NULL)
 
-mema = message_magic_alias(.check = FALSE, .last = "'min(100, .sw)'width")
+mema = message_magic_alias(.check = FALSE)
 
 stvec = stringmagic::string_vec_alias()
 
@@ -5888,9 +6105,9 @@ keep_apply = function(x, keep = NULL, logical = FALSE){
     }
 
     if(grepl("^!", var2keep)){
-      qui_keep = qui_keep | !grepl(substr(var2keep, 2, nchar(var2keep)), vect2check)
+      qui_keep = qui_keep | !grepl(substr(var2keep, 2, nchar(var2keep)), vect2check, perl = TRUE)
     } else {
-      qui_keep = qui_keep | grepl(var2keep, vect2check)
+      qui_keep = qui_keep | grepl(var2keep, vect2check, perl = TRUE)
     }
   }
 
@@ -5924,9 +6141,9 @@ drop_apply = function(x, drop = NULL){
     }
 
     if(grepl("^!", var2drop)){
-      res = res[grepl(substr(var2drop, 2, nchar(var2drop)), vect2check)]
+      res = res[grepl(substr(var2drop, 2, nchar(var2drop)), vect2check, perl = TRUE)]
     } else {
-      res = res[!grepl(var2drop, vect2check)]
+      res = res[!grepl(var2drop, vect2check, perl = TRUE)]
     }
   }
 
@@ -5958,10 +6175,10 @@ order_apply = function(x, order = NULL){
     }
 
     if(grepl("^!", var2order)){
-      who = !grepl(substr(var2order, 2, nchar(var2order)), vect2check)
+      who = !grepl(substr(var2order, 2, nchar(var2order)), vect2check, perl = TRUE)
       res = c(res[who], res[!who])
     } else {
-      who = grepl(var2order, vect2check)
+      who = grepl(var2order, vect2check, perl = TRUE)
       res = c(res[who], res[!who])
     }
   }
@@ -6050,64 +6267,9 @@ char2num = function(x, addItem = FALSE){
 
 }
 
-quickUnclassFactor = function(x, addItem = FALSE, sorted = FALSE){
-  # does as unclass(as.factor(x))
-  # but waaaaay quicker
-
-  not_num = !is.numeric(x)
-  is_char_convert = not_num && !is.character(x)
-
-  if(is_char_convert){
-    res = cpp_quf_gnl(as.character(x))
-  } else {
-    res = cpp_quf_gnl(x)
-  }
-
-  if(sorted){
-
-    if(not_num){
-      items = x[res$x_unik]
-    } else {
-      items = res$x_unik
-    }
-
-    x = res$x_uf
-
-    new_order = order(items)
-    order_new_order = order(new_order)
-    x_uf = order_new_order[x]
-
-    if(addItem){
-      if(is_char_convert){
-        res = list(x = x_uf, items = as.character(items[new_order]))
-      } else {
-        res = list(x = x_uf, items = items[new_order])
-      }
-
-      return(res)
-    } else {
-      return(x_uf)
-    }
-  }
-
-  if(addItem){
-
-    if(not_num){
-      if(is_char_convert){
-        items = as.character(x[res$x_unik])
-      } else {
-        items = x[res$x_unik]
-      }
-
-      res = list(x = res$x_uf, items = items)
-    } else {
-      names(res) = c("x", "items")
-    }
-
-    return(res)
-  } else {
-    return(res$x_uf)
-  }
+to_index_internal = function(x, add_items = FALSE, sorted = FALSE){
+  to_integer(x, add_items = add_items, sorted = sorted, items.list = TRUE, 
+             na.valid = TRUE, internal = TRUE)
 }
 
 missnull = function(x) missing(x) || is.null(x)
@@ -6139,36 +6301,6 @@ isLogical = function(x) length(x) == 1L && is.logical(x) && !is.na(x)
 
 isSingleChar = function(x) length(x) == 1L && is.character(x) && !is.na(x)
 
-fml2varnames = function(fml, combine_fun = FALSE){
-  # This function transforms a one sided formula into a
-  # character vector for each variable
-
-  # In theory, I could just use terms.formula to extract the variable.
-  # But I can't!!!! Because of this damn ^ argument.
-  # I need to apply a trick
-
-  # combine_fun: whether to add a call to combine_clusters_fast
-
-  # Only the ^ users "pay the price"
-
-  if("^" %in% all.vars(fml, functions = TRUE)){
-    # new algo using fml_combine, more robust
-    fml_char = as.character(fml)[2]
-    all_var_names = fml_combine(fml_char, TRUE, vars = TRUE)
-    if(!combine_fun){
-      all_var_names = rename_hat(all_var_names)
-    }
-
-  } else {
-    t = terms(fml)
-    all_var_names = attr(t, "term.labels")
-    # => maybe I should be more cautious below???? Sometimes `:` really means stuff like 1:5
-    all_var_names = gsub(":", "*", all_var_names) # for very special cases
-  }
-
-
-  all_var_names
-}
 
 msg_na_inf = function(any_na, any_inf){
   if(any_na && any_inf){
@@ -6287,126 +6419,6 @@ trim_obs_removed = function(x, object){
   x
 }
 
-is_operator = function(x, op) if(length(x) <= 1) FALSE else x[[1]] == op
-
-fml_breaker = function(fml, op){
-  res = list()
-  k = 1
-  while(is_operator(fml, op)){
-    res[[k]] = fml[[3]]
-    k = k + 1
-    fml = fml[[2]]
-  }
-  res[[k]] = fml
-
-  res
-}
-
-fml_maker = function(lhs, rhs){
-
-  while(is_operator(lhs, "(")){
-    lhs = lhs[[2]]
-  }
-
-  if(missing(rhs)){
-    if(is_operator(lhs, "~")){
-      return(lhs)
-    }
-    res = ~ .
-    res[[2]] = lhs
-  } else {
-
-    while(is_operator(rhs, "(")){
-      rhs = rhs[[2]]
-    }
-
-    res = . ~ .
-    res[[2]] = lhs
-    res[[3]] = rhs
-  }
-
-  res
-}
-
-fml_split_internal = function(fml, split.lhs = FALSE){
-
-  fml_split_tilde = fml_breaker(fml, "~")
-  k = length(fml_split_tilde)
-
-  # NOTA in fml_breaker: to avoid copies, the order of elements returned is reversed
-
-  # currently res is the LHS
-  res = list(fml_split_tilde[[k]])
-
-  if(k == 2){
-    rhs = fml_breaker(fml_split_tilde[[1]], "|")
-    l = length(rhs)
-
-  } else if(k == 3){
-    rhs  = fml_breaker(fml_split_tilde[[2]], "|")
-    l = length(rhs)
-    rhs_right = fml_breaker(fml_split_tilde[[1]], "|")
-
-    if(length(rhs_right) > 1){
-      stop_up("Problem in the formula: the formula in the RHS (expressing the IVs) cannot be multipart.")
-    }
-
-    # The rightmost element of the RHS is in position 1!!!!
-    iv_fml = fml_maker(rhs[[1]], rhs_right[[1]])
-
-    rhs[[1]] = iv_fml
-
-  } else {
-    # This is an error
-    stop_up("Problem in the formula: you cannot have more than one RHS part containing a formula.")
-  }
-
-  if(!split.lhs){
-    new_fml = fml_maker(res[[1]], rhs[[l]])
-
-    res[[1]] = new_fml
-    if(l == 1) return(res)
-    res[2:l] = rhs[(l - 1):1]
-
-  } else {
-    res[1 + (1:l)] = rhs[l:1]
-  }
-
-  res
-}
-
-
-fml_split = function(fml, i, split.lhs = FALSE, text = FALSE, raw = FALSE){
-  # I had to create that fonction to cope with the following formula:
-  #
-  #                       y ~ x1 | fe1 | u ~ z
-  #
-  # For Formula to work well, one would need to write insstead: y | x1 | fe1 | (u ~ z)
-  # that set of parentheses are superfluous
-
-  my_split = fml_split_internal(fml, split.lhs)
-
-  if(raw){
-    return(my_split)
-  } else if(text){
-
-    if(!missing(i)){
-      return(deparse_long(my_split[[i]]))
-    } else {
-      return(sapply(my_split, deparse_long))
-    }
-
-  } else if(!missing(i)) {
-    return(fml_maker(my_split[[i]]))
-
-  } else {
-    res = lapply(my_split, fml_maker)
-
-    return(res)
-  }
-
-}
-
 error_sender = function(expr, ..., clean, up = 0, arg_name){
   res = tryCatch(expr, error = function(e) structure(list(conditionCall(e), conditionMessage(e)), class = "try-error"))
 
@@ -6465,242 +6477,6 @@ error_sender = function(expr, ..., clean, up = 0, arg_name){
   res
 }
 
-is_fml_inside = function(fml){
-  # we remove parentheses first
-
-  while(is_operator(fml, "(")){
-    fml = fml[[2]]
-  }
-
-  is_operator(fml, "~")
-}
-
-
-merge_fml = function(fml_linear, fml_fixef = NULL, fml_iv = NULL){
-
-  is_fe = length(fml_fixef) > 0
-  is_iv = length(fml_iv) > 0
-
-  if(!is_fe && !is_iv){
-    res = fml_linear
-  } else {
-    fml_all = deparse_long(fml_linear)
-
-    if(is_fe){
-      # we add parentheses if necessary
-      if(is_operator(fml_fixef[[2]], "|")){
-        fml_all[[2]] = paste0("(", as.character(fml_fixef)[2], ")")
-      } else {
-        fml_all[[2]] = as.character(fml_fixef)[2]
-      }
-    }
-
-    if(is_iv) fml_all[[length(fml_all) + 1]] = deparse_long(fml_iv)
-
-     res = as.formula(paste(fml_all, collapse = "|"), .GlobalEnv)
-  }
-
-  res
-}
-
-
-fixest_fml_rewriter = function(fml){
-  # Currently performs the following
-  # - expands lags
-  # - protects powers: x^3 => I(x^3)
-  #
-  # fml = sw(f(y, 1:2)) ~ x1 + l(x2, 1:2) + x2^2 | fe1 | y ~ z::e + g^3
-  # fml = y ~ 1 | id + period | l(x_endo, -1:1) ~ l(x_exo, -1:1)
-
-  fml_text = deparse_long(fml)
-
-  isPanel = grepl("(^|[^\\._[:alnum:]])(f|d|l)\\(", fml_text)
-  isPower = grepl("^", fml_text, fixed = TRUE)
-
-  if(isPanel){
-    # We rewrite term-wise
-
-    fml_parts = fml_split(fml, raw = TRUE)
-    n_parts = length(fml_parts)
-
-    #
-    # LHS
-    #
-
-    # only panel: no power (bc no need), no interact
-
-    # We tolerate multiple LHS and expansion
-    lhs_text = fml_split(fml, 1, text = TRUE, split.lhs = TRUE)
-
-    if(grepl("^(c|c?sw0?|list)\\(", lhs_text)){
-      lhs_text2eval = gsub("^(c|c?sw0?|list)\\(", "sw(", lhs_text)
-      lhs_names = eval(str2lang(lhs_text2eval))
-    } else {
-      lhs_names = lhs_text
-    }
-
-    lhs_all = error_sender(expand_lags_internal(lhs_names),
-                           "Problem in the formula regarding lag/leads: ", 
-                           clean = "__expand")
-
-    if(length(lhs_all) > 1){
-      lhs_fml = paste("c(", paste(lhs_all, collapse = ","), ")")
-    } else {
-      lhs_fml = lhs_all
-    }
-
-    lhs_text = lhs_fml
-
-    #
-    # RHS
-    #
-
-    # power + panel + interact
-
-    if(isPower){
-      # rhs actually also contains the LHS
-      rhs_text = deparse_long(fml_parts[[1]])
-      rhs_text = gsub("(?<!I\\()(\\b(\\.[[:alpha:]]|[[:alpha:]])[[:alnum:]\\._]*\\^[[:digit:]]+)", 
-                      "I(\\1)", rhs_text, perl = TRUE)
-
-      if(grepl("\\^[[:alpha:]]", rhs_text)){
-        stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
-      }
-
-      fml_rhs = as.formula(rhs_text)
-    } else {
-      fml_rhs = fml_maker(fml_parts[[1]])
-    }
-
-    rhs_terms = get_vars(fml_rhs)
-
-    if(length(rhs_terms) == 0){
-      rhs_text = "1"
-    } else {
-      rhs_terms = error_sender(expand_lags_internal(rhs_terms),
-                               "Problem in the formula regarding lag/leads: ", 
-                               clean = "__expand")
-
-      if(attr(terms(fml_rhs), "intercept") == 0){
-        rhs_terms = c("-1", rhs_terms)
-      }
-
-      rhs_text = paste(rhs_terms, collapse = "+")
-    }
-
-    fml_linear = as.formula(paste0(lhs_text, "~", rhs_text))
-
-    #
-    # FE + IV
-    #
-
-    fml_fixef = fml_iv = NULL
-
-    if(n_parts > 1){
-
-      #
-      # FE
-      #
-
-      # Only isPanel (although odd....)
-
-      is_fe = !is_fml_inside(fml_parts[[2]])
-      if(is_fe){
-
-        if(identical(fml_parts[[2]], 0)){
-          fml_fixef = NULL
-
-        } else {
-
-          fml_fixef = fml_maker(fml_parts[[2]])
-          fml_fixef_text = deparse_long(fml_fixef)
-
-          if(grepl("(l|d|f)\\(", fml_fixef_text)){
-            # We need to make changes
-            # 1st: for terms to work => we change ^ if present (sigh)
-
-            do_sub = grepl("^", fml_fixef_text, fixed = TRUE)
-
-            if(do_sub){
-              fml_fixef = as.formula(gsub("^", "%^%", fml_fixef_text, fixed = TRUE))
-            }
-
-            fixef_terms = attr(terms(fml_fixef), "term.labels")
-            fixef_text = error_sender(expand_lags_internal(fixef_terms),
-                                      "Problem in the formula regarding lag/leads: ", 
-                                      clean = "__expand")
-
-            if(do_sub){
-              fixef_text = gsub(" %^% ", "^", fixef_text, fixed = TRUE)
-            }
-
-            fml_fixef = as.formula(paste("~", paste(fixef_text, collapse = "+")))
-
-          }
-        }
-      }
-
-      #
-      # IV
-      #
-
-      if(n_parts == 3 || !is_fe){
-        fml_iv = fml_maker(fml_parts[[n_parts]])
-
-        fml_endo = .xpd(lhs = ~y, rhs = fml_iv[[2]])
-        fml_inst = .xpd(lhs = ~y, rhs = fml_iv[[3]])
-
-        endo_lag_expand = fixest_fml_rewriter(fml_endo)$fml
-        inst_lag_expand = fixest_fml_rewriter(fml_inst)$fml
-
-        fml_iv = .xpd(lhs = endo_lag_expand[[3]], rhs = inst_lag_expand[[3]])
-      }
-    }
-
-    fml_new = merge_fml(fml_linear, fml_fixef, fml_iv)
-
-  } else if(isPower){
-    # This is damn costly.... but I have to deal with corner cases....
-    # I think I should do that at the C level, this will be much faster I guess
-
-    # We only take care of the RHS (we don't care about the LHS)
-    no_lhs_text = gsub("^[^~]+~", "", fml_text)
-    no_lhs_text = gsub("(?<!I\\()(\\b(\\.[[:alpha:]]|[[:alpha:]])[[:alnum:]\\._]*\\^[[:digit:]]+)", 
-                       "I(\\1)", no_lhs_text, perl = TRUE)
-
-    if(grepl("\\^[[:alpha:]]", no_lhs_text)){
-      # We check if there is one ^ specifically in the RHS or in the IV part
-      fml_parts = fml_split(fml, raw = TRUE)
-      n_parts = length(fml_parts)
-
-      rhs_txt = fml_split(fml, i = 1, text = TRUE)
-
-      if(grepl("\\^[[:alpha:]]", rhs_txt)){
-        stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
-      }
-
-      if(is_fml_inside(fml_parts[[n_parts]])){
-        iv_txt = fml_split(fml, i = n_parts, text = TRUE)
-
-        if(grepl("\\^[[:alpha:]]", iv_txt)){
-          stop_up("The operator `^` between variables can be used only in the fixed-effects part of the formula. Otherwise, please use `:` instead.")
-        }
-      }
-
-    }
-
-    fml_new = as.formula(paste0(gsub("~.+", "", fml_text), "~", no_lhs_text))
-
-  } else {
-    res = list(fml = fml, isPanel = FALSE)
-    return(res)
-  }
-
-  res = list(fml = fml_new, isPanel = isPanel)
-
-  return(res)
-}
-
 
 check_set_types = function(x, types, msg){
   arg_name = deparse(substitute(x))
@@ -6752,13 +6528,20 @@ get_vars = function(x){
   attr(terms(x), "term.labels")
 }
 
-mat_posdef_fix = function(X, tol = 1e-10){
+mat_posdef_fix = function(X, tol = 1e-12, check = FALSE){
   # X must be a symmetric matrix
   # We don't check it
+  
+  if(check){
+    eigval = eigen(X, symmetric = TRUE, only.values = TRUE)$values
+    if(all(eigval > tol)){
+      return(X)
+    }
+  }
 
-  if(any(diag(X) < tol)){
-    e = eigen(X, symmetric = TRUE)
-
+  e = eigen(X, symmetric = TRUE)
+  # Should already be TRUE if this function is called, but in case someone else wants to use it, does not hurt to check.
+  if (any(e$values < tol)){
     if (is.complex(e$values)) {
       attr(X, "is_complex") = TRUE
     } else {
@@ -6880,7 +6663,7 @@ fetch_arg_deparse = function(arg){
   if(n > 2){
     for(i in 2:length(sc)){
       mc = sc[[i]]
-      if(grepl("[tT]ry", mc[[1]])) next
+      if(grepl("[tT]ry", as.character(mc[[1]])[1])) next
       if(!arg %in% names(mc)) break
       arg_name = deparse_long(mc[[arg]])
     }
@@ -7014,6 +6797,35 @@ insert_in_between = function(x, y){
   res[2 * 1:n_x] = y
 
   res
+}
+
+insert_at = function(x, values, pos){
+  
+  n_x = length(x)
+  stopifnot(pos <= n_x + 1, identical(mode(x), mode(values)))
+  
+  if(length(values) == 0){
+    return(x)
+  }
+  
+  if(pos == 1){
+    return(c(values, x))
+  }
+  
+  if(pos == n_x + 1){
+    return(c(x, values))
+  }
+  
+  c(x[1:(pos - 1)], values, x[pos:n_x])
+}
+
+replace_at = function(x, values, pos){
+  
+  n_x = length(x)
+  stopifnot(pos <= n_x, identical(mode(x), mode(values)))
+  
+  x = x[-pos]
+  insert_at(x, values, pos)
 }
 
 str_trim = function(x, n_first = 0, n_last = 0){
@@ -7177,7 +6989,7 @@ char_to_vars = function(x){
   rev(res)
 }
 
-not_too_many_messages = function(key){
+was_not_recently_used = function(key){
   # we don't proc in less than 2 seconds
   # avoid ugly looping issues
   all_times = getOption("fixest_all_timings")
@@ -7192,6 +7004,29 @@ not_too_many_messages = function(key){
   }
 
   FALSE
+}
+
+rename_and_assign_old_arguments = function(dot_args, ..., error_when_wrong = FALSE){
+  # ...: format: old = new
+  if(length(dot_args) == 0){
+    return()
+  }
+  
+  arg_dict = list(...)
+  
+  old_args = names(dot_args)
+  
+  for(arg in old_args){
+    if(error_when_wrong && !arg %in% names(arg_dict)){
+      sc_all = sys.calls()
+      fun = as.character(sc_all[[length(sc_all) - 1]][[1]])[1]
+      stop_up("The argument {Q ? arg} is not valid for the function {bq ? fun}.")
+    }
+    
+    new_arg = arg_dict[[arg]]
+    assign(new_arg, dot_args[[arg]], parent.frame())
+  }
+  
 }
 
 
@@ -7652,18 +7487,18 @@ getFixest_fml = function(){
 #'
 #'
 #'
-setFixest_estimation = function(data = NULL, panel.id = NULL, fixef.rm = "perfect",
+setFixest_estimation = function(data = NULL, panel.id = NULL, fixef.rm = "perfect_fit",
                                 fixef.tol = 1e-6, fixef.iter = 10000, collin.tol = 1e-10,
-                                lean = FALSE, verbose = 0, warn = TRUE, combine.quick = NULL,
+                                lean = FALSE, verbose = 0, warn = TRUE, fixef.keep_names = NULL,
                                 demeaned = FALSE, mem.clean = FALSE, glm.iter = 25,
                                 glm.tol = 1e-8, data.save = FALSE, reset = FALSE){
 
-  check_set_arg(fixef.rm, "match(none, perfect, singleton, both)")
+  check_set_arg(fixef.rm, "match(singletons, infinite_coef, perfect_fit, none)")
   check_arg(fixef.tol, collin.tol, glm.tol, "numeric scalar GT{0}")
   check_arg(fixef.iter, glm.iter, "integer scalar GE{1}")
   check_arg(verbose, "integer scalar GE{0}")
   check_arg(lean, warn, demeaned, mem.clean, reset, data.save, "logical scalar")
-  check_arg(combine.quick, "NULL logical scalar")
+  check_arg(fixef.keep_names, "NULL logical scalar")
   check_arg(panel.id, "NULL character vector len(,2) no na | os formula")
 
   if(!missing(data)){
@@ -7756,36 +7591,7 @@ getFixest_multi = function(){
 }
 
 
-#### .................. ####
-#### DOCUMENTATION DATA ####
-####
 
-
-
-#' Trade data sample
-#'
-#' This data reports trade information between countries of the European Union (EU15).
-#'
-#' @usage
-#' data(trade)
-#'
-#' @format
-#' `trade` is a data frame with 38,325 observations and 6 variables named `Destination`, `Origin`, `Product`, `Year`, `dist_km` and `Euros`.
-#'
-#' * Origin: 2-digits codes of the countries of origin of the trade flow.
-#' * Destination: 2-digits codes of the countries of destination of the trade flow.
-#' * Products: Number representing the product categories (from 1 to 20).
-#' * Year: Years from 2007 to 2016
-#' * dist_km: Geographic distance in km between the centers of the countries of origin and destination.
-#' * Euros: The total amount in euros of the trade flow for the specific year/product category/origin-destination country pair.
-#'
-#'
-#' @source
-#' This data has been extrated from Eurostat on October 2017.
-#'
-#'
-#'
-"trade"
 
 
 

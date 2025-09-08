@@ -300,7 +300,7 @@ sunab = function(cohort, period, ref.c = NULL, ref.p = -1, bin, bin.rel,
   #  we find out the never/always treated
   #
 
-  cohort_int = quickUnclassFactor(cohort)
+  cohort_int = to_index_internal(cohort)
   c_order = order(cohort_int)
   info = cpp_find_never_always_treated(cohort_int[c_order], period[c_order])
 
@@ -344,49 +344,50 @@ sunab = function(cohort, period, ref.c = NULL, ref.p = -1, bin, bin.rel,
 
 
   # We add the agg argument to GLOBAL_fixest_mm_info
-  if(!no_agg){
-    is_GLOBAL = FALSE
-    for(where in 1:min(8, sys.nframe())){
-      if(exists("GLOBAL_fixest_mm_info", parent.frame(where))){
-        GLOBAL_fixest_mm_info = get("GLOBAL_fixest_mm_info", parent.frame(where))
-        is_GLOBAL = TRUE
-        break
-      }
+  is_GLOBAL = FALSE
+  for(where in 1:min(8, sys.nframe())){
+    if(exists("GLOBAL_fixest_mm_info", parent.frame(where))){
+      GLOBAL_fixest_mm_info = get("GLOBAL_fixest_mm_info", parent.frame(where))
+      is_GLOBAL = TRUE
+      break
+    }
+  }
+
+  if(is_GLOBAL){
+    agg_att = c("ATT" = paste0("\\Q", period_name, "\\E::[[:digit:]]+:cohort"))
+    agg_period = paste0("(\\Q", period_name, "\\E)::(-?[[:digit:]]+):cohort")
+    
+    # We add the attribute containing the appropriate model_matrix_info
+    # for the period
+    info = list()
+    period_unik = sort(unique(c(period, ref.p)))
+    info$coef_names_full = paste0(period_name, "::", period_unik)
+    info$items = period_unik
+
+    if(length(ref.p) > 0){
+      info$ref_id = c(which(info$items %in% ref.p[1]), which(info$items %in% ref.p[-1]))
+      info$ref = info$items[info$ref_id]
     }
 
-    if(is_GLOBAL){
-      agg_att = c("ATT" = paste0("\\Q", period_name, "\\E::[[:digit:]]+:cohort"))
-      agg_period = paste0("(\\Q", period_name, "\\E)::(-?[[:digit:]]+):cohort")
+    info$f_name = period_name
 
-      if(att){
-        agg = agg_att
-      } else {
-        agg = agg_period
+    info$is_num = TRUE
+    info$is_inter_num = info$is_inter_fact = FALSE
 
-        # We add the attribute containing the appropriate model_matrix_info
-        info = list()
-        period_unik = sort(unique(c(period, ref.p)))
-        info$coef_names_full = paste0(period_name, "::", period_unik)
-        info$items = period_unik
-
-        if(length(ref.p) > 0){
-          info$ref_id = c(which(info$items %in% ref.p[1]), which(info$items %in% ref.p[-1]))
-          info$ref = info$items[info$ref_id]
-        }
-
-        info$f_name = period_name
-
-        info$is_num = TRUE
-        info$is_inter_num = info$is_inter_fact = FALSE
-
-        attr(agg, "model_matrix_info") = info
-      }
-
-      GLOBAL_fixest_mm_info$sunab = list(agg = agg, agg_att = agg_att, 
-                                         agg_period = agg_period, ref.p = ref.p)
-      # re assignment
-      assign("GLOBAL_fixest_mm_info", GLOBAL_fixest_mm_info, parent.frame(where))
+    attr(agg_period, "model_matrix_info") = info
+    
+    if(no_agg){
+      agg = NULL
+    } else if(att){
+      agg = agg_att
+    } else {
+      agg = agg_period
     }
+
+    GLOBAL_fixest_mm_info$sunab = list(agg = agg, agg_att = agg_att, 
+                                        agg_period = agg_period, ref.p = ref.p)
+    # re assignment
+    assign("GLOBAL_fixest_mm_info", GLOBAL_fixest_mm_info, parent.frame(where))
   }
 
   res
@@ -495,7 +496,7 @@ aggregate.fixest = function(x, agg, full = FALSE, use_weights = TRUE, ...){
 
   check_arg(x, "class(fixest) mbt")
   if(isTRUE(x$is_sunab)){
-    check_arg(agg, "scalar(character, logical)")
+    check_set_arg(agg, "match(att, period, cohort) | scalar(character, logical)")
   } else {
     check_arg(agg, "character scalar")
   }
@@ -656,75 +657,6 @@ aggregate.fixest = function(x, agg, full = FALSE, use_weights = TRUE, ...){
   res
 }
 
-
-
-
-
-####
-#### DATASETS ####
-####
-
-
-#' Sample data for difference in difference
-#'
-#' This data has been generated to illustrate the use of difference in difference functions in 
-#' package \pkg{fixest}. This is a balanced panel of 104 individuals and 10 periods. 
-#' About half the individuals are treated, the treatment having a positive effect on 
-#' the dependent variable `y` after the 5th period. The effect of the treatment on `y` is gradual.
-#'
-#' @usage
-#' data(base_did)
-#'
-#' @format
-#' `base_did` is a data frame with 1,040 observations and 6 variables named 
-#' `y`, `x1`, `id`, `period`, `post` and `treat`.
-#'
-#' \describe{
-#' \item{y}{The dependent variable affected by the treatment.}
-#' \item{x1}{ An explanatory variable.}
-#' \item{id}{ Identifier of the individual.}
-#' \item{period}{ From 1 to 10}
-#' \item{post}{ Indicator taking value 1 if the period is strictly greater than 5, 0 otherwise.}
-#' \item{treat}{ Indicator taking value 1 if the individual is treated, 0 otherwise.}
-#'
-#' }
-#'
-#' @source
-#' This data has been generated from \pkg{R}.
-#'
-#'
-#'
-#'
-"base_did"
-
-
-
-
-
-#' Sample data for staggered difference in difference
-#'
-#' This data has been generated to illustrate the Sun and Abraham (Journal of Econometrics, 2021) method for staggered difference-in-difference. This is a balanced panel of 95 individuals and 10 periods. Half the individuals are treated. For those treated, the treatment date can vary from the second to the last period. The effect of the treatment depends on the time since the treatment: it is first negative and then increasing.
-#'
-#' @usage
-#' data(base_stagg)
-#'
-#' @format
-#' `base_stagg` is a data frame with 950 observations and 7 variables:
-#'
-#' * id: panel identifier.
-#' * year: from 1 to 10.
-#' * year_treated: the period at which the individual is treated.
-#' * time_to_treatment: different between the year and the treatment year.
-#' * treated: indicator taking value 1 if the individual is treated, 0 otherwise.
-#' * treatment_effect_true: true effect of the treatment.
-#' * x1: explanatory variable, correlated with the period.
-#' * y: the dependent variable affected by the treatment.
-#'
-#'
-#' @source
-#' This data has been generated from \pkg{R}.
-#'
-"base_stagg"
 
 
 

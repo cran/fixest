@@ -8,14 +8,14 @@
 setFixest_estimation(
   data = NULL,
   panel.id = NULL,
-  fixef.rm = "perfect",
+  fixef.rm = "perfect_fit",
   fixef.tol = 1e-06,
   fixef.iter = 10000,
   collin.tol = 1e-10,
   lean = FALSE,
   verbose = 0,
   warn = TRUE,
-  combine.quick = NULL,
+  fixef.keep_names = NULL,
   demeaned = FALSE,
   mem.clean = FALSE,
   glm.iter = 25,
@@ -37,12 +37,33 @@ with this \code{data.frame} names. Can also be a matrix.}
 separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables
 with \code{^} only inside formulas (see the dedicated section in \code{\link{feols}}).}
 
-\item{fixef.rm}{Can be equal to "perfect" (default), "singleton", "both" or "none".
-Controls which observations are to be removed. If "perfect", then observations
-having a fixed-effect with perfect fit (e.g. only 0 outcomes in Poisson estimations)
-will be removed. If "singleton", all observations for which a fixed-effect appears
-only once will be removed. Note, importantly, that singletons are removed in just one pass,
-there is no recursivity implemented. The meaning of "both" and "none" is direct.}
+\item{fixef.rm}{Can be equal to "perfect_fit" (default), "singletons", "infinite_coef"
+or "none".
+
+This option controls which observations should be removed prior to the estimation.
+If "singletons", fixed-effects associated to a single observation are removed
+(since they perfectly explain it).
+
+The value "infinite_coef" only works with GLM families with limited left hand sides (LHS)
+and exponential link.
+For instance the Poisson family for which the LHS cannot be lower than 0, or the logit
+family for which the LHS lies within 0 and 1.
+In that case the fixed-effects (FEs) with only-0 LHS would lead to infinite coefficients
+(FE = -Inf would explain perfectly the LHS).
+The value \code{fixef.rm="infinite_coef"} removes all observations associated to FEs with
+infinite coefficients.
+
+If "perfect_fit", it is equivalent to "singletons" and "infinite_coef" combined.
+That means all observations that are perfectly explained by the FEs are removed.
+
+If "none": no observation is removed.
+
+Note that whathever the value of this options: the coefficient estimates
+will remain the same. It only affects inference (the standard-errors).
+
+The algorithm is recursive, meaning that, e.g. in the presence of several fixed-effects (FEs),
+removing singletons in one FE can create singletons (or perfect fits) in another FE.
+The algorithm continues until there is no singleton/perfect-fit remaining.}
 
 \item{fixef.tol}{Precision used to obtain the fixed-effects. Defaults to \code{1e-5}.
 It corresponds to the maximum absolute difference allowed between two coefficients
@@ -53,12 +74,12 @@ controlled by the algorithm.}
 \item{fixef.iter}{Maximum number of iterations in fixed-effects algorithm
 (only in use for 2+ fixed-effects). Default is 10000.}
 
-\item{collin.tol}{Numeric scalar, default is \code{1e-10}. Threshold deciding when variables should
+\item{collin.tol}{Numeric scalar, default is \code{1e-9}. Threshold deciding when variables should
 be considered collinear and subsequently removed from the estimation. Higher values means more
 variables will be removed (if there is presence of collinearity). One signal of presence of
 collinearity is t-stats that are extremely low (for instance when t-stats < 1e-3).}
 
-\item{lean}{Logical, default is \code{FALSE}. If \code{TRUE} then all large objects are removed
+\item{lean}{Logical scalar, default is \code{FALSE}. If \code{TRUE} then all large objects are removed
 from the returned result: this will save memory but will block the possibility to
 use many methods. It is recommended to use the arguments \code{se} or \code{cluster} to
 obtain the appropriate standard-errors at estimation time, since obtaining different
@@ -71,21 +92,22 @@ it can detail the number of iterations in the demeaning algorithm
 \item{warn}{Logical, default is \code{TRUE}. Whether warnings should be displayed
 (concerns warnings relating to convergence state).}
 
-\item{combine.quick}{Logical. When you combine different variables to transform them
-into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}.
+\item{fixef.keep_names}{Logical or \code{NULL} (default). When you combine different
+variables to transform them into a single fixed-effects you can do
+e.g. \code{y ~ x | paste(var1, var2)}.
 The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}.
 Because pasting variables is a costly operation, the internal algorithm may use a
 numerical trick to hasten the process. The cost of doing so is that you lose the labels.
 If you are interested in getting the value of the fixed-effects coefficients
-after the estimation, you should use \code{combine.quick = FALSE}. By default it is
-equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE}
+after the estimation, you should use \code{fixef.keep_names = TRUE}. By default it is
+equal to \code{TRUE} if the number of unique values is lower than 50,000, and to \code{FALSE}
 otherwise.}
 
 \item{demeaned}{Logical, default is \code{FALSE}. Only used in the presence of fixed-effects: should
 the centered variables be returned? If \code{TRUE}, it creates the items
 \code{y_demeaned} and \code{X_demeaned}.}
 
-\item{mem.clean}{Logical, default is \code{FALSE}. Only to be used if the data set is
+\item{mem.clean}{Logical scalar, default is \code{FALSE}. Only to be used if the data set is
 large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as
 much as possible and \code{\link{gc}} is run before each substantial C++ section in the internal
 code to avoid memory issues.}

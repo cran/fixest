@@ -5,21 +5,55 @@
 \alias{update.fixest_multi}
 \title{Updates a \code{fixest} estimation}
 \usage{
-\method{update}{fixest}(object, fml.update, nframes = 1, evaluate = TRUE, ...)
+\method{update}{fixest}(
+  object,
+  fml.update = NULL,
+  fml = NULL,
+  nframes = 1,
+  use_calling_env = TRUE,
+  evaluate = TRUE,
+  ...
+)
 
-\method{update}{fixest_multi}(object, fml.update, nframes = 1, evaluate = TRUE, ...)
+\method{update}{fixest_multi}(
+  object,
+  fml.update = NULL,
+  fml = NULL,
+  nframes = 1,
+  use_calling_env = TRUE,
+  evaluate = TRUE,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{fixest} or \code{fixest_multi} object. These are obtained from \code{\link{feols}}, or
 \code{\link{feglm}} estimations, for example.}
 
-\item{fml.update}{Changes to be made to the original argument \code{fml}. See more information
-on \code{\link[stats:update.formula]{update.formula}}. You can add/withdraw both variables
-and fixed-effects. E.g. \code{. ~ . + x2 | . + z2} would add the variable \code{x2} and the
-fixed-effect \code{z2} to the former estimation.}
+\item{fml.update}{A formula representing the changes to be made to the original
+formula. By default it is \code{NULL}.
+Use a dot to refer to the previous variables in the current part.
+For example: \code{. ~ . + xnew} will add the variable \code{xnew} as an explanatory variable.
+Note that the previous fixed-effects (FEs) and IVs are implicitly forwarded.
+To rerun without the FEs or the IVs, you need to set them to 0 in their respective slot.
+Ex, assume the original formula is: \code{y ~ x | fe | endo ~ inst}, passing \code{. ~ . + xnew}
+to fml.update leads to \code{y ~ x + xnew | fe | endo ~ inst} (FEs and IVs are forwarded).
+To add xnew and remove the IV part: use \code{. ~ . + xnew | . | 0} which leads to
+\code{y ~ x + xnew | fe}.}
 
-\item{nframes}{(Advanced users.) Defaults to 1. Number of frames up the stack where
-to perform the evaluation of the updated call. By default, this is the parent frame.}
+\item{fml}{A formula, default is \code{NULL}. If provided, it will completely override
+the value in \code{fml.update}, which will be ignored. Note that this formula will be
+used for the new estimation, without any modification.}
+
+\item{nframes}{(Advanced users.) Defaults to 1. Only used if the argument
+\code{use_calling_env} is \code{FALSE}.
+Number of frames up the stack where to perform the evaluation of the updated call.
+By default, this is the parent frame.}
+
+\item{use_calling_env}{Logical scalar, default is \code{TRUE}. If \code{TRUE} then the evaluation
+of the call will be done within the environment that called the initial estimation.
+This is mostly useful when the \code{fixest} object has been created through a custom
+function, so that the new evaluation can use the variables within the enclosure of
+the function.}
 
 \item{evaluate}{Logical, default is \code{TRUE}. If \code{FALSE}, only the updated call is returned.}
 
@@ -55,7 +89,8 @@ etable(est_pois, est_2, est_3, est_4)
 
 }
 \seealso{
-See also the main estimation functions \code{\link{femlm}}, \code{\link{feols}} or \code{\link{feglm}}. \code{\link{predict.fixest}}, \code{\link{summary.fixest}}, \code{\link{vcov.fixest}}, \code{\link{fixef.fixest}}.
+See also the main estimation functions \code{\link{femlm}}, \code{\link{feols}} or \code{\link{feglm}}.
+\code{\link{predict.fixest}}, \code{\link{summary.fixest}}, \code{\link{vcov.fixest}}, \code{\link{fixef.fixest}}.
 }
 \author{
 Laurent Berge

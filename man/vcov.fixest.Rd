@@ -51,8 +51,8 @@ the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{attr}{Logical, defaults to \code{FALSE}. Whether to include the attributes describing how
 the VCOV was computed.}
@@ -73,9 +73,12 @@ c) a number strictly between 0 and 1 which represents the fraction of all thread
 The default is to use 50\% of all threads. You can set permanently the number
 of threads used within this package using the function \code{\link{setFixest_nthreads}}.}
 
-\item{vcov_fix}{Logical scalar, default is \code{TRUE}. If the VCOV ends up not being
+\item{vcov_fix}{Logical scalar, default is \code{FALSE}. If the VCOV ends up not being
 positive definite, whether to "fix" it using an eigenvalue decomposition
-(a la Cameron, Gelbach & Miller 2011).}
+(a la Cameron, Gelbach & Miller 2011).
+Since the VCOV should be PSD asymptotically, this might be a sign of a problem
+with using the asymptotic approximation (e.g. too few units in clusters).
+If a problem is detected, the function will print a message to inform you.}
 
 \item{...}{Other arguments to be passed to \code{\link{summary.fixest}}.
 
@@ -240,12 +243,12 @@ se(vcov(est_geo, "conley"))
 
 # You can change the way the small sample corrections are done with the argument ssc.
 # The argument ssc must be created by the ssc function
-se(vcov(est, ssc = ssc(adj = FALSE)))
+se(vcov(est, ssc = ssc(K.adj = FALSE)))
 
 # You can add directly the call to ssc in the vcov formula.
 # You need to add it like a variable:
-se(vcov(est, iid ~ ssc(adj = FALSE)))
-se(vcov(est, DK ~ period + ssc(adj = FALSE)))
+se(vcov(est, iid ~ ssc(K.adj = FALSE)))
+se(vcov(est, DK ~ period + ssc(K.adj = FALSE)))
 
 
 

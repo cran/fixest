@@ -57,7 +57,6 @@
 #' est_pois = fepois(Euros ~ log(dist_km)|Origin+Destination+Product, trade)
 #'
 #' # displaying the results
-#' #  (by default SEs are clustered if FEs are used)
 #' print(est_pois)
 #'
 #' # By default the coefficient table is displayed.
@@ -374,11 +373,8 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 #' @param ssc An object of class `ssc.type` obtained with the function [`ssc`]. Represents 
 #' how the degree of freedom correction should be done.You must use the function [`ssc`] 
 #' for this argument. The arguments and defaults of the function [`ssc`] are: 
-#' `adj = TRUE`, `fixef.K="nested"`, `cluster.adj = TRUE`, `cluster.df = "min"`, 
-#' `t.df = "min"`, `fixef.force_exact=FALSE)`. See the help of the function [`ssc`] for details.
-#' @param .vcov A user provided covariance matrix or a function computing this matrix. If a 
-#' matrix, it must be a square matrix of the same number of rows as the number 
-#' of variables estimated. If a function, it must return the previously mentioned matrix.
+#' `K.adj = TRUE`, `K.fixef = "nonnested"`, `G.adj = TRUE`, `G.df = "min"`, 
+#' `t.df = "min"`, `K.exact = FALSE)`. See the help of the function [`ssc`] for details.
 #' @param lean Logical, default is `FALSE`. Used to reduce the (memory) size of the summary object.
 #'  If `TRUE`, then all objects of length N (the number of observations) are removed 
 #' from the result. Note that some `fixest` methods may consequently not work when applied 
@@ -391,12 +387,15 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 #' coefficients only.) Logical, default is `FALSE`. If `TRUE`, then the bounded coefficients 
 #' (if any) are treated as unrestricted coefficients and their S.E. is computed (otherwise 
 #' it is not).
-#' @param vcov_fix Logical scalar, default is `TRUE`. If the VCOV ends up not being 
+#' @param vcov_fix Logical scalar, default is `FALSE`. If the VCOV ends up not being 
 #' positive definite, whether to "fix" it using an eigenvalue decomposition 
 #' (a la Cameron, Gelbach & Miller 2011).
+#' Since the VCOV should be PSD asymptotically, this might be a sign of a problem 
+#' with using the asymptotic approximation (e.g. too few units in clusters).
+#' If a problem is detected, the function will print a message to inform you. 
 #' @param n Integer, default is 1000. Number of coefficients to display when the print method 
 #' is used.
-#' @param ... Only used if the argument `.vcov` is provided and is a function: extra arguments 
+#' @param ... Only used if the argument `vcov` is provided and is a function: extra arguments 
 #' to be passed to that function.
 #'
 #' @section Compatibility with \pkg{sandwich} package:
@@ -511,12 +510,12 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
 #' # Compatibility with sandwich
 #' #
 #'
-#' # You can use the VCOVs from sandwich by using the argument .vcov:
+#' # You can use the VCOVs from sandwich by using the argument vcov:
 #' library(sandwich)
-#' summary(est_pois, .vcov = vcovCL, cluster = trade[, c("Destination", "Product")])
+#' summary(est_pois, vcov = vcovCL, cluster = trade[, c("Destination", "Product")])
 #'
 #'
-summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov = NULL,
+summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL,
                           stage = NULL, lean = FALSE, agg = NULL, forceCovariance = FALSE,
                           se = NULL, keepBounded = FALSE, n = 1000, vcov_fix = TRUE,
                           nthreads = getFixest_nthreads(), ...){
@@ -538,9 +537,20 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
     object$n_print = n
   }
 
+  # .vcov is now deprecated
+  if(".vcov" %in% names(dots) && is.null(vcov)){
+    if(is.null(getOption("fixest_deprec_arg_.vcov"))){
+      warning("The argument '.vcov' is deprecated. Please use 'vcov' instead.")
+      options(fixest_deprec_arg_.vcov = TRUE)
+    }
+    vcov = dots[[".vcov"]]
+    attr(vcov, "deparsed_arg") = fetch_arg_deparse(".vcov")
+    dots[[".vcov"]] = NULL
+  }
+
   # we need this to save the summary flags
-  # All three arguments se+cluster+.vcov are formatted into a valid vcov arg.
-  vcov_in = vcov = oldargs_to_vcov(se, cluster, vcov, .vcov)
+  # All three arguments se+cluster are formatted into a valid vcov arg.
+  vcov_in = vcov = oldargs_to_vcov(se, cluster, vcov)
 
   check_arg(lean, "logical scalar")
   check_arg(stage, "NULL integer vector no na len(,2) GE{1} LE{2}")
@@ -602,7 +612,8 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
                                            vcov = vcov, ssc = ssc, lean = lean,
                                            forceCovariance = forceCovariance,
                                            vcov_fix = vcov_fix,
-                                           n = n, nthreads = nthreads, iv = TRUE)
+                                           n = n, nthreads = nthreads, iv = TRUE, 
+                                           ...)
 
           stage_names[length(stage_names) + 1] = paste0("First stage: ", 
                                                         names(object$iv_first_stage)[i])
@@ -612,7 +623,7 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
         # We keep the information on clustering => matters for wald tests of 1st stage
         my_res = summary(object, vcov = vcov, ssc = ssc, lean = lean,
                          forceCovariance = forceCovariance, vcov_fix = vcov_fix,
-                         n = n, nthreads = nthreads, iv = TRUE)
+                         n = n, nthreads = nthreads, iv = TRUE, ...)
 
         res[[length(res) + 1]] = my_res
         stage_names[length(stage_names) + 1] = "Second stage"
@@ -706,8 +717,9 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
   if(lean){
     var2clean = c("fixef_id", "data", "residuals", "fitted.values", "scores", "sumFE",
                   "slope_variables_reordered", "y", "weights", "irls_weights",
-                  "obs_selection", "iv_residuals", "fitted.values_demean",
-                  "working_residuals", "linear.predictors")
+                  "iv_residuals", "fitted.values_demean",
+                  "working_residuals", "linear.predictors", 
+                  "summary_flags", "call_env")
 
     object[var2clean] = NULL
 
@@ -722,31 +734,25 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
   }
 
   object$summary = TRUE
-
+  
+  # New behavior 2024-08-27: we do not keep the flags if lean = TRUE
+  # => leads to large objects + feature lost is OK
+  #
+  
   # We save the arguments used to construct the summary
   if("summary_flags" %in% names(dots)){
     # If here => this is a call from an estimation (=fit)
-    object$summary_flags = dots$summary_flags
+    if(!lean){
+      object$summary_flags = dots$summary_flags
+    }
     object$summary_from_fit = TRUE
-  } else {
+  } else if(!lean){
     # build_flags does not accept missing arguments
     if(missing(ssc)) ssc = NULL
-
-    if(lean){
-
-      size_KB = as.numeric(object.size(vcov)) / 8 / 1000
-
-      if(size_KB > 100){
-        # Here => means the user has manually provided a cluster => will be of size N at least
-        # To respect lean = TRUE we keep no memory of this choice
-        vcov_in = NULL
-      }
-
-    }
-
     object$summary_flags = build_flags(mc, vcov = vcov_in, ssc = ssc)
     object$summary_from_fit = NULL
   }
+  
 
   # agg
   if(!missnull(agg)){
@@ -761,15 +767,19 @@ summary.fixest = function(object, vcov = NULL, cluster = NULL, ssc = NULL, .vcov
 
 
 #' @rdname summary.fixest
-summary.fixest_list = function(object, se, cluster, ssc = getFixest_ssc(), .vcov, 
+summary.fixest_list = function(object, se, cluster, ssc = getFixest_ssc(), vcov = NULL, 
                                stage = 2, lean = FALSE, n, ...){
 
   dots = list(...)
 
   res = list()
   for(i in seq_along(object)){
-    my_res = summary(object[[i]], se = se, cluster = cluster, ssc = ssc, 
-                     .vcov = .vcov, stage = stage, lean = lean, n = n)
+    if (!is.null(vcov) && is.list(vcov) && length(object) == length(vcov)) {
+      my_res = summary(object[[i]], se = se, cluster = cluster, ssc = ssc, 
+        vcov = vcov[[i]], stage = stage, lean = lean, n = n)
+    } else {
+      my_res = summary(object[[i]], vcov = vcov, se = se, cluster = cluster, ssc = ssc, vcov = vcov, stage = stage, lean = lean, n = n, ...)
+    }
 
     # we unroll in case of IV
     if("fixest_multi" %in% class(my_res)){
@@ -1499,6 +1509,7 @@ coeftable.default = function(object, keep, drop, order, ...){
     if(!is.null(colnames(mat)) && any(grepl("(?i)(coef|estimate|value|Pr\\()", colnames(mat)))){
       ok = TRUE
       res = mat
+      break
     }
   }
 
@@ -1670,7 +1681,6 @@ se.matrix = function(object, keep, drop, order, ...){
 #' # Coeftable/se/tstat/pvalue
 #' #
 #'
-#' # Default is clustering along Origin^Product
 #' coeftable(est)
 #' se(est)
 #' tstat(est)
@@ -1684,7 +1694,7 @@ se.matrix = function(object, keep, drop, order, ...){
 #' pvalue(est, cluster = ~Origin + Product)
 #' tstat(est, cluster = ~Origin + Product)
 #'
-#' # Or you can cluster only once:
+#' # Or you can cluster only once using summary:
 #' est_sum = summary(est, cluster = ~Origin + Product)
 #' coeftable(est_sum)
 #' se(est_sum)
@@ -2532,6 +2542,13 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 
     if(do_anyway || isTRUE(object$lean)){
       newdata = fetch_data(object, "In 'predict', ")
+      
+      if(sample == "estimation"){
+        for(i in seq_along(object$obs_selection)){
+          newdata = select_obs(newdata, object$obs_selection[[i]])
+        }
+      }
+      
       is_original_data = TRUE
     } else {
       if(type == "response" || object$method_type == "feols"){
@@ -2558,6 +2575,9 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
       return(res)
     }
 
+  } else if(sample == "original"){
+    warning("The argument `sample` is ignored when `newdata` is provided.")
+    sample = "estimation"
   }
 
   if(!is.matrix(newdata) && !"data.frame" %in% class(newdata)){
@@ -2626,12 +2646,12 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
 
       # Checking if ^ is present
       if(grepl("\\^", fe_var)){
-        # If fastCombine was used => we're screwed, impossible to recover
+        # If fixef.keep_names was used => we're screwed, impossible to recover
         if(!all(grepl("_", fixef_values_possible, fixed = TRUE))){
-          stop("You cannot use predict() based on the initial regression since the fixed-effect '", fe_var, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'combine.quick=FALSE'.")
+          stop("You cannot use predict() based on the initial regression since the fixed-effect '", fe_var, "' was combined using an algorithm dropping the FE values (but fast). Please re-run the regression using the argument 'fixef.keep_names=TRUE'.")
         }
 
-        fe_var = fml_combine(fe_var, fastCombine = FALSE, vars = TRUE)
+        fe_var = fml_combine(fe_var, fixef.keep_names = TRUE, vars = TRUE)
       }
 
       # Obtaining the vector of fixed-effect
@@ -2644,7 +2664,7 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
     names(id_fixef) = fixef_vars
 
     # Value of the fixef coefficients // we don't show the notes, it's inelegant
-    fixef_coef = fixef(object, sorted = FALSE, notes = FALSE)
+    fixef_coef = fixef(object, sorted = FALSE, notes = FALSE, fixef.tol = 1e-6)
 
     # We create the DF to be returned
     if(fixef.return){
@@ -2749,7 +2769,7 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
     # dropping names
     value_fixef = as.vector(value_fixef)
   }
-
+  
   #
   # 2) Linear values
   #
@@ -2760,8 +2780,12 @@ predict.fixest = function(object, newdata, type = c("response", "link"), se.fit 
   var_keep = NULL
   rhs_fml = fml_split(fml, 1)
   linear.varnames = all_vars_with_i_prefix(rhs_fml[[3]])
-
-  if(length(linear.varnames) > 0){
+  
+  if(length(linear.varnames) == 0 && "(Intercept)" %in% names(coef)){
+    # we need a specific branch
+    value_linear = rep(coef[["(Intercept)"]], nrow(newdata))
+    
+  } else if(length(linear.varnames) > 0){
     # Checking all variables are there
 
     if(isTRUE(object$iv) && object$iv_stage == 2){
@@ -3084,12 +3108,28 @@ confint.fixest = function(object, parm, level = 0.95, vcov, se, cluster,
 #' 
 #' @param object A `fixest` or `fixest_multi` object. These are obtained from [`feols`], or
 #' [`feglm`] estimations, for example.
-#' @param fml.update Changes to be made to the original argument `fml`. See more information 
-#' on [`update.formula`][stats::update.formula]. You can add/withdraw both variables 
-#' and fixed-effects. E.g. `. ~ . + x2 | . + z2` would add the variable `x2` and the 
-#' fixed-effect `z2` to the former estimation.
-#' @param nframes (Advanced users.) Defaults to 1. Number of frames up the stack where 
-#' to perform the evaluation of the updated call. By default, this is the parent frame.
+#' @param fml.update A formula representing the changes to be made to the original 
+#' formula. By default it is `NULL`. 
+#' Use a dot to refer to the previous variables in the current part. 
+#' For example: `. ~ . + xnew` will add the variable `xnew` as an explanatory variable.
+#' Note that the previous fixed-effects (FEs) and IVs are implicitly forwarded. 
+#' To rerun without the FEs or the IVs, you need to set them to 0 in their respective slot.
+#' Ex, assume the original formula is: `y ~ x | fe | endo ~ inst`, passing `. ~ . + xnew`
+#' to fml.update leads to `y ~ x + xnew | fe | endo ~ inst` (FEs and IVs are forwarded).
+#' To add xnew and remove the IV part: use `. ~ . + xnew | . | 0` which leads to
+#' `y ~ x + xnew | fe`.
+#' @param fml A formula, default is `NULL`. If provided, it will completely override
+#' the value in `fml.update`, which will be ignored. Note that this formula will be 
+#' used for the new estimation, without any modification.
+#' @param nframes (Advanced users.) Defaults to 1. Only used if the argument 
+#' `use_calling_env` is `FALSE`. 
+#' Number of frames up the stack where to perform the evaluation of the updated call. 
+#' By default, this is the parent frame.
+#' @param use_calling_env Logical scalar, default is `TRUE`. If `TRUE` then the evaluation 
+#' of the call will be done within the environment that called the initial estimation.
+#' This is mostly useful when the `fixest` object has been created through a custom 
+#' function, so that the new evaluation can use the variables within the enclosure of
+#' the function.
 #' @param evaluate Logical, default is `TRUE`. If `FALSE`, only the updated call is returned.
 #' @param ... Other arguments to be passed to the functions [`femlm`], [`feols`] or [`feglm`].
 #'
@@ -3097,7 +3137,8 @@ confint.fixest = function(object, parm, level = 0.95, vcov, se, cluster,
 #' It returns a `fixest` object (see details in [`femlm`], [`feols`] or [`feglm`]).
 #'
 #' @seealso
-#' See also the main estimation functions [`femlm`], [`feols`] or [`feglm`]. [`predict.fixest`], [`summary.fixest`], [`vcov.fixest`], [`fixef.fixest`].
+#' See also the main estimation functions [`femlm`], [`feols`] or [`feglm`]. 
+#' [`predict.fixest`], [`summary.fixest`], [`vcov.fixest`], [`fixef.fixest`].
 #'
 #' @author
 #' Laurent Berge
@@ -3122,22 +3163,19 @@ confint.fixest = function(object, parm, level = 0.95, vcov, se, cluster,
 #' # Quick look at the 4 estimations
 #' etable(est_pois, est_2, est_3, est_4)
 #'
-update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
+update.fixest = function(object, fml.update = NULL, fml = NULL, nframes = 1, 
+                         use_calling_env = TRUE, evaluate = TRUE, ...){
   # Update method
   # fml.update: update the formula
   # If 1) SAME DATA and 2) SAME dep.var, then we make initialisation
 
 
-  if(missing(fml.update)){
-    fml.update = . ~ .
-  } else {
-    check_arg(fml.update, "formula")
-  }
+  check_arg(fml.update, fml, "NULL ts formula")
 
-  check_arg(evaluate, "logical scalar")
+  check_arg(use_calling_env, evaluate, "logical scalar")
 
   if(isTRUE(object$is_fit)){
-    stop("update method not available for fixest estimations obtained from fit methods.")
+    stop("update method not available for `fixest` estimations obtained from fit methods.")
   }
 
   if(!isScalar(nframes) || nframes < 1 || nframes %% 1 != 0){
@@ -3156,7 +3194,7 @@ update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
 
   dot_names = names(dots)
   if("fixef" %in% dot_names){
-    stop("Argument 'fixef' is not accepted in the 'update.fixest' method. Please make modifications to fixed-effects directly in the argument 'fml.update'. (E.g. .~.|.+v5 to add variable v5 as a fixed-effect.)")
+    stop("Argument 'fixef' is not accepted in the 'update.fixest' method. Please make modifications to fixed-effects directly in the argument 'fml.update'. \n(E.g. `. ~ . | . + v5` to add variable `v5` as a fixed-effect.)")
   }
 
   if(any(dot_names == "")){
@@ -3164,14 +3202,7 @@ update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
     problems = call_new[call_new_names == ""][-1]
     stop("In 'update.fixest' the arguments of '...' are passed to the function ", object$method, ", and must be named. Currently there are un-named arguments (e.g. '", deparse_long(problems[[1]]), "').")
   }
-
-  #
-  # I) Linear formula update
-  #
-
-  fml_old = object$fml_all$linear
-  fml_linear = update(fml_old, fml_split(fml.update, 1))
-
+  
   # Family information
   if(!is.null(dots$family)){
     if(object$method_type == "feols"){
@@ -3180,98 +3211,17 @@ update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
       family_new = match.arg(dots$family, c("poisson", "negbin", "gaussian", "logit"))
     }
   }
-
+  
   #
-  # II) fixed-effects updates
+  # the formula
   #
-
-  fml_fixef = NULL
-
-  update_fml_parts = fml_split(fml.update, raw = TRUE)
-  n_parts = length(update_fml_parts)
-
-  if(n_parts > 2 + (object$method_type == "feols")){
-    stop("The update formula cannot have more than ", 2 + (object$method_type == "feols"), " parts for the method ", object$method, ".")
+  
+  fml_new = formula(object)
+  if(!is.null(fml)){
+    fml_new = fml
+  } else if(!is.null(fml.update)){
+    fml_new = fixest_upadte_formula(fml.update, fml_new)
   }
-
-  is_fe = n_parts > 1 && !is_fml_inside(update_fml_parts[[2]])
-
-  fixef_vars = object$fixef_vars
-
-  if(is_fe){
-
-    fixef_old = object$fml_all$fixef
-
-    # I use it as text to catch the var1^var2 FEs (update does not work)
-    if(is.null(fixef_old)){
-      fixef_old = ~1
-      fixef_old_text = "~ 1"
-    } else {
-      fixef_old_text = deparse_long(fixef_old)
-    }
-
-    fixef_new_fml = fml_maker(update_fml_parts[[2]])
-    fixef_new_text = deparse_long(fixef_new_fml)
-
-    if(fixef_new_text == "~."){
-      # nothing happens
-      fixef_new = fixef_old
-
-    } else if(fixef_new_text %in% c("~0", "~1")){
-      fixef_new = ~1
-
-    } else if(grepl("\\^", fixef_old_text) || grepl("\\^", fixef_new_text)){
-      # we update manually.... dammmit
-      # Note that what follows does not work ONLY when you have number^var or number^number
-      # and both cases don't make much sense -- I need not control for them
-      fml_text_old = gsub("\\^", "__666__", fixef_old_text)
-      fml_text_new = gsub("\\^", "__666__", fixef_new_text)
-
-      fixef_new_wip = update(as.formula(fml_text_old), as.formula(fml_text_new))
-
-      fixef_new = as.formula(gsub("__666__", "^", fixef_new_wip))
-    } else {
-      fixef_new = update(fixef_old, fixef_new_fml)
-    }
-
-    if(length(all.vars(fixef_new)) > 0){
-      # means there is a fixed-effect
-      fml_fixef = fixef_new
-    }
-
-  } else if(!is.null(fixef_vars)){
-    # the formula updated:
-    fml_fixef = object$fml_all$fixef
-
-  }
-
-  #
-  # III) IV updates
-  #
-
-  if(n_parts > 2 || (n_parts == 2 && !is_fe)){
-
-    iv_new_fml = fml_maker(update_fml_parts[[n_parts]])
-
-    if(!is_fml_inside(iv_new_fml)){
-      stop("The third part of the update formula in 'feols' must be a formula.")
-    }
-
-    iv_old = object$fml_all$iv
-
-    if(is.null(iv_old)){
-      fml_iv = iv_new_fml
-
-    } else {
-      fml_iv = update(iv_old, iv_new_fml)
-    }
-
-  } else {
-    fml_iv = object$fml_all$iv
-  }
-
-
-  fml_new = merge_fml(fml_linear, fml_fixef, fml_iv)
 
   #
   # The call
@@ -3318,12 +3268,18 @@ update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
   # Data: if the data has been saved AND isn't provided in input, the new estimation
   # will be within the saved data set
   
+  if(use_calling_env && !is.null(object$call_env)){
+    env = object$call_env
+  } else {
+    env = parent.frame(nframes)
+  }
+  
   if(!is.null(object$data) && !"data" %in% dot_names){
     prms = list(DATA_SAVED = object$data)
     call_clear[["data"]] = quote(DATA_SAVED)
-    res = eval(call_clear, prms, parent.frame(nframes))
+    res = eval(call_clear, prms, env)
   } else {
-    res = eval(call_clear, parent.frame(nframes))
+    res = eval(call_clear, env)
   }
 
   res
@@ -3331,7 +3287,8 @@ update.fixest = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
 
 
 #' @rdname update.fixest
-update.fixest_multi = function(object, fml.update, nframes = 1, evaluate = TRUE, ...){
+update.fixest_multi = function(object, fml.update = NULL, fml = NULL, nframes = 1, 
+                               use_calling_env = TRUE, evaluate = TRUE, ...){
   # We use update.fixest
   # We just need to rewrite the formula since the call in the object is the one 
   # of the main estimation.
@@ -3356,8 +3313,9 @@ update.fixest_multi = function(object, fml.update, nframes = 1, evaluate = TRUE,
   
   call_new = match.call()
 
-  update(est_first, fml.update = fml.update, nframes = nframes + 1, 
-         evaluate = evaluate, is_multiple = TRUE, call = call_new, ...)
+  update(est_first, fml.update = fml.update, fml = fml, nframes = nframes + 1, 
+         use_calling_env = use_calling_env, evaluate = evaluate, 
+         is_multiple = TRUE, call = call_new, ...)
 }
 
 
@@ -3368,17 +3326,48 @@ update.fixest_multi = function(object, fml.update, nframes = 1, evaluate = TRUE,
 #' in the formula after a pipe (\dQuote{|}). If the estimation was done with a non 
 #' linear in parameters part, then this will be added in the formula in between `I()`.
 #'
-#'
+#' @inheritParams update.fixest
+#' 
 #' @param x An object of class `fixest`. Typically the result of a [`femlm`], [`feols`] 
 #' or [`feglm`] estimation.
 #' @param type A character scalar. Default is `type = "full"` which gives back a formula 
 #' containing the linear part of the model along with the fixed-effects (if any) and the 
-#' IV part (if any). If `type = "linear"` then only the linear formula is returned. 
-#' If `type = "NL"` then only the non linear in parameters part is returned.
+#' IV part (if any). Here is a description of the other types:
+#' - `full.noiv`: the full formula without the IV part
+#' - `full.nofixef.noiv`: the full formula without the IV nor the fixed-effects part
+#' - `lhs`: a one-sided formula with the dependent variable
+#' - `rhs`: a one-sided formula of the right hand side without the IVs (if any)
+#' - `rhs.nofixef` or `indep`: a one-sided formula of the right hand side without the 
+#' fixed-effects nor IVs (if any), it is equivalent to the 
+#' independent variables
+#' - `NL`: a one-sided formula with the non-linear part (if any)
+#' - `fixef`: a one-sided formula containing the fixed-effects
+#' - `iv`: a two-sided formula containing the endogenous variables (left) and the
+#' instruments (right)
+#' - `iv.endo`: a one-sided formula of the endogenous variables
+#' - `iv.inst`: a one-sided formula of the instruments
+#' - `iv.reduced`: a two-sided formula representing the reduced form, 
+#' that is `y ~ exo + inst`
+#' @param fml.build A formula or `NULL` (default). You can create a new formula based 
+#' on the parts of the formula of the object in `x`. In this argument you have access
+#' to these specific variables:
+#' - `.`: to refer to the part of the original formula
+#' - `.lhs`: to refer to the dependent variable
+#' - `.indep`: to refer to the independent variables (excluding the fixed-effects)
+#' - `.fixef`: to refer to the fixed-effects
+#' - `.endo`: to refer to endogenous variables in an IV estimation
+#' - `.inst`: to refer to instruments in an IV estimation
+#' 
+#' Example, the original estimation was `y ~ x1 | z ~ inst`. Then 
+#' `fml.build = . ~ .endo + .` leads to `y ~ z + x1`.
 #' @param ... Not currently used.
+#' 
+#' @details 
+#' The arguments `type`, `fml.update` and `fml.build` are exclusive: they 
+#' cannot be used at the same time.
 #'
 #' @return
-#' It returns a formula.
+#' It returns either a one-sided formula, either a two-sided formula.
 #'
 #' @seealso
 #' See also the main estimation functions [`femlm`], [`feols`] or [`feglm`]. 
@@ -3389,37 +3378,144 @@ update.fixest_multi = function(object, fml.update, nframes = 1, evaluate = TRUE,
 #'
 #' @examples
 #'
-#' # simple estimation on iris data, using "Species" fixed-effects
-#' res = femlm(Sepal.Length ~ Sepal.Width + Petal.Length +
-#'             Petal.Width | Species, iris)
+#' # example estimation with IVS and FEs
+#' base = setNames(iris, c("y", "x1", "endo", "instr", "species"))
+#' est = feols(y ~ x1 | species | endo ~ instr, base)
+#' 
+#' # the full formula
+#' formula(est)
+#' 
+#' # idem without the IVs nor the FEs
+#' formula(est, "full.nofixef.noiv")
+#' 
+#' # the reduced form
+#' formula(est, "iv.reduced")
+#' 
+#' # the IV relation only
+#' formula(est, "iv")
+#' 
+#' # the dependent variable => onse-sided formula
+#' formula(est, "lhs")
+#' 
+#' # using update, we add x1^2 as an independent variable:
+#' formula(est, fml.update = . ~ . + x1^2)
+#' 
+#' # using build, see the difference => the FEs and the IVs are not inherited
+#' formula(est, fml.build = . ~ . + x1^2)
+#' 
+#' # we can use some special variables
+#' formula(est, fml.build = . ~ .endo + .indep)
 #'
-#' # formula with the fixed-effect variable
-#' formula(res)
 #'
-#' # linear part without the fixed-effects
-#' formula(res, "linear")
-#'
-#'
-formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
+formula.fixest = function(x, type = "full", fml.update = NULL, 
+                          fml.build = NULL, ...){
   # Extract the formula from the object
   # we add the clusters in the formula if needed
-
+  
   # Checking the arguments
   if(is_user_level_call()){
     validate_dots(suggest_args = "type")
   }
-
+  
+  check_arg(fml.update, fml.build, "NULL ts formula")
+  
   if(isTRUE(x$is_fit)){
     stop("formula method not available for fixest estimations obtained from fit methods.")
   }
+  
+  check_set_arg(type, "match(full, full.noiv, full.nofixef.noiv, lhs, indep, rhs, rhs.nofixef, NL, fixef, iv, iv.endo, iv.inst, iv.reduced, linear)", 
+                .message = "The argument `type` must be one of: `full`, `full.noiv`, `full.nofixef.noiv`, `lhs`, `rhs`, `indep`, `rhs.nofixef`, `NL`, `fixef`, `iv`, `iv.endo`, `iv.inst`, `iv.reduced`")
+  
+  if(!is.null(fml.update)){
+    fml_old = merge_fml(x$fml_all$linear, x$fml_all$fixef, x$fml_all$iv)
+    res = fixest_upadte_formula(fml.update, fml_old)
+    
+    return(res)
+    
+  }
+  
+  if(!is.null(fml.build)){
+    
+    fml_main = x$fml_all$linear
+    fml_fixef = x$fml_all$fixef
+    fml_iv = x$fml_all$iv
+    
+    fml_parts_new = fml_split(fml.build)
+    
+    if(length(fml_parts_new) == 1){
+      fml_fixef = NULL
+      fml_iv = NULL
+    } else if(length(fml_parts_new) == 2){
+      if(length(fml_parts_new[[2]]) == 2){
+        # no iv
+        fml_iv = NULL
+      } else {
+        # no FE
+        fml_fixef = NULL
+      }
+    }
+    
+    fml_old = merge_fml(fml_main, fml_fixef, fml_iv)
+    res = fixest_upadte_formula(fml.build, fml_old)
+    
+    vars = all.vars(res)
+    if(".lhs" %in% vars){
+      res = replace_target_with_expr(res, quote(.lhs), formula(x, "lhs")[[2]])
+    }
+    
+    if(".indep" %in% vars){
+      res = replace_target_with_expr(res, quote(.indep), formula(x, "indep")[[2]])
+    }
+    
+    if(".fixef" %in% vars){
+      res = replace_target_with_expr(res, quote(.fixef), formula(x, "fixef")[[2]])
+    }
+    
+    if(".endo" %in% vars){
+      if(!isTRUE(x$iv)){
+        stop("In the argument `fml.update`, the variable `.endo` is only accessible when `x` is an IV estimation, which is not the case here.")
+      }
+      res = replace_target_with_expr(res, quote(.endo), formula(x, "iv.endo")[[2]])
+    }
+    
+    if(".inst" %in% vars){
+      if(!isTRUE(x$iv)){
+        stop("In the argument `fml.update`, the variable `.inst` is only accessible when `x` is an IV estimation, which is not the case here.")
+      }
+      res = replace_target_with_expr(res, quote(.inst), formula(x, "iv.inst")[[2]])
+    }
+    
+    return(res)
+    
+  }
+  
+  
+  if(type == "linear") type = "full.nofixef.noiv"
+  if(type == "indep") type = "rhs.nofixef"
+  
+  if(type == "full"){
+    res = merge_fml(x$fml_all$linear, x$fml_all$fixef, x$fml_all$iv)
+    return(res)
+    
+  } else if(type == "full.noiv"){
+    res = merge_fml(x$fml_all$linear, x$fml_all$fixef, NULL)
+    return(res)
+    
+  } else if(type == "full.nofixef.noiv"){
+    res = merge_fml(x$fml_all$linear, NULL, NULL)
+    return(res)
+    
+  } else if(type == "lhs"){
+    return(x$fml[1:2])
 
-  check_set_arg(type, "match")
+  } else if(type == "rhs"){
+    rhs = merge_fml(x$fml_all$linear, x$fml_all$fixef)
+    return(rhs[c(1, 3)])
 
-  if(type == "linear"){
-    return(x$fml)
+  } else if(type == "rhs.nofixef"){
+    return(x$fml[c(1, 3)])
 
   } else if(type == "NL"){
-
     if(!x$method == "feNmlm"){
       stop("type = 'NL' is not valid for a ", x$method, " estimation.")
     }
@@ -3431,16 +3527,66 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 
     return(NL.fml)
 
-  } else if(type == "iv"){
+  } else if(type == "fixef"){
+    
+    if(is.null(x$fml_all$fixef)){
+      res = ~0
+    } else {
+      res = x$fml_all$fixef
+    }
+    
+    return(res)
+
+  } else {
+    
     if(is.null(x$fml_all$iv)){
-      stop("type = 'iv' is only available for feols estimations with IV.")
+      stopi("Argument `type = '{type}'` is only available for feols estimations with IVs.")
+    }
+    
+    fml_iv = x$fml_all$iv
+    
+    if(type == "iv"){
+      return(fml_iv)
+
+    } else if(type == "iv.endo"){
+      return(fml_iv[1:2])
+
+    } else if(type == "iv.inst"){
+      return(fml_iv[c(1, 3)])
+
+    } else if(type == "iv.reduced"){
+      rhs = xpd(x$fml, add = fml_iv[[3]])
+      res = merge_fml(rhs, x$fml_all$fixef)
+      return(res)
+
     }
   }
+  
+}
 
-  # Shall I add LHS ~ RHS + NL(NL fml) | fe | iv ???
-  res = merge_fml(x$fml_all$linear, x$fml_all$fixef, x$fml_all$iv)
+#' @rdname formula.fixest
+formula.fixest_multi = function(x, type = "full", fml.update = NULL, 
+                                fml.build = NULL, ...){
+  
+  est_first = x[[1]]
+  fml_full = est_first$call$fml
+  fml_parts = fml_split(fml_full, raw = TRUE)
+  n_parts = length(fml_parts)
+  is_fe = n_parts > 1 && !is_fml_inside(fml_parts[[2]])
 
-  res
+  fml_all = est_first$fml_all
+  # linear 
+  fml_all$linear = est_first$fml = fml_parts[[1]]
+
+  # fixef
+  if(is_fe){
+    fml_fixef = ~1
+    fml_fixef[[2]] = fml_parts[[2]]
+    fml_all$fixef = fml_fixef
+  }
+  est_first$fml_all = fml_all
+  
+  formula(est_first, type = type, fml.update = fml.update, fml.build = fml.build)
 }
 
 
@@ -3453,21 +3599,32 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 #'
 #' @inheritParams nobs.fixest
 #'
-#' @param data If missing (default) then the original data is obtained by evaluating 
-#' the `call`. Otherwise, it should be a `data.frame`.
+#' @param data A data.frame or `NULL` (the default). If missing or `NULL`, then the 
+#' original data is obtained by evaluating  the `call`.
 #' @param type Character vector or one sided formula, default is "rhs". Contains the type of 
 #' matrix/data.frame to be returned. Possible values are: "lhs", "rhs", "fixef", "iv.rhs1" 
 #' (1st stage RHS), "iv.rhs2" (2nd stage RHS), "iv.endo" (endogenous vars.), "iv.exo" 
 #' (exogenous vars), "iv.inst" (instruments).
-#' @param na.rm Default is `TRUE`. Should observations with NAs be removed from the matrix?
-#' @param subset Logical or character vector. Default is `FALSE`. If `TRUE`, then the 
+#' @param sample Character scalar equal to "estimation" (default) or "original". Only
+#' used when `data=NULL` (i.e. the original data is requested). By default, 
+#' only the observations effectively used in the estimation are returned (it includes 
+#' the observations with NA values or the fully explained by the fixed-effects (FE), or
+#' due to NAs in the weights).
+#' 
+#' If `sample="original"`, all the observations are returned. In that case, if 
+#' you use `na.rm=TRUE` (which is not the default), you can withdraw the observations 
+#' with NA values (and keep the ones fully explained by the FEs).
+#' @param na.rm Logical scalar, default is `FALSE`. Should observations with NAs be 
+#' removed from the resulting matrix or data.frame? Note that if `data=NULL`
+#' @param subset Logical scalar or character vector. Default is `FALSE`. If `TRUE`, then the 
 #' matrix created will be restricted only to the variables contained in the argument `data`, 
 #' which can then contain a subset of the variables used in the estimation. If a 
 #' character vector, then only the variables matching the elements of the vector via 
 #' regular expressions will be created.
 #' @param as.matrix Logical scalar, default is `FALSE`. Whether to coerce the result to a matrix.
 #' @param as.df Logical scalar, default is `FALSE`. Whether to coerce the result to a data.frame.
-#' @param collin.rm Logical scalar, default is `TRUE`. Whether to remove variables that were 
+#' @param collin.rm Logical scalar, default is `TRUE`. Only used when `data=NULL` (i.e. 
+#' the data used in the estimation is requested). Whether to remove variables that were 
 #' found to be collinear during the estimation. Beware: it does not perform a 
 #' collinearity check.
 #' @param ... Not currently used.
@@ -3486,13 +3643,32 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 #'
 #' @examples
 #'
-#' base = iris
-#' names(base) = c("y", "x1", "x2", "x3", "species")
-#'
-#' est = feols(y ~ poly(x1, 2) + x2, base)
+#' # we use a data set with NAs and fixed-effect singletons
+#' base = setNames(iris, c("y", "x1", "x2", "x3", "fe"))
+#' # adding NAs
+#' base$x1[1:4] = NA
+#' # adding singletons
+#' base$fe = as.character(base$fe)
+#' base$fe[10 + 1:5] = letters[1:5]
+#' 
+#' # OLS estimation where we remove singletons
+#' est = feols(y ~ x1 + poly(x2, 2) | fe, base, fixef.rm = "singleton")
+#' 
+#' # by default, we have the data set used in the estimation
 #' head(model.matrix(est))
-#'
+#' nrow(model.matrix(est))
+#' 
+#' # to have the original data set: we need to use sample="original"
+#' head(model.matrix(est, sample = "original"))
+#' nrow(model.matrix(est, sample = "original"))
+#' 
+#' # we can drop only the NA values (and not the singletons) with na.rm=TRUE
+#' head(model.matrix(est, sample = "original", na.rm = TRUE))
+#' nrow(model.matrix(est, sample = "original", na.rm = TRUE))
+#' 
+#' #
 #' # Illustration of subset
+#' #
 #'
 #' # subset => character vector
 #' head(model.matrix(est, subset = "x1"))
@@ -3502,8 +3678,9 @@ formula.fixest = function(x, type = c("full", "linear", "iv", "NL"), ...){
 #'
 #'
 #'
-model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset = FALSE,
-                               as.matrix = FALSE, as.df = FALSE, collin.rm = TRUE, ...){
+model.matrix.fixest = function(object, data = NULL, type = "rhs", sample = "estimation",
+                               na.rm = FALSE, subset = FALSE, as.matrix = FALSE, 
+                               as.df = FALSE, collin.rm = TRUE, ...){
   # We evaluate the formula with the past call
   # type: lhs, rhs, fixef, iv.endo, iv.inst, iv.rhs1, iv.rhs2
   # if fixef => return a DF
@@ -3514,7 +3691,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
   }
 
   # We allow type to be used in the location of data if data is missing
-  if(!missing(data) && missing(type)){
+  if(!missnull(data) && missing(type)){
     sc = sys.call()
     if(!"data" %in% names(sc)){
       if(!is.null(data) && (is.character(data) || "formula" %in% class(data))){
@@ -3524,7 +3701,6 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
       }
     }
   }
-
 
   type = check_set_types(type, c("lhs", "rhs", "fixef", "iv.endo", "iv.inst", "iv.exo", 
                                  "iv.rhs1", "iv.rhs2"))
@@ -3538,17 +3714,17 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
   }
 
   check_arg(subset, "logical scalar | character vector no na")
-
-  check_set_arg(as.matrix, as.df, collin.rm, "logical scalar")
+  check_set_arg(sample, "match(estimation, original)")
+  check_set_arg(na.rm, as.matrix, as.df, collin.rm, "logical scalar")
 
   # The formulas
   fml_full = formula(object, type = "full")
   fml_linear = formula(object, type = "linear")
 
   # Evaluation with the data
-  original_data = FALSE
+  is_original_data = FALSE
   if(missnull(data)){
-    original_data = TRUE
+    is_original_data = TRUE
 
     data = fetch_data(object, "To apply 'model.matrix.fixest', ")
 
@@ -3601,10 +3777,15 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     }
 
     linear.mat = error_sender(fixest_model_matrix_extra(
-      object = object, newdata = data, original_data = original_data,
+      object = object, newdata = data, original_data = is_original_data,
       fml = fml, fake_intercept = fake_intercept,
       subset = subset),
       "In 'model.matrix', the RHS could not be evaluated: ")
+    
+    if(!is.null(object$rm_variable)){
+      qui = which(colnames(linear.mat) %in% object$rm_variable)
+      linear.mat = linear.mat[, -qui, drop = FALSE]
+    }
 
     if(collin.rm){
       qui = which(colnames(linear.mat) %in% object$collin.var)
@@ -3638,7 +3819,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     fixef_terms_full = fixef_terms(object$fml_all$fixef)
     fixef_terms = fixef_terms_full$fml_terms
 
-    fixef_df = error_sender(prepare_df(fixef_terms_full$fe_vars, data, fastCombine = FALSE),
+    fixef_df = error_sender(prepare_df(fixef_terms_full$fe_vars, data, fixef.keep_names = TRUE),
                 "In 'model.matrix', problem evaluating the fixed-effects part of the formula:\n")
 
     isSlope = any(fixef_terms_full$slope_flag != 0)
@@ -3656,7 +3837,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     fml = object$iv_endo_fml
 
     endo.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, 
-                                                      original_data = original_data, fml = fml,
+                                                      original_data = is_original_data, fml = fml,
                                                       fake_intercept = TRUE), 
                             "In 'model.matrix', the endogenous variables could not be evaluated: ")
 
@@ -3676,7 +3857,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     fml = object$fml_all$iv
 
     inst.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, 
-                                                      original_data = original_data, fml = fml, 
+                                                      original_data = is_original_data, fml = fml, 
                                                       fake_intercept = TRUE), 
                             "In 'model.matrix', the instruments could not be evaluated: ")
 
@@ -3698,7 +3879,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     fml = object$fml_all$linear
 
     exo.mat = error_sender(fixest_model_matrix_extra(object = object, newdata = data, 
-                                                     original_data = original_data, fml = fml, fake_intercept = fake_intercept), 
+                                                     original_data = is_original_data, fml = fml, fake_intercept = fake_intercept), 
                            "In 'model.matrix', the instruments could not be evaluated: ")
 
     if(is.atomic(exo.mat) && length(exo.mat) == 1){
@@ -3744,7 +3925,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     # iv_rhs1 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
     #                        "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
     iv_rhs1 = error_sender(fixest_model_matrix_extra(object = object, newdata = data, 
-                                                     original_data = original_data, fml = fml, 
+                                                     original_data = is_original_data, fml = fml, 
                                                      fake_intercept = fake_intercept, 
                                                      subset = subset), 
                            "In 'model.matrix', the RHS of the 1st stage could not be evaluated: ")
@@ -3778,7 +3959,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     fit_vars = c()
     for(i in seq_along(stage_1)){
       fit_vars[i] = v = paste0("fit_", names(stage_1)[i])
-      data[[v]] = predict(stage_1[[i]], newdata = data, sample = "original")
+      data[[v]] = predict(stage_1[[i]], newdata = data)
     }
 
     # II) we create the variables
@@ -3793,7 +3974,7 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
     # iv_rhs2 = error_sender(fixest_model_matrix(fml, data, fake_intercept = fake_intercept),
     #                        "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
     iv_rhs2 = error_sender(fixest_model_matrix_extra(object = object, newdata = data, 
-                                                     original_data = original_data, fml = fml, 
+                                                     original_data = is_original_data, fml = fml, 
                                                      fake_intercept = fake_intercept, 
                                                      subset = subset), 
                            "In 'model.matrix', the RHS of the 2nd stage could not be evaluated: ")
@@ -3825,34 +4006,17 @@ model.matrix.fixest = function(object, data, type = "rhs", na.rm = TRUE, subset 
   #
 
   check_0 = FALSE
-  if(original_data){
+  if(is_original_data){
 
-    if(na.rm == FALSE){
-      # We do nothing. Or shall I add NA values for obs not
-      # included in the estimation?
-      if(FALSE && length(object$obs_selection) > 0){
-
-        # we reconstruct the full vector of obs
-        # and we fill with NA
-        obs_id = 1:nrow(data)
-        for(i in seq_along(object$obs_selection)){
-          obs_id = select_obs(obs_id, object$obs_selection[[i]])
-        }
-
-        res[!1:nrow(res) %in% obs_id, ] = NA
-
-      }
-
-    } else {
+    if(sample == "estimation"){
       for(i in seq_along(object$obs_selection)){
         check_0 = TRUE
         res = select_obs(res, object$obs_selection[[i]])
       }
+      
+      na.rm = FALSE
     }
-
-
-
-    na.rm = FALSE
+    
   }
 
   if(na.rm){
@@ -4057,40 +4221,55 @@ deviance.fixest = function(object, ...){
 
 #' Hat values for `fixest` objects
 #'
-#' Computes the hat values for [`feols`] or [`feglm`] estimations. Only works when 
-#' there are no fixed-effects.
+#' Computes the hat values for [`feols`] or [`feglm`] estimations. 
 #'
 #' @param model A fixest object. For instance from feols or feglm.
+#' @param exact Logical scalar, default is `TRUE`. Whether the diagonals of the projection matrix should be calculated exactly. If `FALSE`, then it will be approximated using a JLA algorithm. See details. Unless you have a very large number of observations, it is recommended to keep the default value.
+#' @param boot.size Integer scalar or `NULL`, default is 1000. This is only used when `exact == FALSE`. This determines the number of bootstrap samples used to estimate the projection matrix. If equal to `NULL`, it falls back to the default value of 1000.
 #' @param ... Not currently used.
 #'
 #' @details
-#' Hat values are not available for [`fenegbin`][fixest::femlm], [`femlm`] 
-#' and [`feNmlm`] estimations.
-#'
-#' When there are fixed-effects, the hat values of the reduced form are different from the 
-#' hat values of the full model. And we cannot get costlessly the hat values of the full model 
-#' from the reduced form. It would require to reestimate the model with the 
-#' fixed-effects as regular variables.
-#'
-#' @return
-#' Returns a vector of the same length as the number of observations used in the estimation.
-#'
+#' Hat values are not available for [`fenegbin`][fixest::femlm], [`femlm`] and [`feNmlm`] estimations.
+#' 
+#' Hat values for generalized linear model are disussed in Belsley, Kuh and Welsch (1980), Cook and Weisberg (1982), etc.
+#' 
+#' When `exact == FALSE`, the Johnson-Lindenstrauss approximation (JLA) algorithm is used which approximates the diagonals of the projection matrix. For more precision (but longer time), increase the value of `boot.size`. See Kline, Saggio, and Sølvsten (2020) for details.
+#' 
+#' 
+#' @references
+#' Belsley, D. A., Kuh, E. and Welsch, R. E. (1980). *Regression Diagnostics*. New York: Wiley.
+#' Cook, R. D. and Weisberg, S. (1982). *Residuals and Influence in Regression*. London: Chapman and Hall.
+#' Kline, P., Saggio R., and Sølvsten, M. (2020). *Leave‐Out Estimation of Variance Components*. Econometrica.
+#' 
 #' @examples
 #'
 #' est = feols(Petal.Length ~ Petal.Width + Sepal.Width, iris)
 #' head(hatvalues(est))
 #'
+#' @return
+#' Returns a vector of the same length as the number of observations used in the estimation.
 #'
-hatvalues.fixest = function(model, ...){
+#'
+hatvalues.fixest = function(model, exact = TRUE, boot.size = 1000, ...){
   # Only works for feglm/feols objects + no fixed-effects
   # When there are fixed-effects the hatvalues of the reduced form is different from
   #  the hatvalues of the full model. And we cannot get costlessly the hatvalues of the full
   #  model from the reduced form. => we need to reestimate the model with the FEs as
   #  regular variables.
+  
+  check_arg(exact, "logical scalar")
+  check_arg(boot.size, "NULL integer scalar GT{1}")
+  if(is.null(boot.size)){
+    boot.size = 1000
+  }
 
   if(isTRUE(model$lean)){
     # LATER: recompute it
     stop("The method 'hatvalues.fixest' cannot be applied to 'lean' fixest objects. Please re-estimate with 'lean = FALSE'.")
+  }
+
+  if (!is.null(model$iv)) {
+    stop("The method 'hatvalues.fixest' cannot be applied to IV models.")
   }
 
   if(is_user_level_call()){
@@ -4098,29 +4277,192 @@ hatvalues.fixest = function(model, ...){
   }
 
   method = model$method_type
-  family = model$family
-
-  msg = "hatvalues.fixest: 'hatvalues' is not implemented for estimations with fixed-effects."
-
-  # An error is in fact nicer than a message + NA return due to the interplay with sandwich
-  if(!is.null(model$fixef_id)){
-    stop(msg)
+  if (!(method %in% c("feols", "feglm"))) {
+    stopi("'hatvalues' is currently not implemented for function {bq ? model$method}.")
   }
 
-  if(method == "feols"){
-    X = model.matrix(model)
 
-    res = cpp_diag_XUtX(X, model$cov.iid / model$sigma2)
+  # Fast path: no fixed effects means we already have (X'X)^{-1}
+  if (is.null(model$fixef_id)) {
+    if(method == "feols"){
+      X = model.matrix(model)
+  
+      res = cpp_diag_XUtX(X, model$cov.iid / model$sigma2)
+  
+    } else if(method == "feglm"){
+      XW = model.matrix(model) * sqrt(model$irls_weights)
+      res = cpp_diag_XUtX(XW, model$cov.iid)
+  
+    } else {
+      # we never get here
+      stop("'hatvalues' is currently not implemented for function ", method, ".")
+    }
 
-  } else if(method == "feglm"){
-    XW = model.matrix(model) * sqrt(model$irls_weights)
-    res = cpp_diag_XUtX(XW, model$cov.iid)
+    return(res)
+  }
 
+  # Slower path: Fixed-effects
+  # 
+  # Outline: Blockwise Formula for Projection Matrix
+  # https://en.wikipedia.org/wiki/Projection_matrix#Blockwise_formula
+  # Part 1: fixed effects
+  # Part 2: slope vars (demeaned by fixed effects)
+  # Part 3: rhs vars (demeaned by fixed effects and slope vars)
+  # Sum the three parts to get the projection matrix
+  P_ii_list = list()
+  mats = list()
+  
+  mats$fixef = sparse_model_matrix(model, type = "fixef", collin.rm = TRUE, sortCols = FALSE)
+
+  # Check for slope.vars and move to seperate matrix
+  if (!is.null(model$slope_flag)) {
+    slope_var_cols = which(
+      grepl("\\[\\[", colnames(mats$fixef))
+    )
+    mats$slope_vars = mats$fixef[, slope_var_cols]
+    mats$fixef = mats$fixef[, -slope_var_cols]
+  }
+
+  # Get weights
+  if (method == "feols") {
+    weights = model$weights
   } else {
-    stop("'hatvalues' is currently not implemented for function ", method, ".")
+    weights = model$irls_weights
+  }
+  
+
+  if (!is.null(model$fixef_vars)) {
+    # for `demean`
+    fe_df = model.matrix(model, type = "fixef")
+    fe_df = subset(fe_df, select = model$fixef_vars)
+
+    # Matrix of fixed effects times weights
+    if (!is.null(weights)){
+      mats$fixef = mats$fixef * sqrt(weights)
+    }
+
+    # Demean X by FEs and slope_vars
+    if (is.null(model$onlyFixef) & method == "feols") {
+      mats$rhs = demean(model)[, -1, drop = FALSE] 
+      if (!is.null(weights)){
+        mats$rhs = mats$rhs * sqrt(weights)
+      }
+    }
+    
+    if (is.null(model$onlyFixef) & method == "feglm") {
+      mats$rhs = demean(
+        model.matrix(model, "rhs"),
+        fe_df,
+        weights = weights
+      )
+      
+      if (!is.null(weights)){
+        mats$rhs = mats$rhs * sqrt(weights)
+      }
+    }
+
+    # Demean slope_vars by FEs
+    if (!is.null(mats$slope_vars)) {
+      mats$slope_vars = demean(
+        as.matrix(mats$slope_vars), 
+        fe_df, 
+        weights = weights
+      )
+      
+      if (!is.null(weights)){
+        mats$slope_vars = mats$slope_vars * sqrt(weights)
+      }
+    }
+
+  } else if (is.null(model$onlyFixef)) {
+    mats$rhs = sparse_model_matrix(
+      model, type = c("rhs"), 
+      collin.rm = TRUE, na.rm = TRUE
+    )
+
+    if (!is.null(weights)){
+      mats$rhs = mats$rhs * sqrt(weights)
+    }
   }
 
-  res
+  # Caclulate P_ii's
+  if (!is.null(mats$fixef)) {
+    # https://stackoverflow.com/questions/39533785/how-to-compute-diagx-solvea-tx-efficiently-without-taking-matrix-i
+    U = Matrix::chol(Matrix::crossprod(mats$fixef))
+    Z = Matrix::solve(Matrix::t(U), Matrix::t(mats$fixef))
+    P_ii_list$fixef = Matrix::colSums(Z ^ 2)
+  }
+
+  # Note: This might fail if looking at too large of a matrix
+  if (exact == TRUE) {
+    if (!is.null(mats$slope_vars)) { 
+      Z = Matrix::solve(
+        Matrix::crossprod(mats$slope_vars), 
+        Matrix::t(mats$slope_vars)
+      )
+      # P_ii = diag(X %*% Z) = rowSums(X * Z)
+      P_ii_list$slope_vars = Matrix::rowSums(
+        mats$slope_vars * Matrix::t(Z)
+      )
+    }
+
+    if (!is.null(mats$rhs)) {
+      tXXinv = model$cov.iid 
+      if (method == "feols") tXXinv = tXXinv / model$sigma2
+
+      P_ii_list$rhs = Matrix::rowSums(
+        mats$rhs * Matrix::t(tXXinv %*% Matrix::t(mats$rhs))
+      )
+    }
+    
+  } else {
+    # Theory: https://cs-people.bu.edu/evimaria/cs565/achlioptas.pdf
+    n = model$nobs
+
+    if (!is.null(mats$slope_vars)) { 
+      P_ii_list$slope_vars = rep(0, n)
+      tSS = Matrix::crossprod(mats$slope_vars)
+      tS = Matrix::t(mats$slope_vars)
+    }
+    
+    if (!is.null(mats$rhs)) { 
+      P_ii_list$rhs = rep(0, n)
+      tXX = Matrix::crossprod(mats$rhs)
+      tX = Matrix::t(mats$rhs)
+    }
+
+    for (j in 1:boot.size) {
+      # Rademacher Weights (-1, 1)
+      Rp_j <- matrix(
+        (stats::runif(n) > 0.5) * 2 - 1,
+        # Uncomment for speed-up
+        # rademacher::sample_rademacher(n), 
+        nrow = 1, ncol = n
+      )
+
+      if (!is.null(mats$slope_vars)) {
+        tS_Rp_j <- Matrix::tcrossprod(tS, Rp_j)
+
+        Zj <- Matrix::solve(tSS, tS_Rp_j)
+        P_ii_list$slope_vars = 
+          P_ii_list$slope_vars + 
+          as.numeric(mats$slope_vars %*% Zj)^2 / boot.size
+      }
+
+      if (!is.null(mats$rhs)) { 
+        tX_Rp_j <- Matrix::tcrossprod(tX, Rp_j)
+
+        Zj <- Matrix::solve(tXX, tX_Rp_j)
+        P_ii_list$rhs = 
+          P_ii_list$rhs + 
+          as.numeric(mats$rhs %*% Zj)^2 / boot.size
+      }
+    }
+  }
+
+  P_ii = Reduce("+", P_ii_list)
+
+  P_ii
 }
 
 

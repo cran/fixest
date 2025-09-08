@@ -51,8 +51,19 @@
 \arguments{
 \item{object}{A \code{fixest_multi} object, coming from a \code{fixest} multiple estimation.}
 
-\item{vcov}{A function to be used to compute the standard-errors of each fixest object. You can
-pass extra arguments to this function using the argument \code{.vcov_args}. See the example.}
+\item{vcov}{Versatile argument to specify the VCOV.
+In general, it is either a character scalar equal to a VCOV type, either a formula of the form:
+vcov_type ~ variables. The VCOV types implemented are: "iid", "hetero" (or "HC1"),
+"cluster", "twoway", "NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley".
+It also accepts object from vcov_cluster, vcov_NW, NW, vcov_DK, DK, vcov_conley and conley.
+It also accepts covariance matrices computed externally.
+Finally it accepts functions to compute the covariances.
+See the vcov documentation in the vignette.
+You can pass several VCOVs (as above) if you nest them into a list.
+If the number of VCOVs equals the number of models, eahc VCOV is mapped to the appropriate model.
+If there is one model and several VCOVs, or if the first element of the list is equal to
+\code{"each"} or \code{"times"}, then the estimations will be replicated and the results
+for each estimation and each VCOV will be reported.}
 
 \item{keep}{Character vector. This element is used to display only a subset of variables. This
 should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}} help for more info). Each

@@ -1,4 +1,248 @@
 
+# fixest 0.13.2
+
+## bug fixes
+
+- fix ad hoc bug with the reverse dependency `did2s` < `1.0.2`
+
+# fixest 0.13.1
+
+## bug fixes
+
+- fix bug in the package startup message
+
+# fixest 0.13.0
+
+## Breaking changes
+
+- **the new default VCOV is `iid` for all estimations**. To change the default to the way it was, place `setFixest_vcov(all = "cluster", no_FE = "iid")` in your `.Rprofile`.
+ 
+- the function `dof` is removed (it was deprecated and replaced with the function `ssc` since 2021)
+
+- in `etable`, the argument `replace = TRUE` by default (it was `FALSE`)
+
+- the arguments of the function `ssc` are renamed:
+
+  - `adj` => `K.adj`
+  - `fixef.K` => `K.fixef`
+  - `fixef.force_exact` => `K.exact`
+  - `cluster.adj` => `G.adj`
+  - `cluster.df` => `G.df`
+  
+  Retro compatibility is ensured. Thanks to Kyle Butts and Grant McDermott for the brainstorm!
+
+- in the functions `coefplot` and `iplot`: the argument `object` is removed, now all models need to be passed in `...`. The dots do not accept arguments to summary methods any more. Retro-compatibility partly ensured.
+
+- in all estimations, now the default is to remove all observations that are perfectly fit by the fixed-effects (this includes the singletons). To go back to the previous case, use the argument `fixef.rm="infinite_coef"`, or add the following command in your `.Rprofile`: `setFixest_estimation(fixef.rm = "infinite_coef")`.
+
+- the argument `fixef.rm` is modified, the accepted values now become "singletons", "infinite_coef", "perfect_fit" (new default), or "none" (formerly it was "singleton", "perfect", "both", "none"). It leads to the removal of i) fixed-effects associated to a single observation, ii) fixed-effects fitting perfectly the outcome and leading to infinite coefficients (in GLM families, e.g. think to only 0 outcomes in a Poisson estimation), iii) the observations removed in the first two cases, iv) no observations is removed. In any case: the point estimates (coefficients) do not vary depending on the value of this argument. The inference on the other hand may vary (that is the standard-errors of the coefficients may change).
+
+
+## New Features
+
+- new VCOVs: heteroskedaticity-robust HC2 and HC3 VCOVs available thanks to @kylebutts
+
+- new function: `sparse_model_matrix` which creates sparse model matrices from regression objects in a memory-efficient way. Contribution by @kylebutts.
+
+```R
+est = feols(mpg ~ drat | cyl, mtcars)
+
+sparse_model_matrix(est, type = "lhs")
+#> 32 x 1 sparse Matrix of class "dgCMatrix"
+#>        mpg
+#>  [1,] 21.0
+#>  [2,] 21.0
+#>  [3,] 22.8
+
+sparse_model_matrix(est, type = c("rhs", "fixef"))
+#> 32 x 4 sparse Matrix of class "dgCMatrix"
+#>      drat cyl::4 cyl::6 cyl::8
+#> [1,] 3.90      .      1      .
+#> [2,] 3.90      .      1      .
+#> [3,] 3.85      1      .      .
+
+# Or you can pass a (linear) formula
+sparse_model_matrix(mpg ~ i(vs) | gear^cyl, data = mtcars, type = c("rhs", "fixef"))
+#> 32 x 10 sparse Matrix of class "dgCMatrix"
+#>   [[ suppressing 10 column names ‘vs::0’, ‘vs::1’, ‘gear^cyl::4_6’ ... ]]
+#>                          
+#>  [1,] 1 . 1 . . . . . . .
+#>  [2,] 1 . 1 . . . . . . .
+#>  [3,] . 1 . 1 . . . . . .
+```
+
+- variables on the left-hand-side that are present on the right-hand-sides, are automatically removed from the estimation
+```R
+# we regress `Ozone` and `Temp` on all other variables but `Day`:
+feols(c(Ozone, Temp) ~ regex("!Day"), airquality)
+#> NOTE: 42 observations removed because of NA values (RHS: 42).
+#>       |-> this msg only concerns the variables common to all estimations
+#>                                x.1                x.2
+#> Dependent Var.:              Ozone               Temp
+#>                                                      
+#> Constant           -58.05* (22.97)   55.93*** (4.405)
+#> Solar.R           0.0496* (0.0235)    0.0114 (0.0070)
+#> Wind            -3.317*** (0.6458)   -0.1925 (0.2126)
+#> Temp             1.871*** (0.2736)                   
+#> Month              -2.992. (1.516)  2.047*** (0.4108)
+#> Ozone                              0.1636*** (0.0239)
+#> _______________ __________________ __________________
+#> S.E. type                      IID                IID
+#> Observations                   111                111
+#> R2                         0.61986            0.59476
+#> Adj. R2                    0.60552            0.57947
+#> ---
+#> Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+- more notes and messages better fit the user screen
+
+- the functions `coefplot` and `iplot` now accept models passsed via `...`, aligning their design to the one of `etable`
+
+- the functions `coefplot` and `iplot` now accept the argument `vcov`. The argument `vcov` can be a list of valid `vcov` values, in which case it will be recycled across the models.
+
+- all estimations gain the two arguments: `panel.time.step` and `panel.duplicate.method` to handle non standard lags
+
+- in `coefplot`: the argument `dict` now updates the entries in the global dictionnary (instead of replacing them)
+
+- improve the display of the numbers in `fitstat`
+
+- use perl regular expressions (instead of standard RE) in all instances of the arguments `keep`, `drop`, `order`
+
+- when using `feols` estimations with `sunab(att = TRUE)`, now `iplot` reports the graph of the treatment effect aggregated by periods (i.e. as if `att = FALSE`)
+
+- in estimations, `subset` now accepts negative integers
+
+- function `xpd` gains the argument `add.after_pipe` to add components to the formula after a pipe (`|`)
+
+- the `update.fixest` and `update.fixest_multi` now handle the formula updates much better, in particular for IVs 
+
+- `update.(fixest|fixest_multi)` gain the new argument `fml` which can override the `fml.update` argument
+
+- `update.(fixest|fixest_multi)` gain the new argument `use_calling_env` which default to `TRUE`, so that `fixest` objects created within a function can be updated without problem even outside of the function
+
+- greatly improve the `formula.fixest` method, with now a wide range of possibilities to compose the resulting formula
+
+- in `formula.fixest`, add the new arguments `fml.update` and `fml.build` to easily modify the formula of the original object
+
+- add new method `formula.fixest_multi`
+
+- complete rewrite of the internal algorithm turning the fixed-effects into indexes, it is now: i) faster (much faster when combining mutliple fixed effects), ii) more consistent for character vectors
+
+- new algorithm removing the fixed-effects from the estimation due to singletons or perfect fits: now the algorithm is recursive
+
+- the method `model.matrix` gains the argument `sample` which can be equal to "estimation" or "original". The argument `na.rm` is now more coherent as it does not do more than what is suggests (as was the case earlier).
+
+- the function `demean` gains the argument `sample` to decide whether to get the demeaned variables: i) for only for the observations used in the estimation, or ii) for all the observations of the original data set.
+
+## New vignette and data set
+
+- add a new vignette on collinearity
+
+- new data set `base_pub`, based on publication data from the Microsoft Academic Graph, used to illustrate the new vignette
+
+## Other changes
+
+- in `vcov`: if the VCOV fails to be positive semi-definite (having negative eigenvalues), a warning is reported. This should be relatively rare and typically only very slightly changes the standard errors.
+
+- default for the argument `collin.tol` increased from `1e-10` to `1e-9`.
+
+- requires stringmagic >= 1.2.0
+
+- add checks in IVs as regards the number of instruments and endogenous variables
+
+- attribute renaming: attribute of the VCOV `dof.K` becomes `df.K` (to be consistent with to other attribute `df.t`)
+
+- in IV estimations, the R2 reported in the second stage is based on the residuals of the second stage estimation and **not** the corrected residuals (using the original variables with the second stage coefficients)
+
+- slight performance increase for estimations with single variables
+
+- in multiple estimations for which, after NA removal, the variables in the step-wise part are vectors of only 0s can now be estimated. The stepwise part is simply ignored. Feature request by @shoonlee, #483
+
+- add explicit linkage to the `numDeriv` package in the manual to fix CRAN notes
+
+- add suggestions when some variables are misspelled in estimations
+
+- substantially improve the robustness (and speed) of the internal algorithms handling formulas
+
+- in all estimations: the argument `combine.quick` is renamed into `fixef.keep_names`
+
+- the removal of the fixed-effects due to infinite coefficients is now triggered more accurately for any GLM family (even uncommon ones)
+
+## etable
+
+- add a section in the documentation documenting the Latex depdencies
+
+- `setFixest_etable` now accepts the arguments `div.class` and `signif.code`
+
+- when a file is created and the containing folders do not exist:
+  - the new default is to create up to the grand parent folder
+  - the new argument `create_dirs` (default is `FALSE`) creates all containing directories
+
+- when `markdown = TRUE`, the images are directly inserted in the `<img>` container as URI, avoiding any issue with paths
+
+- the caching of table images is now automatically enabled
+
+- argument `title` becomes `caption`, retro-compatibility is ensured
+
+- argument `caption` (formerly `title`) now accepts character vectors, which become concatenated
+
+- argument `coefstat` gains the option `pvalue`
+
+- default values for `fitstat` set in `setFixest_etable` can be accessed with a `'.'` 
+
+## Bugs
+
+- fix bug in `predict` when the data of origin was missing. Thanks to @grantmcdermott, #544
+
+- fix bug when several scalars to be evaluated from the calling environment are included in the formula of the regression
+
+- fix bug when: using IV, interpolating the LHS variable, requesting multiple LHS, using a RHS formula as interpolated variable. Reported by @sumtxt, #522
+
+- fix bug `lean = TRUE`: remove a potentially large a copy of environments when an estimation was called within a function. Thanks to @aaronrudkin, #514
+
+- fix bug in `etable`: some arguments globally set were wrongly reset when calling the function. Reported by @aaronrudkin, @etiennebacher kindly provided a reprex, #517
+
+- fix documentation bugs. Reported by @cseveren
+
+- fix bug in `etable`: `drop.section` was not catching the option `coef`. Thanks to @Oravishayrizi, #540
+
+- fix bug in `etable` when `view = TRUE`, now it displays properly in VSCode
+
+- fix bug in `etable` preventing the use of the argument `export` when `markdown = TRUE` within a Rmd document
+
+- fix bug regarding panels in estimations, the format `panel.id = "id,time"` did not work. Now fixed. Reported by @nataliamush, #537
+
+- fig bug preventing the use of the argument `vcov` in `fitstat` for the Wald statistics
+
+- fix bug in `coeftable.default` not catching the right coefficients matrix
+
+- fix bug in `etable` preventing the user to modify the `fitstat` argument if it was previously set with `setFixest_etable`
+
+- fix bug in `predict.fixest` when there is an estimation with only the constant. Reported by @Oravishayrizi, #576
+
+- fix bug in `predict.fixest` when `interval != "none"` and `sample = "estimation"`, now the prediction only applies to the estimation sample and not the original sample. Reported  by Alex Fisher, #549
+
+- fix bug when a custom `vcov` is passed to `fixest::feols` with the `fixest::` prefix. Thanks to Kyle Butts, #540
+
+- fix bug R crashing when data set with 0-observation was provided by the user. Reported by @luciowasserman, #577
+
+- fix bug which included the intercept in stepwise estimation even when the user asked for no intercept
+
+- fix various bugs in `coefplot`/`iplot`. Among others, the one reported by @raffaem, #546
+
+- fix bug regarding the display of the x-axis in coefplot
+
+- fix bug preventing to jointly use the arguments `subset` and `fixef`. Reported by @MaelAstruc, #503
+
+- fix bug preventing the display of named custom vcov in `etable`
+
+- fix bug in `etable` when `headers`/`extralines` receive a list of numeric and character values at the same time. Reported by @Oravishayrizi, #574
+
+- fix fatal crash in `feols` when: i) multiple estimations were used, ii) samples were different across estimations, iii) singletons were removed. Reported by @marco-t3, #486
+
+- fix bug RMSE with weights, reported by @alegalluzzi, #594
+
 # fixest 0.12.1
 
 ## Major bugs affecting R versions <= 4.1.2
@@ -22,6 +266,10 @@
 - fix bug in `etable` when variables appeared in the statistics and those variables contained invalid Latex characters. PR by @MaelAstruc, #508
 
 - fix formatting for coefficients/statistics equal to 0. Reported by @MaelAstruc, #504
+
+## Deprecation
+
+ - Argument `.vcov` has been removed. It was present for historical reasons, and is removed to increase code clarity. Old code will still work with a warning to use the `vcov` argument instead
 
 # fixest 0.12.0
 

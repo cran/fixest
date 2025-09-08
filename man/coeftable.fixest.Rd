@@ -55,14 +55,25 @@
 \arguments{
 \item{object}{A \code{fixest} object. For example an estimation obtained from \code{\link{feols}}.}
 
-\item{vcov}{A function to be used to compute the standard-errors of each fixest object. You can
-pass extra arguments to this function using the argument \code{.vcov_args}. See the example.}
+\item{vcov}{Versatile argument to specify the VCOV.
+In general, it is either a character scalar equal to a VCOV type, either a formula of the form:
+vcov_type ~ variables. The VCOV types implemented are: "iid", "hetero" (or "HC1"),
+"cluster", "twoway", "NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley".
+It also accepts object from vcov_cluster, vcov_NW, NW, vcov_DK, DK, vcov_conley and conley.
+It also accepts covariance matrices computed externally.
+Finally it accepts functions to compute the covariances.
+See the vcov documentation in the vignette.
+You can pass several VCOVs (as above) if you nest them into a list.
+If the number of VCOVs equals the number of models, eahc VCOV is mapped to the appropriate model.
+If there is one model and several VCOVs, or if the first element of the list is equal to
+\code{"each"} or \code{"times"}, then the estimations will be replicated and the results
+for each estimation and each VCOV will be reported.}
 
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{cluster}{Tells how to cluster the standard-errors (if clustering is requested). Can
 be either a list of vectors, a character vector of variable names, a formula or an
@@ -143,7 +154,6 @@ est = fepois(Euros ~ log(dist_km) | Origin^Product + Year, trade)
 # Coeftable/se/tstat/pvalue
 #
 
-# Default is clustering along Origin^Product
 coeftable(est)
 se(est)
 tstat(est)
@@ -157,7 +167,7 @@ se(est, cluster = ~Origin + Product)
 pvalue(est, cluster = ~Origin + Product)
 tstat(est, cluster = ~Origin + Product)
 
-# Or you can cluster only once:
+# Or you can cluster only once using summary:
 est_sum = summary(est, cluster = ~Origin + Product)
 coeftable(est_sum)
 se(est_sum)

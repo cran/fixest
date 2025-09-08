@@ -10,7 +10,6 @@
   vcov = NULL,
   cluster = NULL,
   ssc = NULL,
-  .vcov = NULL,
   stage = NULL,
   lean = FALSE,
   agg = NULL,
@@ -28,7 +27,7 @@
   se,
   cluster,
   ssc = getFixest_ssc(),
-  .vcov,
+  vcov = NULL,
   stage = 2,
   lean = FALSE,
   n,
@@ -62,12 +61,8 @@ the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
-
-\item{.vcov}{A user provided covariance matrix or a function computing this matrix. If a
-matrix, it must be a square matrix of the same number of rows as the number
-of variables estimated. If a function, it must return the previously mentioned matrix.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{stage}{Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object
 is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1}
@@ -108,9 +103,12 @@ it is not).}
 \item{n}{Integer, default is 1000. Number of coefficients to display when the print method
 is used.}
 
-\item{vcov_fix}{Logical scalar, default is \code{TRUE}. If the VCOV ends up not being
+\item{vcov_fix}{Logical scalar, default is \code{FALSE}. If the VCOV ends up not being
 positive definite, whether to "fix" it using an eigenvalue decomposition
-(a la Cameron, Gelbach & Miller 2011).}
+(a la Cameron, Gelbach & Miller 2011).
+Since the VCOV should be PSD asymptotically, this might be a sign of a problem
+with using the asymptotic approximation (e.g. too few units in clusters).
+If a problem is detected, the function will print a message to inform you.}
 
 \item{nthreads}{The number of threads. Can be: a) an integer lower than, or equal to,
 the maximum number of threads; b) 0: meaning all available threads will be used;
@@ -118,7 +116,7 @@ c) a number strictly between 0 and 1 which represents the fraction of all thread
 The default is to use 50\% of all threads. You can set permanently the number
 of threads used within this package using the function \code{\link{setFixest_nthreads}}.}
 
-\item{...}{Only used if the argument \code{.vcov} is provided and is a function: extra arguments
+\item{...}{Only used if the argument \code{vcov} is provided and is a function: extra arguments
 to be passed to that function.}
 }
 \value{
@@ -232,9 +230,9 @@ summary(est_geo, "conley")
 # Compatibility with sandwich
 #
 
-# You can use the VCOVs from sandwich by using the argument .vcov:
+# You can use the VCOVs from sandwich by using the argument vcov:
 library(sandwich)
-summary(est_pois, .vcov = vcovCL, cluster = trade[, c("Destination", "Product")])
+summary(est_pois, vcov = vcovCL, cluster = trade[, c("Destination", "Product")])
 
 
 }

@@ -12,7 +12,7 @@ femlm(
   vcov,
   start = 0,
   fixef,
-  fixef.rm = "perfect",
+  fixef.rm = "perfect_fit",
   offset,
   subset,
   split,
@@ -23,6 +23,8 @@ femlm(
   se,
   ssc,
   panel.id,
+  panel.time.step = NULL,
+  panel.duplicate.method = "none",
   fixef.tol = 1e-05,
   fixef.iter = 10000,
   nthreads = getFixest_nthreads(),
@@ -31,7 +33,7 @@ femlm(
   warn = TRUE,
   notes = getFixest_notes(),
   theta.init,
-  combine.quick,
+  fixef.keep_names = NULL,
   mem.clean = FALSE,
   only.env = FALSE,
   only.coef = FALSE,
@@ -47,7 +49,7 @@ fenegbin(
   theta.init,
   start = 0,
   fixef,
-  fixef.rm = "perfect",
+  fixef.rm = "perfect_fit",
   offset,
   subset,
   split,
@@ -58,6 +60,8 @@ fenegbin(
   se,
   ssc,
   panel.id,
+  panel.time.step = NULL,
+  panel.duplicate.method = "none",
   fixef.tol = 1e-05,
   fixef.iter = 10000,
   nthreads = getFixest_nthreads(),
@@ -65,7 +69,7 @@ fenegbin(
   verbose = 0,
   warn = TRUE,
   notes = getFixest_notes(),
-  combine.quick,
+  fixef.keep_names = NULL,
   mem.clean = FALSE,
   only.env = FALSE,
   only.coef = FALSE,
@@ -113,12 +117,33 @@ These variables should contain the identifier of each observation (e.g., think o
 as a panel identifier). Note that the recommended way to include fixed-effects is to
 insert them directly in the formula.}
 
-\item{fixef.rm}{Can be equal to "perfect" (default), "singleton", "both" or "none".
-Controls which observations are to be removed. If "perfect", then observations
-having a fixed-effect with perfect fit (e.g. only 0 outcomes in Poisson estimations)
-will be removed. If "singleton", all observations for which a fixed-effect appears
-only once will be removed. Note, importantly, that singletons are removed in just one pass,
-there is no recursivity implemented. The meaning of "both" and "none" is direct.}
+\item{fixef.rm}{Can be equal to "perfect_fit" (default), "singletons", "infinite_coef"
+or "none".
+
+This option controls which observations should be removed prior to the estimation.
+If "singletons", fixed-effects associated to a single observation are removed
+(since they perfectly explain it).
+
+The value "infinite_coef" only works with GLM families with limited left hand sides (LHS)
+and exponential link.
+For instance the Poisson family for which the LHS cannot be lower than 0, or the logit
+family for which the LHS lies within 0 and 1.
+In that case the fixed-effects (FEs) with only-0 LHS would lead to infinite coefficients
+(FE = -Inf would explain perfectly the LHS).
+The value \code{fixef.rm="infinite_coef"} removes all observations associated to FEs with
+infinite coefficients.
+
+If "perfect_fit", it is equivalent to "singletons" and "infinite_coef" combined.
+That means all observations that are perfectly explained by the FEs are removed.
+
+If "none": no observation is removed.
+
+Note that whathever the value of this options: the coefficient estimates
+will remain the same. It only affects inference (the standard-errors).
+
+The algorithm is recursive, meaning that, e.g. in the presence of several fixed-effects (FEs),
+removing singletons in one FE can create singletons (or perfect fits) in another FE.
+The algorithm continues until there is no singleton/perfect-fit remaining.}
 
 \item{offset}{A formula or a numeric vector. An offset can be added to the estimation.
 If equal to a formula, it should be of the form (for example) \code{~0.5*x**2}. This
@@ -185,14 +210,30 @@ you should use \code{vcov} instead.}
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{panel.id}{The panel identifiers. Can either be: i) a one sided formula
 (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2
 (e.g. \code{panel.id=c('id', 'time')}, or iii) a character scalar of two variables
 separated by a comma (e.g. \code{panel.id='id,time'}). Note that you can combine variables
 with \code{^} only inside formulas (see the dedicated section in \code{\link{feols}}).}
+
+\item{panel.time.step}{The method to compute the lags, default is \code{NULL} (which means
+automatically set). Can be equal to: \code{"unitary"}, \code{"consecutive"}, \code{"within.consecutive"},
+or to a number. If \code{"unitary"}, then the largest common divisor between consecutive
+time periods is used (typically if the time variable represents years, it will be 1).
+This method can apply only to integer (or convertible to integer) variables.
+If \code{"consecutive"}, then the time variable can be of any type: two successive
+time periods represent a lag of 1. If \code{"witihn.consecutive"} then \strong{within a given id},
+two successive time periods represent a lag of 1. Finally, if the time variable is numeric,
+you can provide your own numeric time step.}
+
+\item{panel.duplicate.method}{If several observations have the same id and time values,
+then the notion of lag is not defined for them. If \code{duplicate.method = "none"} (default)
+and duplicate values are found, this leads to an error. You can use
+\code{duplicate.method = "first"} so that the first occurrence of identical id/time
+observations will be used as lag.}
 
 \item{fixef.tol}{Precision used to obtain the fixed-effects. Defaults to \code{1e-5}.
 It corresponds to the maximum absolute difference allowed between two coefficients
@@ -209,7 +250,7 @@ c) a number strictly between 0 and 1 which represents the fraction of all thread
 The default is to use 50\% of all threads. You can set permanently the number
 of threads used within this package using the function \code{\link{setFixest_nthreads}}.}
 
-\item{lean}{Logical, default is \code{FALSE}. If \code{TRUE} then all large objects are removed
+\item{lean}{Logical scalar, default is \code{FALSE}. If \code{TRUE} then all large objects are removed
 from the returned result: this will save memory but will block the possibility to
 use many methods. It is recommended to use the arguments \code{se} or \code{cluster} to
 obtain the appropriate standard-errors at estimation time, since obtaining different
@@ -234,25 +275,26 @@ remove these messages permanently by using \code{setFixest_notes(FALSE)}.}
 parameter if \code{family="negbin"}. By default, the algorithm uses as a starting value
 the theta obtained from the model with only the intercept.}
 
-\item{combine.quick}{Logical. When you combine different variables to transform them
-into a single fixed-effects you can do e.g. \code{y ~ x | paste(var1, var2)}.
+\item{fixef.keep_names}{Logical or \code{NULL} (default). When you combine different
+variables to transform them into a single fixed-effects you can do
+e.g. \code{y ~ x | paste(var1, var2)}.
 The algorithm provides a shorthand to do the same operation: \code{y ~ x | var1^var2}.
 Because pasting variables is a costly operation, the internal algorithm may use a
 numerical trick to hasten the process. The cost of doing so is that you lose the labels.
 If you are interested in getting the value of the fixed-effects coefficients
-after the estimation, you should use \code{combine.quick = FALSE}. By default it is
-equal to \code{FALSE} if the number of observations is lower than 50,000, and to \code{TRUE}
+after the estimation, you should use \code{fixef.keep_names = TRUE}. By default it is
+equal to \code{TRUE} if the number of unique values is lower than 50,000, and to \code{FALSE}
 otherwise.}
 
-\item{mem.clean}{Logical, default is \code{FALSE}. Only to be used if the data set is
+\item{mem.clean}{Logical scalar, default is \code{FALSE}. Only to be used if the data set is
 large compared to the available RAM. If \code{TRUE} then intermediary objects are removed as
 much as possible and \code{\link{gc}} is run before each substantial C++ section in the internal
 code to avoid memory issues.}
 
-\item{only.env}{(Advanced users.) Logical, default is \code{FALSE}. If \code{TRUE}, then only
+\item{only.env}{(Advanced users.) Logical scalar, default is \code{FALSE}. If \code{TRUE}, then only
 the environment used to make the estimation is returned.}
 
-\item{only.coef}{Logical, default is \code{FALSE}. If \code{TRUE}, then only the estimated
+\item{only.coef}{Logical scalar, default is \code{FALSE}. If \code{TRUE}, then only the estimated
 coefficients are returned. Note that the length of the vector returned is always
 the length of the number of coefficients to be estimated: this means that the
 variables found to be collinear are returned with an NA value.}
@@ -321,7 +363,6 @@ expected predictor (i.e. fitted.values) obtained by the estimation.}
 \item{residuals}{The difference between the dependent variable and the expected predictor.}
 \item{sumFE}{The sum of the fixed-effects coefficients for each observation.}
 \item{offset}{(When relevant.) The offset formula.}
-\item{weights}{(When relevant.) The weights formula.}
 }
 \description{
 This function estimates maximum likelihood models with any number of fixed-effects.
@@ -339,14 +380,14 @@ of the two variables fe_1 and fe_2. This is identical to doing \code{paste0(fe_1
 but more convenient.
 
 Note that pasting is a costly operation, especially for large data sets.
-Thus, the internal algorithm uses a numerical trick which is fast, but the drawback is
-that the identity of each observation is lost (i.e. they are now equal to a meaningless
-number instead of being equal to \code{paste0(fe_1, "_", fe_2)}). These \dQuote{identities}
-are useful only if you're interested in the value of the fixed-effects (that you can
-extract with \code{\link{fixef.fixest}}). If you're only interested in coefficients of the variables,
-it doesn't matter. Anyway, you can use \code{combine.quick = FALSE} to tell the internal
-algorithm to use \code{paste} instead of the numerical trick. By default, the numerical
-trick is performed only for large data sets.
+Hence, by default this paste is done only when the number of unique values
+is lower than 50,000 observations.
+
+In case you are using a large data set and want to keep the identity of the fixed-effects,
+you need to use the argument \code{fixef.keep_names = TRUE}.
+
+Note that these \dQuote{identities} are useful only if you're interested in
+the value of the fixed-effects (that you can extract with \code{\link{fixef.fixest}}).
 }
 
 \section{Lagging variables}{
@@ -385,8 +426,7 @@ The function \code{\link{i}} has in fact more arguments, please see details in i
 
 
 Standard-errors can be computed in different ways, you can use the arguments \code{se} and \code{ssc}
-in \code{\link{summary.fixest}} to define how to compute them. By default, in the presence
-of fixed-effects, standard-errors are automatically clustered.
+in \code{\link{summary.fixest}} to define how to compute them. By default, the VCOV is the "standard" one.
 
 The following vignette: \href{https://lrberge.github.io/fixest/articles/standard_errors.html}{On standard-errors} describes in details how the standard-errors are computed in
 \code{fixest} and how you can replicate standard-errors from other software.
@@ -476,36 +516,45 @@ unique to the \emph{left-hand-side} of \code{fixest} estimations (the default be
 operator is to aggregate with sums, see \code{\link{xpd}}).
 
 Second, you can use a regular expression to grep the left-hand-sides on the fly. When the
-\code{..("regex")} feature is used naked on the LHS, the variables grepped are inserted into
+\code{..("regex")} (re \code{regex("regex")}) feature is used naked on the LHS,
+the variables grepped are inserted into
 \code{c()}. For example \verb{..("Pe") ~ Sepal.Length, iris} is equivalent to
 \verb{c(Petal.Length, Petal.Width) ~ Sepal.Length, iris}. Beware that this is a
 special feature unique to the \emph{left-hand-side} of \code{fixest} estimations
 (the default behavior of \code{..("regex")} is to aggregate with sums, see \code{\link{xpd}}).
+
+Note that if the dependent variable is also on the right-hand-side, it is automatically
+removed from the set of explanatory variable.
+For example, feols(y ~ y + x, base) works as feols(y ~ x, base).
+This is particulary useful to batch multiple estimations with multiple left hand sides.
 }
 
 \section{Dot square bracket operator in formulas}{
 
 
-In a formula, the dot square bracket (DSB) operator can: i) create manifold variables at once,
-or ii) capture values from the current environment and put them verbatim in the formula.
+In a formula, the dot square bracket (DSB) operator can: i) create manifold variables
+at once, or ii) capture values from the current environment and put them
+verbatim in the formula.
 
 Say you want to include the variables \code{x1} to \code{x3} in your formula. You can use
 \code{xpd(y ~ x.[1:3])} and you'll get \code{y ~ x1 + x2 + x3}.
 
-To summon values from the environment, simply put the variable in square brackets. For example:
-\code{for(i in 1:3) xpd(y.[i] ~ x)} will create the formulas \code{y1 ~ x} to \code{y3 ~ x} depending on the
-value of \code{i}.
+To summon values from the environment, simply put the variable in square brackets.
+For example:
+\code{for(i in 1:3) xpd(y.[i] ~ x)} will create the formulas \code{y1 ~ x} to \code{y3 ~ x}
+depending on the value of \code{i}.
 
 You can include a full variable from the environment in the same way:
 \code{for(y in c("a", "b")) xpd(.[y] ~ x)} will create the two formulas \code{a ~ x} and \code{b ~ x}.
 
 The DSB can even be used within variable names, but then the variable must be nested in
 character form. For example \code{y ~ .["x.[1:2]_sq"]} will create \code{y ~ x1_sq + x2_sq}. Using the
-character form is important to avoid a formula parsing error. Double quotes must be used. Note
-that the character string that is nested will be parsed with the function \code{\link{dsb}}, and thus it
-will return a vector.
+character form is important to avoid a formula parsing error.
+Double quotes must be used. Note that the character string that is nested will
+be parsed with the function \code{\link{dsb}}, and thus it will return a vector.
 
-By default, the DSB operator expands vectors into sums. You can add a comma, like in \code{.[, x]},
+By default, the DSB operator expands vectors into sums. You can add a comma,
+like in \code{.[, x]},
 to expand with commas--the content can then be used within functions. For instance:
 \code{c(x.[, 1:2])} will create \code{c(x1, x2)} (and \emph{not} \code{c(x1 + x2)}).
 
@@ -514,14 +563,15 @@ In all \code{fixest} estimations, this special parsing is enabled, so you don't 
 One-sided formulas can be expanded with the DSB operator: let \code{x = ~sepal + petal}, then
 \code{xpd(y ~ .[x])} leads to \code{color ~ sepal + petal}.
 
-You can even use multiple square brackets within a single variable, but then the use of nesting
-is required. For example, the following \code{xpd(y ~ .[".[letters[1:2]]_.[1:2]"])} will create
+You can even use multiple square brackets within a single variable,
+but then the use of nesting is required.
+For example, the following \code{xpd(y ~ .[".[letters[1:2]]_.[1:2]"])} will create
 \code{y ~ a_1 + b_2}. Remember that the nested character string is parsed with \code{\link{dsb}},
 which explains this behavior.
 
-When the element to be expanded i) is equal to the empty string or, ii) is of length 0, it is
-replaced with a neutral element, namely \code{1}. For example, \verb{x = "" ; xpd(y ~ .[x])} leads to
-\code{y ~ 1}.
+When the element to be expanded i) is equal to the empty string or,
+ii) is of length 0, it is replaced with a neutral element, namely \code{1}.
+For example, \verb{x = "" ; xpd(y ~ .[x])} leads to \code{y ~ 1}.
 }
 
 \examples{

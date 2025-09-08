@@ -19,7 +19,6 @@ esttable(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
@@ -33,7 +32,8 @@ esttable(
   order = NULL,
   dict = TRUE,
   file = NULL,
-  replace = FALSE,
+  replace = TRUE,
+  create_dirs = FALSE,
   convergence = NULL,
   signif.code = NULL,
   headers = list("auto"),
@@ -70,12 +70,11 @@ esttex(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
   fitstat = NULL,
-  title = NULL,
+  caption = NULL,
   coefstat = "se",
   ci = 0.95,
   se.row = NULL,
@@ -85,7 +84,8 @@ esttex(
   order = NULL,
   dict = TRUE,
   file = NULL,
-  replace = FALSE,
+  replace = TRUE,
+  create_dirs = FALSE,
   convergence = NULL,
   signif.code = NULL,
   label = NULL,
@@ -138,13 +138,12 @@ etable(
   se = NULL,
   ssc = NULL,
   cluster = NULL,
-  .vcov = NULL,
   .vcov_args = NULL,
   digits = 4,
   digits.stats = 5,
   tex,
   fitstat = NULL,
-  title = NULL,
+  caption = NULL,
   coefstat = "se",
   ci = 0.95,
   se.row = NULL,
@@ -154,7 +153,8 @@ etable(
   order = NULL,
   dict = TRUE,
   file = NULL,
-  replace = FALSE,
+  replace = TRUE,
+  create_dirs = FALSE,
   convergence = NULL,
   signif.code = NULL,
   label = NULL,
@@ -206,7 +206,7 @@ setFixest_etable(
   digits = 4,
   digits.stats = 5,
   fitstat,
-  coefstat = c("se", "tstat", "confint"),
+  coefstat = c("se", "tstat", "confint", "pvalue"),
   ci = 0.95,
   se.below = TRUE,
   keep,
@@ -214,6 +214,7 @@ setFixest_etable(
   order,
   dict,
   float,
+  signif.code = NULL,
   fixef_sizes = FALSE,
   fixef_sizes.simplify = TRUE,
   family,
@@ -230,8 +231,9 @@ setFixest_etable(
   drop.section = NULL,
   view = FALSE,
   markdown = NULL,
-  view.cache = FALSE,
+  view.cache = TRUE,
   page.width = "fit",
+  div.class = "etable",
   postprocess.tex = NULL,
   postprocess.df = NULL,
   fit_format = "__var__",
@@ -257,15 +259,19 @@ log_etable(type = "pdflatex")
 \code{\link{feols}} or \code{\link{feglm}}). Note that any other type of element is discarded. Note that you can
 give a list of \code{fixest} objects.}
 
-\item{vcov}{Versatile argument to specify the VCOV. In general, it is either a character
-scalar equal to a VCOV type, either a formula of the form: \code{vcov_type ~ variables}. The
-VCOV types implemented are: "iid", "hetero" (or "HC1"), "cluster", "twoway",
-"NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley". It also accepts
-object from \code{\link{vcov_cluster}}, \code{\link[=vcov_hac]{vcov_NW}}, \code{\link[=vcov_hac]{NW}},
-\code{\link[=vcov_hac]{vcov_DK}}, \code{\link[=vcov_hac]{DK}}, \code{\link{vcov_conley}} and
-\code{\link[=vcov_conley]{conley}}. It also accepts covariance matrices computed externally.
-Finally it accepts functions to compute the covariances. See the \code{vcov} documentation
-in the \href{https://lrberge.github.io/fixest/articles/fixest_walkthrough.html#the-vcov-argument-1}{vignette}.}
+\item{vcov}{Versatile argument to specify the VCOV.
+In general, it is either a character scalar equal to a VCOV type, either a formula of the form:
+vcov_type ~ variables. The VCOV types implemented are: "iid", "hetero" (or "HC1"),
+"cluster", "twoway", "NW" (or "newey_west"), "DK" (or "driscoll_kraay"), and "conley".
+It also accepts object from vcov_cluster, vcov_NW, NW, vcov_DK, DK, vcov_conley and conley.
+It also accepts covariance matrices computed externally.
+Finally it accepts functions to compute the covariances.
+See the vcov documentation in the vignette.
+You can pass several VCOVs (as above) if you nest them into a list.
+If the number of VCOVs equals the number of models, eahc VCOV is mapped to the appropriate model.
+If there is one model and several VCOVs, or if the first element of the list is equal to
+\code{"each"} or \code{"times"}, then the estimations will be replicated and the results
+for each estimation and each VCOV will be reported.}
 
 \item{stage}{Can be equal to \code{2} (default), \code{1}, \code{1:2} or \code{2:1}. Only used if the object
 is an IV estimation: defines the stage to which \code{summary} should be applied. If \code{stage = 1}
@@ -291,8 +297,8 @@ you should use \code{vcov} instead.}
 \item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
 how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
-\code{adj = TRUE}, \code{fixef.K="nested"}, \code{cluster.adj = TRUE}, \code{cluster.df = "min"},
-\code{t.df = "min"}, \verb{fixef.force_exact=FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
 
 \item{cluster}{Tells how to cluster the standard-errors (if clustering is requested).
 Can be either a list of vectors, a character vector of variable names, a formula or
@@ -305,10 +311,7 @@ blank with \code{vcov = "twoway"} (assuming \code{var1} [resp. \code{var2}] was
 the 1st [resp. 2nd] fixed-effect). You can interact two variables using \code{^} with
 the following syntax: \code{cluster = ~var1^var2} or \code{cluster = "var1^var2"}.}
 
-\item{.vcov}{A function to be used to compute the standard-errors of each fixest object. You can
-pass extra arguments to this function using the argument \code{.vcov_args}. See the example.}
-
-\item{.vcov_args}{A list containing arguments to be passed to the function \code{.vcov}.}
+\item{.vcov_args}{A list containing arguments to be passed to the function \code{vcov}.}
 
 \item{digits}{Integer or character scalar. Default is 4 and represents the number of significant
 digits to be displayed for the coefficients and standard-errors. To apply rounding instead of
@@ -333,9 +336,9 @@ use: \code{fitstat=c('n', 'cor2', 'ar2', 'war2')}, or \code{fitstat=~n+cor2+ar2+
 can use the dot to refer to default values:\code{ ~ . + ll} would add the log-likelihood to the
 default fit statistics.}
 
-\item{coefstat}{One of \code{"se"} (default), \code{"tstat"} or \code{"confint"}. The statistic to report for
-each coefficient: the standard-error, the t-statistics or the confidence interval. You can
-adjust the confidence interval with the argument \code{ci}.}
+\item{coefstat}{One of \code{"se"} (default), \code{"tstat"}, \code{"pvalue"}, or \code{"confint"}. The statistic to report for
+each coefficient: the standard-error, the t-statistics, the p-value,
+or the confidence interval. You can adjust the confidence interval with the argument \code{ci}.}
 
 \item{ci}{Level of the confidence interval, defaults to \code{0.95}. Only used if
 \code{coefstat = confint}.}
@@ -389,6 +392,12 @@ export a regular \code{data.frame}, use argument \code{tex = FALSE}.}
 \item{replace}{Logical, default is \code{FALSE}. Only used if option \code{file} is used. Should the
 exported table be written in a new file that replaces any existing file?}
 
+\item{create_dirs}{Logical, default is \code{FALSE}. Only used if when some file needs to be
+created (e;g. when \code{file} or \code{export} is used). By default, i.e. when \code{FALSE},
+if the parent directory does not exist, the containing folders are created
+up to the grand parent.
+If \code{TRUE}, all containing folders are recursively created.}
+
 \item{convergence}{Logical, default is missing. Should the convergence state of the algorithm be
 displayed? By default, convergence information is displayed if at least one model did not
 converge.}
@@ -431,7 +440,7 @@ default this line is displayed when at least two models are from different famil
 \code{10**(powerBelow+1)} is written with a power in Latex. For example \code{0.0000456} would be written
 \verb{4.56$\\\\times 10^\{-5\}$} by default. Setting \code{powerBelow = -6} would lead to \code{0.00004} in Latex.}
 
-\item{interaction.combine}{Character scalar, defaults to \code{" $\\\\times$ "} for Tex and to \code{" = "}
+\item{interaction.combine}{Character scalar, defaults to \code{" $\\\\times$ "} for Tex and to \code{" x "}
 otherwise. When the estimation contains interactions, then the variables names (after aliasing)
 are combined with this argument. For example: if \code{dict = c(x1="Wind", x2="Rain")} and you have
 the following interaction \code{x1:x2}, then it will be renamed (by default)
@@ -439,7 +448,7 @@ the following interaction \code{x1:x2}, then it will be renamed (by default)
 
 \item{interaction.order}{Character vector of regular expressions. Only affects variables that
 are interacted like x1 and x2 in \code{feols(y ~ x1*x2, data)}. You can change the order in which the
-interacted variables are displayed: e.g. \code{interaction.order = "x2"} would lead to "x1 x x2"
+interacted variables are displayed: e.g. \code{interaction.order = "x2"} would lead to "x2 x x1"
 instead of "x1 x x2". Please look at the argument 'order' and the dedicated section in the help
 page for more information.}
 
@@ -530,7 +539,8 @@ respectively for dot-, parenthesis-, left-, center- and right-aligned.}
 \item{highlight}{List containing coefficients to highlight.
 Highlighting is of the form \code{.("options1" = "coefs1", "options2" = "coefs2", etc)}.
 The coefficients to be highlighted can be written in three forms: 1) row, eg \code{"x1"} will
-highlight the full row of the variable \code{x1}; 2) cells, use \code{'@'} after the coefficient name to
+highlight the full row of the variable \code{x1};
+2) cells, use \code{'@'} after the coefficient name to
 give the column, it accepts ranges, eg \code{"x1@2, 4-6, 8"} will highlight only the columns
 2, 4, 5, 6, and 8 of the variable \code{x1}; 3) range, by giving the top-left and
 bottom-right values separated with a semi-colon, eg \code{"x1@2 ; x3@5"} will highlight
@@ -544,7 +554,11 @@ row color instead. Here are the other options: \code{'se'} to highlight the stan
 to monitor the width of the box; \code{'sep0'} to \code{'sep9'} to monitor the inner spacing.
 Finally the remaining option is the color: simply add an R color (it must be a valid R color!).
 You can use \code{"color!alpha"} with "alpha" a number between 0 to 100 to change
-the alpha channel of the color.}
+the alpha channel of the color.
+
+To be able to use use the highlighting feature, you need the
+following lines in your latex preamble: \verb{\\\\usepackage\{tikz\}} and
+\verb{\\\\usetikzlibrary\{matrix, shapes, arrows, fit, tikzmark\}}}
 
 \item{coef.style}{Named list containing styles to be applied to the coefficients. It must be of
 the form \code{.("style1" = "coefs1", "style2" = "coefs2", etc)}. The style must contain the
@@ -580,12 +594,12 @@ margin width represent the width of a single side margin (and hence will be doub
 when \code{markdown = TRUE}. The table in an image format is embedded in a \verb{<div>} container,
 and that container is of class \code{div.class}.}
 
-\item{title}{(Tex only.) Character scalar. The title of the Latex table.}
+\item{caption}{(Tex only.) Character scalar. The caption of the Latex table.}
 
 \item{label}{(Tex only.) Character scalar. The label of the Latex table.}
 
-\item{float}{(Tex only.) Logical. By default, if the argument \code{title} or \code{label} is provided, it
-is set to \code{TRUE}. Otherwise, it is set to \code{FALSE}.}
+\item{float}{(Tex only.) Logical. By default, if the argument \code{caption} or \code{label} is provided,
+it is set to \code{TRUE}. Otherwise, it is set to \code{FALSE}.}
 
 \item{style.tex}{An object created by the function \code{\link{style.tex}}. It represents the style of the
 Latex table, see the documentation of \code{\link{style.tex}}.}
@@ -677,7 +691,7 @@ or to \code{"images/etable/"} for earlier versions.}
 this argument is \code{TRUE} if the argument \code{file} (used for exportation) is not missing; it is
 equal to \code{FALSE} otherwise.}
 
-\item{view.cache}{Logical, default is \code{FALSE}. Only used when \code{view = TRUE}.
+\item{view.cache}{Logical, default is \code{TRUE}. Only used when \code{view = TRUE}.
 Whether the PNGs of the tables should be cached.}
 
 \item{reset}{(\code{setFixest_etable} only.) Logical, default is \code{FALSE}. If \code{TRUE}, this will reset
@@ -697,11 +711,11 @@ Which log file to report; if 'tex', the full source code of the tex file is retu
 if 'dir': the directory of the log files is returned.}
 }
 \value{
-If \code{tex = TRUE}, the lines composing the Latex table are returned invisibly while the table
-is directly prompted on the console.
+If \code{tex = TRUE}, the lines composing the Latex table are returned invisibly while
+the table is directly prompted on the console.
 
-If \code{tex = FALSE}, the data.frame is directly returned. If the argument \code{file} is not missing,
-the \code{data.frame} is printed and returned invisibly.
+If \code{tex = FALSE}, the data.frame is directly returned. If the argument \code{file} is
+not missing, the \code{data.frame} is printed and returned invisibly.
 }
 \description{
 Aggregates the results of multiple estimations and displays them in the form of either a Latex
@@ -720,10 +734,11 @@ You can permanently change the way your table looks in Latex by using \code{setF
 The following vignette gives an example as well as illustrates how to use the \code{style} and
 postprocessing functions: \href{https://lrberge.github.io/fixest/articles/exporting_tables.html}{Exporting estimation tables}.
 
-When the argument \code{postprocess.tex} is not missing, two additional tags will be included in the
-character vector returned by \code{etable}: \code{"\%start:tab\\\\n"} and \code{"\%end:tab\\\\n"}. These can be used
-to identify the start and end of the tabular and are useful to insert code within the \code{table}
-environment.
+When the argument \code{postprocess.tex} is not missing, two additional tags will
+be included in the character vector returned by \code{etable}:
+\code{"\%start:tab\\\\n"} and \code{"\%end:tab\\\\n"}. These can be used
+to identify the start and end of the tabular and are useful to insert code
+within the \code{table} environment.
 }
 \section{Functions}{
 \itemize{
@@ -732,23 +747,64 @@ environment.
 \item \code{esttex()}: Exports the results of multiple \code{fixest} estimations in a Latex table.
 
 }}
+\section{Latex dependencies}{
+
+
+Some features require specific Latex dependencies, these are:
+\itemize{
+\item always needed: \verb{\\\\usepackage\{booktabs\}}, \verb{\\\\usepackage\{array\}},
+\verb{\\\\usepackage\{multirow\}}, \verb{\\\\usepackage\{amsmath\}}, \verb{\\\\usepackage\{amssymb\}}
+\item if there are line break within cells: \verb{\\\\usepackage\{makecell\}}
+\item if the tabularx environment is used: \verb{\\\\usepackage\{tabularx\}}
+\item if threeparttable notes are used: \verb{\\\\usepackage[flushleft]\{threeparttable\}}
+\item if you use adjustbox: \verb{\\\\usepackage\{adjustbox\}}
+\item if you use any kind of colors in the table: \verb{\\\\usepackage[dvipsnames,table]\{xcolor\}}
+\item if you highlight cells with a box: \verb{\\\\usepackage\{tikz\}} and
+\verb{\\\\usetikzlibrary\{matrix, shapes, arrows, fit, tikzmark\}}
+\item if you highlight rows using the background color: \verb{\\\\usepackage\{colortbl\}}
+}
+
+Here is a summary:
+
+\preformatted{
+\% required
+\\usepackage{booktabs}
+\\usepackage{array}
+\\usepackage{multirow}
+\\usepackage{amsmath}
+\\usepackage{amssymb}
+
+\% optionnal, dependent on context
+\\usepackage{makecell}
+\\usepackage{tabularx}
+\\usepackage[flushleft]{threeparttable}
+\\usepackage{adjustbox}
+\\usepackage[dvipsnames,table]{xcolor}
+\\usepackage{tikz}
+\\usetikzlibrary{matrix, shapes, arrows, fit, tikzmark}
+\\usepackage{colortbl}
+}
+}
+
 \section{How does \code{digits} handle the number of decimals displayed?}{
 
 
 The default display of decimals is the outcome of an algorithm. Let's take the example
 of \code{digits = 3} which "kind of" requires 3 significant digits to be displayed.
 
-For numbers greater than 1 (in absolute terms), their integral part is always displayed and
-the number of decimals shown is equal to \code{digits} minus the number of digits in the integral
-part. This means that \code{12.345} will be displayed as \code{12.3}. If the number of decimals should
-be 0, then a single decimal is displayed to suggest that the number is not whole. This means
-that \code{1234.56} will be displayed as \code{1234.5}. Note that if the number is whole, no decimals
-are shown.
+For numbers greater than 1 (in absolute terms), their integral part is
+always displayed and the number of decimals shown is equal to \code{digits}
+minus the number of digits in the integral part.
+This means that \code{12.345} will be displayed as \code{12.3}.
+If the number of decimals should be 0, then a single decimal is displayed
+to suggest that the number is not whole. This means that \code{1234.56} will
+be displayed as \code{1234.5}. Note that if the number is whole, no decimals are shown.
 
 For numbers lower than 1 (in absolute terms), the number of decimals displayed is equal
-to \code{digits} except if there are only 0s in which case the first significant digit is shown.
-This means that \code{0.01234} will be displayed as \code{0.012} (first rule), and that 0.000123 will
-be displayed as \code{0.0001} (second rule).
+to \code{digits} except if there are only 0s in which case the first significant
+digit is shown.
+This means that \code{0.01234} will be displayed as \code{0.012} (first rule),
+and that 0.000123 will be displayed as \code{0.0001} (second rule).
 }
 
 \section{Arguments keep, drop and order}{
@@ -759,89 +815,102 @@ to manipulate character strings (and it exists across most programming languages
 
 For example drop = "Wind" would drop any variable whose name contains "Wind". Note that
 variables such as "Temp:Wind" or "StrongWind" do contain "Wind", so would be dropped.
-To drop only the variable named "Wind", you need to use \code{drop = "^Wind$"} (with "^" meaning
-beginning, resp. "$" meaning end, of the string => this is the language of regular expressions).
+To drop only the variable named "Wind", you need to use
+\code{drop = "^Wind$"} (with "^" meaning beginning, resp. "$" meaning end,
+of the string => this is the language of regular expressions).
 
-Although you can combine several regular expressions in a single character string using pipes,
-\code{drop} also accepts a vector of regular expressions.
+Although you can combine several regular expressions in a single character
+string using pipes, \code{drop} also accepts a vector of regular expressions.
 
-You can use the special character "!" (exclamation mark) to reverse the effect of the regular
-expression (this feature is specific to this function). For example \code{drop = "!Wind"} would drop
-any variable that does not contain "Wind".
+You can use the special character "!" (exclamation mark) to reverse the effect
+of the regular expression (this feature is specific to this function).
+For example \code{drop = "!Wind"} would drop any variable that does not contain "Wind".
 
-You can use the special character "\%" (percentage) to make reference to the original variable
-name instead of the aliased name. For example, you have a variable named \code{"Month6"}, and use a
-dictionary \code{dict = c(Month6="June")}. Thus the variable will be displayed as \code{"June"}. If you
-want to delete that variable, you can use either \code{drop="June"}, or \code{drop="\%Month6"} (which makes
-reference to its original name).
+You can use the special character "\%" (percentage) to make reference to the
+original variable name instead of the aliased name. For example, you have a
+variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}.
+Thus the variable will be displayed as \code{"June"}.
+If you want to delete that variable, you can use either \code{drop="June"},
+or \code{drop="\%Month6"} (which makes reference to its original name).
 
 The argument \code{order} takes in a vector of regular expressions, the order will follow the
-elements of this vector. The vector gives a list of priorities, on the left the elements with
-highest priority. For example, order = c("Wind", "!Inter", "!Temp") would give highest
-priorities to the variables containing "Wind" (which would then appear first), second highest
-priority is the variables not containing "Inter", last, with lowest priority, the variables not
-containing "Temp". If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you
+elements of this vector. The vector gives a list of priorities,
+on the left the elements with highest priority.
+For example, order = c("Wind", "!Inter", "!Temp") would give highest priorities to
+the variables containing "Wind" (which would then appear first),
+second highest priority is the variables not containing "Inter", last,
+with lowest priority, the variables not containing "Temp".
+If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you
 would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
 }
 
 \section{The argument \code{extralines}}{
 
 
-The argument \code{extralines} adds well... extra lines to the table. It accepts either a list, or a
-one-sided formula.
+The argument \code{extralines} adds well... extra lines to the table.
+It accepts either a list, or a one-sided formula.
 
-For each line, you can define the values taken by each cell using 4 different ways: a) a vector,
-b) a list, c) a function, and d) a formula.
+For each line, you can define the values taken by each cell using 4 different ways:
+a) a vector, b) a list, c) a function, and d) a formula.
 
-If a vector, it should represent the values taken by each cell. Note that if the length of the
-vector is smaller than the number of models, its values are recycled across models, but the
-length of the vector is required to be a divisor of the number of models.
+If a vector, it should represent the values taken by each cell. Note that if the
+length of the vector is smaller than the number of models, its values are
+recycled across models, but the length of the vector is required to be a
+divisor of the number of models.
 
-If a list, it should be of the form \verb{list("item1" = #item1, "item2" = #item2, etc)}. For example
-\code{list("A"=2, "B"=3)} leads to \code{c("A", "A", "B", "B", "B")}. Note that if the number of items is
-1, you don't need to add \verb{= 1}. For example \code{list("A"=2, "B")} is valid and leads to
+If a list, it should be of the form \verb{list("item1" = #item1, "item2" = #item2, etc)}.
+For example \code{list("A"=2, "B"=3)} leads to \code{c("A", "A", "B", "B", "B")}.
+Note that if the number of items is 1, you don't need to add \verb{= 1}.
+For example \code{list("A"=2, "B")} is valid and leads to
 \verb{c("A", "A", "B"}. As for the vector the values are recycled if necessary.
 
 If a function, it will be applied to each model and should return a scalar (\code{NA} values
 returned are accepted).
 
 If a formula, it must be one-sided and the elements in the formula must represent either
-\code{extralines} macros, either fit statistics (i.e. valid types of the function \code{\link{fitstat}}). One
-new line will be added for each element of the formula. To register \code{extralines} macros, you
-must first register them in \code{\link{extralines_register}}.
+\code{extralines} macros, either fit statistics (i.e. valid types of
+the function \code{\link{fitstat}}).
+One new line will be added for each element of the formula.
+To register \code{extralines} macros, you must first register them in \code{\link{extralines_register}}.
 
-Finally, you can combine as many lines as wished by nesting them in a list. The names of the
-nesting list are the row titles (values in the leftmost cell). For example
-\code{extralines = list(~r2, Controls = TRUE, Group = list("A"=2, "B"))} will add three lines,
-the titles of which are "R2", "Controls" and "Group".
+Finally, you can combine as many lines as wished by nesting them in a list.
+The names of the nesting list are the row titles (values in the leftmost cell).
+For example \code{extralines = list(~r2, Controls = TRUE, Group = list("A"=2, "B"))} will
+add three lines, the titles of which are "R2", "Controls" and "Group".
 }
 
 \section{Controlling the placement of extra lines}{
 
 
 The arguments \code{group}, \code{extralines} and \code{fixef.group} allow to add customized lines in the
-table. They can be defined via a list where the list name will be the row name. By default, the
-placement of the extra line is right after the coefficients (except for \code{fixef.group}, covered
-in the last paragraph). For instance, \code{group = list("Controls" = "x[[:digit:]]")} will create a
+table. They can be defined via a list where the list name will be the row name.
+By default, the placement of the extra line is right after the coefficients
+(except for \code{fixef.group}, covered in the last paragraph).
+For instance, \code{group = list("Controls" = "x[[:digit:]]")} will create a
 line right after the coefficients telling which models contain the control variables.
 
-But the placement can be customized. The previous example (of the controls) will be used for
-illustration (the mechanism for \code{extralines} and \code{fixef.group} is identical).
+But the placement can be customized. The previous example (of the controls) will
+be used for illustration (the mechanism for \code{extralines} and \code{fixef.group} is identical).
 
-The row names accept 2 special characters at the very start. The first character tells in which
-section the line should appear: it can be equal to \code{"^"}, \code{"-"}, or \code{"_"}, meaning respectively
-the coefficients, the fixed-effects and the statistics section (which typically appear at the
-top, mid and bottom of the table). The second one governs the placement of the new line within
+The row names accept 2 special characters at the very start.
+The first character tells in which section the line should appear:
+it can be equal to \code{"^"}, \code{"-"}, or \code{"_"}, meaning respectively
+the coefficients, the fixed-effects and the statistics section
+(which typically appear at the top, mid and bottom of the table).
+The second one governs the placement of the new line within
 the section: it can be equal to \code{"^"}, meaning first line, or \code{"_"}, meaning last line.
 
-Let's have some examples. Using the previous example, writing \code{"_^Controls"} would place the new
-line at the top of the statistics section. Writing \code{"-_Controls"} places it as the last row of
-the fixed-effects section; \code{"^^Controls"} at the top row of the coefficients section; etc...
+Let's have some examples. Using the previous example, writing \code{"_^Controls"}
+would place the new line at the top of the statistics section.
+Writing \code{"-_Controls"} places it as the last row of
+the fixed-effects section; \code{"^^Controls"} at the top row of
+the coefficients section; etc...
 
-The second character is optional, the default placement being in the bottom. This means that
-\code{"_Controls"} would place it at the bottom of the statistics section.
+The second character is optional, the default placement being in the bottom.
+This means that \code{"_Controls"} would place it at the bottom of the statistics section.
 
-The placement in \code{fixef.group} is defined similarly, only the default placement is different.
+The placement in \code{fixef.group} is defined similarly, only the default
+placement is different.
 Its default placement is at the top of the fixed-effects section.
 }
 
@@ -849,12 +918,13 @@ Its default placement is at the top of the fixed-effects section.
 
 
 By default on all instances (with the notable exception of the elements of \code{\link{style.tex}})
-special Latex characters are escaped. This means that \code{title="Exports in million $."} will be
-exported as \code{"Exports in million \\\\$."}: the dollar sign will be escaped. This is true for the
-following characters: &, \code{$}, \%, _, ^ and #.
+special Latex characters are escaped. This means that
+\code{caption="Exports in million $."} will be exported as
+\code{"Exports in million \\\\$."}: the dollar sign will be escaped.
+This is true for the following characters: &, \code{$}, \%, _, ^ and #.
 
 Note, importantly, that equations are NOT escaped. This means that
-\code{title="Functional form $a_i \\\\times x^b$, variation in \%."} will be displayed as:
+\code{caption="Functional form $a_i \\\\times x^b$, variation in \%."} will be displayed as:
 \code{"Functional form $a_i \\\\times x^b$, variation in \\\\\%."}: only the
 last percentage will be escaped.
 
@@ -871,7 +941,8 @@ it is only recommended to super users.
 
 Within anything that is Latex-escaped (see previous section), you can use a markdown-style
 markup to put the text in italic and/or bold. Use \verb{*text*}, \verb{**text**} or \verb{***text***} to
-put some text in, respectively, italic (with \verb{\\\\textit}), bold (with \verb{\\\\textbf}) and italic-bold.
+put some text in, respectively, italic (with \verb{\\\\textit}),
+bold (with \verb{\\\\textbf}) and italic-bold.
 
 The markup can be escaped by using an backslash first. For example \code{"***This: \\\\***, are  three stars***"} will leave the three stars in the middle untouched.
 }
