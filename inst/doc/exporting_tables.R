@@ -29,23 +29,23 @@ etable(est, style.df = style.df(depvar.title = "", fixef.title = "",
                                 fixef.suffix = " fixed effect", yesNo = "yes"))
 
 ## ----eval = !is_pander, include = !is_pander--------------------------------------------
-# NOTE:
-# The evaluation of the code of this section requires the 
-#   package 'pander' which is not installed.
-# The code output is not reported.
+# # NOTE:
+# # The evaluation of the code of this section requires the
+# #   package 'pander' which is not installed.
+# # The code output is not reported.
 
 ## ----eval = is_pander-------------------------------------------------------------------
-#  library(pander)
-#  
-#  etable(est, postprocess.df = pandoc.table.return, style = "rmarkdown")
+library(pander)
+
+etable(est, postprocess.df = pandoc.table.return, style = "rmarkdown")
 
 ## ----eval = is_pander-------------------------------------------------------------------
-#  my_style = style.df(depvar.title = "", fixef.title = "",
-#                      fixef.suffix = " fixed effect", yesNo = "yes")
-#  setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)
+my_style = style.df(depvar.title = "", fixef.title = "", 
+                    fixef.suffix = " fixed effect", yesNo = "yes")
+setFixest_etable(style.df = my_style, postprocess.df = pandoc.table.return)
 
 ## ----eval = is_pand, eval = is_pander---------------------------------------------------
-#  etable(est[rhs = 2], style = "rmarkdown", caption = "New default values")
+etable(est[rhs = 2], style = "rmarkdown", caption = "New default values")
 
 ## ---------------------------------------------------------------------------------------
 est_slopes = feols(Ozone ~ Solar.R + Wind | Day + Month[Temp], airquality)
@@ -109,5 +109,5 @@ setFixest_etable(reset = TRUE)
 etable(est, fitstat = ~ . + p_s + p_h + p_day + p_month)
 
 ## ----eval = FALSE-----------------------------------------------------------------------
-#  summary(.l(est, est_slopes), cluster = ~ Month)
+# summary(.l(est, est_slopes), cluster = ~ Month)
 

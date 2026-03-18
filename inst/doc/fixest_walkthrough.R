@@ -32,10 +32,10 @@ print(gravity_pois)
 summary(gravity_pois, vcov = "twoway")
 
 ## ----eval = FALSE-----------------------------------------------------------------------
-#  # Three ways to summon clustering on the Product variable
-#  summary(gravity_pois, vcov = ~Product)
-#  summary(gravity_pois, cluster = "Product")
-#  summary(gravity_pois, cluster = ~Product)
+# # Three ways to summon clustering on the Product variable
+# summary(gravity_pois, vcov = ~Product)
+# summary(gravity_pois, cluster = "Product")
+# summary(gravity_pois, cluster = ~Product)
 
 ## ----eval = TRUE------------------------------------------------------------------------
 summary(gravity_pois, cluster = ~Product)
@@ -57,8 +57,8 @@ gravity_negbin = fenegbin(Euros ~ log(dist_km) | Origin + Destination + Product 
 
 
 ## ----eval=FALSE-------------------------------------------------------------------------
-#  etable(gravity_pois, gravity_negbin, gravity_ols,
-#           vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
+# etable(gravity_pois, gravity_negbin, gravity_ols,
+#          vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
 
 ## ----echo=FALSE, results='asis'---------------------------------------------------------
 tab = etable(gravity_pois, gravity_negbin, gravity_ols, vcov = "twoway", headers = c("Poisson", "Negative Binomial", "Gaussian"))
@@ -73,7 +73,7 @@ for(i in 0:3){
 }
 
 ## ----eval=FALSE-------------------------------------------------------------------------
-#  etable(gravity_subfe, cluster = ~Origin+Destination)
+# etable(gravity_subfe, cluster = ~Origin+Destination)
 
 ## ----echo=FALSE, results='asis'---------------------------------------------------------
 tab = etable(gravity_subfe, cluster = ~Origin+Destination)
@@ -87,17 +87,17 @@ res_multi = fepois(Euros ~ log(dist_km) | csw0(Year, Destination, Origin), trade
 etable(res_multi, cluster = ~Origin+Destination, tex = TRUE)
 
 ## ----eval=FALSE-------------------------------------------------------------------------
-#  # we set the dictionary once and for all
-#  myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
-#  # 1st export: we change the signif code and drop the intercept
-#  etable(res_multi, signifCode = c("a" = 0.01, "b" = 0.05),
-#         drop = "Const", dict = myDict, file = "Estimation Tables.tex",
-#         replace = TRUE, title = "First export -- normal Standard-errors")
-#  # 2nd export: clustered S-E + distance as the first coefficient
-#  etable(res_multi, cluster = ~Product, order = "Dist",
-#         dict = myDict, file = "Estimation Tables.tex",
-#         title = "Second export -- clustered standard-errors (on Product variable)")
-#  
+# # we set the dictionary once and for all
+# myDict = c("log(dist_km)" = "$\\ln (Distance)$", "(Intercept)" = "Constant")
+# # 1st export: we change the signif code and drop the intercept
+# etable(res_multi, signifCode = c("a" = 0.01, "b" = 0.05),
+#        drop = "Const", dict = myDict, file = "Estimation Tables.tex",
+#        replace = TRUE, title = "First export -- normal Standard-errors")
+# # 2nd export: clustered S-E + distance as the first coefficient
+# etable(res_multi, cluster = ~Product, order = "Dist",
+#        dict = myDict, file = "Estimation Tables.tex",
+#        title = "Second export -- clustered standard-errors (on Product variable)")
+# 
 
 ## ---------------------------------------------------------------------------------------
 fixedEffects = fixef(gravity_pois)
@@ -412,11 +412,11 @@ rbind(gamma, exp(fixef(result_NL_fe)$id[as.character(1:20)]))
 
 
 ## ----eval = FALSE-----------------------------------------------------------------------
-#  # Sample of results:
-#  # 1 nthreads: 3.13s
-#  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 1))
-#  # 2 nthreads: 1.82s
-#  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 2))
-#  # 4 nthreads: 1.17s
-#  system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 4))
+# # Sample of results:
+# # 1 nthreads: 3.13s
+# system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 1))
+# # 2 nthreads: 1.82s
+# system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 2))
+# # 4 nthreads: 1.17s
+# system.time(fenegbin(Euros ~ log(dist_km)|Origin+Destination+Product+Year, trade, nthreads = 4))
 

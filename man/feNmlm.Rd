@@ -207,11 +207,12 @@ or \dQuote{fourway}? By default if there are clusters in the estimation:
 \code{se = "cluster"}, otherwise \code{se = "iid"}. Note that this argument is deprecated,
 you should use \code{vcov} instead.}
 
-\item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
-how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
+\item{ssc}{An object of class \code{ssc_type} obtained with the function \code{\link{ssc}}. Represents
+how the small sample correction should be done. You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
 \code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
-\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.
+Not all VCOV types are affected by this argument.}
 
 \item{panel.id}{The panel identifiers. Can either be: i) a one sided formula
 (e.g. \code{panel.id = ~id+time}), ii) a character vector of length 2

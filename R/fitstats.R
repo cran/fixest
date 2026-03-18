@@ -653,7 +653,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
   check_set_arg(type, "character vector no na | os formula")
   check_arg(simplify, verbose, "logical scalar")
 
-  if("formula" %in% class(type)){
+  if(inherits(type, "formula")){
     type = .xpd(type, frame = frame)
 
     type = gsub(" ", "", strsplit(deparse_long(type[[2]]), "+", fixed = TRUE)[[1]])
@@ -685,12 +685,17 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
   res_all = list()
   type_all = type
+  
+  is_NA_model = isTRUE(x$NA_model)
 
   for(i in seq_along(type_all)){
     type = type_all[i]
-
+    
     # Big if
-    if(type == "n"){
+    if(is_NA_model){
+      res_all[[type]] = NA_real_
+      
+    } else if(type == "n"){
       res_all[[type]] = x$nobs
 
     } else if(type == "ll"){
@@ -769,7 +774,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
           df1 = degrees_freedom(x, "k") - 1
           df2 = degrees_freedom(x, "t")
 
-          if(isTRUE(x$iv) && x$iv_stage == 2){
+          if(isTRUE(x$is_iv) && x$iv_stage == 2){
             # We need to compute the SSR
             w = 1
             if(!is.null(x$weights)) w = x$weights
@@ -802,7 +807,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
 
       } else if(root == "ivfall"){
-        if(isTRUE(x$iv)){
+        if(isTRUE(x$is_iv)){
           if(x$iv_stage == 1){
             df1 = degrees_freedom(x, vars = x$iv_inst_names_xpd)
             df2 = degrees_freedom(x, "resid")
@@ -834,7 +839,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
       } else if(root == "ivf1"){
 
-        if(isTRUE(x$iv)){
+        if(isTRUE(x$is_iv)){
           df1 = degrees_freedom(x, vars = x$iv_inst_names_xpd, stage = 1)
           df2 = degrees_freedom(x, "resid", stage = 1)
 
@@ -861,7 +866,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
         }
 
       } else if(root == "ivf2"){
-        if(isTRUE(x$iv) && x$iv_stage == 2){
+        if(isTRUE(x$is_iv) && x$iv_stage == 2){
           # f stat for the second stage
 
           df1 = degrees_freedom(x, vars = x$iv_endo_names_fit)
@@ -881,7 +886,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
         }
 
       } else if(root == "kpr"){
-        if(isTRUE(x$iv) && x$iv_stage == 2){
+        if(isTRUE(x$is_iv) && x$iv_stage == 2){
           # The KP rank test is computed in a specific function
 
           vec = kp_stat(x)
@@ -892,7 +897,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
         }
 
       } else if(root == "cd"){
-        if(isTRUE(x$iv) && x$iv_stage == 2){
+        if(isTRUE(x$is_iv) && x$iv_stage == 2){
           # The KP rank test is computed in a specific function
 
           vec = cd_stat(x)
@@ -916,7 +921,8 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
           # The VCOV is always full rank in here
           stat = .wald(x, names(my_coef))
           p = pf(stat, df1, df2, lower.tail = FALSE)
-          vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = attr(x$cov.scaled, "type"))
+          vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
+                     vcov = attr(x$cov.scaled, "vcov_type"))
           res_all[[type]] = set_value(vec, value)
 
         } else {
@@ -926,7 +932,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
       } else if(root == "ivwaldall"){
 
-        if(isTRUE(x$iv)){
+        if(isTRUE(x$is_iv)){
           if(x$iv_stage == 1){
 
             df1 = degrees_freedom(x, vars = x$iv_inst_names_xpd)
@@ -935,7 +941,8 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
             stat = .wald(x, x$iv_inst_names_xpd)
 
             p = pf(stat, df1, df2, lower.tail = FALSE)
-            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = attr(x$cov.scaled, "type"))
+            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
+                       vcov = attr(x$cov.scaled, "vcov_type"))
             res_all[[type]] = set_value(vec, value)
 
           } else {
@@ -947,7 +954,8 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
             stat = .wald(x, x$iv_endo_names_fit)
 
             p = pf(stat, df1, df2, lower.tail = FALSE)
-            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = attr(x$cov.scaled, "type"))
+            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
+                       vcov = attr(x$cov.scaled, "vcov_type"))
             res_all[[type]] = set_value(vec, value)
           }
 
@@ -957,7 +965,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
       } else if(root %in% "ivwald1"){
 
-        if(isTRUE(x$iv)){
+        if(isTRUE(x$is_iv)){
           df1 = degrees_freedom(x, vars = x$iv_inst_names_xpd, stage = 1)
           df2 = degrees_freedom(x, "resid", stage = 1)
 
@@ -967,7 +975,8 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
             stat = .wald(x, x$iv_inst_names_xpd)
 
             p = pf(stat, df1, df2, lower.tail = FALSE)
-            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = attr(x$cov.scaled, "type"))
+            vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
+                       vcov = attr(x$cov.scaled, "vcov_type"))
             res_all[[type]] = set_value(vec, value)
 
           } else {
@@ -994,7 +1003,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
 
               p = pf(stat, df1, df2, lower.tail = FALSE)
               vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
-                         vcov = attr(x$cov.scaled, "type"))
+                         vcov = attr(x$cov.scaled, "vcov_type"))
               res_all[[paste0(type, "::", endo)]] = set_value(vec, value)
             }
           }
@@ -1004,7 +1013,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
         }
 
       } else if(root == "ivwald2"){
-        if(isTRUE(x$iv) && x$iv_stage == 2){
+        if(isTRUE(x$is_iv) && x$iv_stage == 2){
           # wald stat for the second stage
 
           df1 = degrees_freedom(x, vars = x$iv_endo_names_fit)
@@ -1013,7 +1022,8 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
           stat = .wald(x, x$iv_endo_names_fit)
 
           p = pf(stat, df1, df2, lower.tail = FALSE)
-          vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = attr(x$cov.scaled, "type"))
+          vec = list(stat = stat, p = p, df1 = df1, df2 = df2, 
+                     vcov = attr(x$cov.scaled, "vcov_type"))
           res_all[[type]] = set_value(vec, value)
 
         } else {
@@ -1021,7 +1031,7 @@ fitstat = function(x, type, vcov = NULL, cluster = NULL, ssc = NULL,
         }
 
       } else if(root == "wh"){
-        if(isTRUE(x$iv) && x$iv_stage == 2){
+        if(isTRUE(x$is_iv) && x$iv_stage == 2){
           # Wu Hausman stat for the second stage
           vec = x$iv_wh
           res_all[[type]] = set_value(vec, value)
@@ -1197,13 +1207,19 @@ wald = function(x, keep = NULL, drop = NULL, print = TRUE, vcov, se, cluster, ..
   qui = names(x$coefficients) %in% coef_name
   my_coef = x$coefficients[qui]
   df1 = length(my_coef)
-
-  df2 = x$nobs - x$nparams
+  
+  df2 = attr(x$cov.scaled, "df.t")
+  if(is.null(df2)){
+    df2 = x$nobs - x$nparams
+  } else {
+    # normalisation => can happen with few clusters
+    df2 = max(df2, df1 + 1)
+  }
 
   # The VCOV is always full rank in here
-  stat = drop(my_coef %*% solve(x$cov.scaled[qui, qui]) %*% my_coef) / df1
+  stat = drop(my_coef %*% invert_posdef_mat(x$cov.scaled[qui, qui]) %*% my_coef) / df1
   p = pf(stat, df1, df2, lower.tail = FALSE)
-  vcov = attr(x$cov.scaled, "type")
+  vcov = attr(x$cov.scaled, "vcov_type")
   vec = list(stat = stat, p = p, df1 = df1, df2 = df2, vcov = vcov)
 
   if(print){
@@ -1222,7 +1238,7 @@ wald = function(x, keep = NULL, drop = NULL, print = TRUE, vcov, se, cluster, ..
 fitstat_validate = function(x, vector = FALSE){
   check_value(x, "NA | os formula | charin(FALSE) | character vector no na", .arg_name = "fitstat", .up = 1)
 
-  if("formula" %in% class(x)){
+  if(inherits(x, "formula")){
     x = attr(terms(update(~ DEFAULT, x)), "term.labels")
   } else if (length(x) == 1 && (isFALSE(x) || is.na(x))){
     x = c()
@@ -1325,7 +1341,7 @@ r2 = function(x, type = "all", full_names = FALSE){
 
   check_arg(full_names, "logical scalar")
 
-  if(!"fixest" %in% class(x)){
+  if(!inherits(x, "fixest")){
     stop("Only 'fixest' objects are supported.")
   }
 
@@ -1359,7 +1375,7 @@ r2 = function(x, type = "all", full_names = FALSE){
   isFixef = "fixef_vars" %in% names(x)
   n = nobs(x)
   
-  if(isTRUE(x$iv) && identical(x$iv_stage, 2)){
+  if(isTRUE(x$is_iv) && identical(x$iv_stage, 2)){
     x$ssr = cpp_ssq(x$iv_residuals)
   }
 
@@ -1521,7 +1537,7 @@ degrees_freedom = function(x, type, vars = NULL, vcov = NULL, se = NULL, cluster
   check_arg(stage, "integer scalar GE{1} LE{2}")
   check_arg(vars, "character vector no na")
 
-  if(stage == 1 && isTRUE(x$iv) && x$iv_stage == 2){
+  if(stage == 1 && isTRUE(x$is_iv) && x$iv_stage == 2){
     x = x$iv_first_stage[[1]]
   }
 
@@ -1619,11 +1635,22 @@ kp_stat = function(x){
   # internal function => x must be a fixest object
   #
   # The code here is a translation of the ranktest.jl function from the Vcov.jl package
-  # from @matthieugomez (see https://github.com/matthieugomez/Vcov.jl)
-  #
+  # from @matthieugomez (see https://github.com/FixedEffects/Vcov.jl)
 
 
-  if(!isTRUE(x$iv) || !x$iv_stage == 2) return(NA)
+  if(!isTRUE(x$is_iv) || !x$iv_stage == 2) return(NA)
+
+  n_endo = length(x$iv_first_stage)
+  n_inst = x$iv_n_inst
+  VCOV_TYPE = attr(x$cov.scaled, "vcov_type")
+  if (!identical(VCOV_TYPE, "IID") && n_inst != n_endo) {
+    warning(paste0(
+      "KP calculation is only implemented for the cases:\n",
+      " * vcov type is IID or\n",
+      " * number of endogenous variables == number of instruments"
+    ))
+    return(NA)
+  }
 
   # Necessary data
 
@@ -1637,8 +1664,8 @@ kp_stat = function(x){
   Z = model.matrix(x, type = "iv.inst")
   Z_proj = proj_on_U(x, Z)
 
-  k = n_endo = ncol(X_proj)
-  l = n_inst = ncol(Z)
+  k = n_endo
+  l = n_inst
 
   # We assume l >= k
   q = min(k, l) - 1
@@ -1650,7 +1677,7 @@ kp_stat = function(x){
   } else {
     PI = coef(summary(x, stage = 1))
   }
-  PI = PI[, colnames(PI) %in% x$iv_inst_names_xpd, drop = FALSE]
+  PI = as.matrix(PI[, colnames(PI) %in% x$iv_inst_names_xpd, drop = FALSE])
 
   Fmat = chol(crossprod(Z_proj))
   Gmat = chol(crossprod(X_proj))
@@ -1680,8 +1707,9 @@ kp_stat = function(x){
     a_qq = ssign(u_sub[1]) * u[1:l, k:l, drop = FALSE]
     b_qq = ssign(vt_sub[1]) * t(vt_k)
   } else {
-    a_qq = u[1:l, k:l] %*% (solve(u_sub) %*% mat_sqrt(u_sub %*% t(u_sub)))
-    b_qq = mat_sqrt(vt_sub %*% t(vt_sub)) %*% (solve(t(vt_sub)) %*% t(vt_k))
+    # u_sub %*% t(u_sub) = tcrossprod(u_sub)
+    a_qq = u[1:l, k:l] %*% (solve(u_sub) %*% mat_sqrt( tcrossprod(u_sub) ))
+    b_qq = mat_sqrt( tcrossprod(vt_sub) ) %*% (solve(t(vt_sub)) %*% t(vt_k))
   }
 
   # kronecker
@@ -1690,8 +1718,6 @@ kp_stat = function(x){
 
   # There is need to compute the vcov specifically for this case
   # We do it the same way as it was for x
-
-  VCOV_TYPE = attr(x$cov.scaled, "type")
 
   if(identical(VCOV_TYPE, "IID")){
     vlab = chol(tcrossprod(kronv) / nrow(X_proj))
@@ -1734,7 +1760,7 @@ cd_stat = function(x){
   # x: fixest object
   #
 
-  if(!isTRUE(x$iv) || !x$iv_stage == 2) return(NA)
+  if(!isTRUE(x$is_iv) || !x$iv_stage == 2) return(NA)
 
   # Necessary data
   X = model.matrix(x, type = "iv.endo")

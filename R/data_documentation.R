@@ -147,7 +147,7 @@
 #'
 #'
 #' @source
-#' The source of this data set is the Microsoft Academic Graph data set, extracted in 2020. Now a defunct project, you can find similar data on [OpenAlex](https://docs.openalex.org/).
+#' The source of this data set is the Microsoft Academic Graph data set, extracted in 2020. Now a defunct project, you can find similar data on [OpenAlex](https://developers.openalex.org/).
 #' 
 #' The variables `birth_year`, `is_woman` and `age` were randomly generated. All other variables have created from the raw MAG files.
 #'

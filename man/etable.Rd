@@ -30,7 +30,11 @@ esttable(
   keep = NULL,
   drop = NULL,
   order = NULL,
+  keep_raw = NULL,
+  drop_raw = NULL,
+  order_raw = NULL,
   dict = TRUE,
+  coef.sub = NULL,
   file = NULL,
   replace = TRUE,
   create_dirs = FALSE,
@@ -82,7 +86,11 @@ esttex(
   keep = NULL,
   drop = NULL,
   order = NULL,
+  keep_raw = NULL,
+  drop_raw = NULL,
+  order_raw = NULL,
   dict = TRUE,
+  coef.sub = NULL,
   file = NULL,
   replace = TRUE,
   create_dirs = FALSE,
@@ -151,7 +159,11 @@ etable(
   keep = NULL,
   drop = NULL,
   order = NULL,
+  keep_raw = NULL,
+  drop_raw = NULL,
+  order_raw = NULL,
   dict = TRUE,
+  coef.sub = NULL,
   file = NULL,
   replace = TRUE,
   create_dirs = FALSE,
@@ -294,11 +306,12 @@ or \dQuote{fourway}? By default if there are clusters in the estimation:
 \code{se = "cluster"}, otherwise \code{se = "iid"}. Note that this argument is deprecated,
 you should use \code{vcov} instead.}
 
-\item{ssc}{An object of class \code{ssc.type} obtained with the function \code{\link{ssc}}. Represents
-how the degree of freedom correction should be done.You must use the function \code{\link{ssc}}
+\item{ssc}{An object of class \code{ssc_type} obtained with the function \code{\link{ssc}}. Represents
+how the small sample correction should be done. You must use the function \code{\link{ssc}}
 for this argument. The arguments and defaults of the function \code{\link{ssc}} are:
 \code{K.adj = TRUE}, \code{K.fixef = "nonnested"}, \code{G.adj = TRUE}, \code{G.df = "min"},
-\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.}
+\code{t.df = "min"}, \verb{K.exact = FALSE)}. See the help of the function \code{\link{ssc}} for details.
+Not all VCOV types are affected by this argument.}
 
 \item{cluster}{Tells how to cluster the standard-errors (if clustering is requested).
 Can be either a list of vectors, a character vector of variable names, a formula or
@@ -354,24 +367,68 @@ coefficients? If \code{NULL}, then this is \code{TRUE} for Latex and \code{FALSE
 \item{keep}{Character vector. This element is used to display only a subset of variables. This
 should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}} help for more info). Each
 variable satisfying any of the regular expressions will be kept. This argument is applied post
-aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to display
+aliasing (see argument \code{dict}).
+Use the argument \code{keep_raw} for the same effect before aliasing.
+
+Example: you have the variable \code{x1} to \code{x55} and want to display
 only \code{x1} to \code{x9}, then you could use \code{keep = "x[[:digit:]]$"}. If the first character is an
-exclamation mark, the effect is reversed (e.g. keep = "!Intercept" means: every variable that
-does not contain \dQuote{Intercept} is kept). See details.}
+exclamation mark, the effect is reversed (e.g. keep = "!Constant" means: every variable that
+does not contain \dQuote{Constant} is kept). See details.}
 
 \item{drop}{Character vector. This element is used if some variables are not to be displayed.
 This should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}} help for more info). Each
 variable satisfying any of the regular expressions will be discarded. This argument is applied
-post aliasing (see argument \code{dict}). Example: you have the variable \code{x1} to \code{x55} and want to
+post aliasing (see argument \code{dict}).
+Use the argument \code{drop_raw} for the same effect before aliasing.
+
+Example: you have the variable \code{x1} to \code{x55} and want to
 display only \code{x1} to \code{x9}, then you could use \verb{drop = "x[[:digit:]]\{2\}}". If the first character
-is an exclamation mark, the effect is reversed (e.g. drop = "!Intercept" means: every variable
-that does not contain \dQuote{Intercept} is dropped). See details.}
+is an exclamation mark, the effect is reversed (e.g. drop = "!Constant" means: every variable
+that does not contain \dQuote{Constant} is dropped). See details.}
 
 \item{order}{Character vector. This element is used if the user wants the variables to be
 ordered in a certain way. This should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}}
 help for more info). The variables satisfying the first regular expression will be placed first,
 then the order follows the sequence of regular expressions. This argument is applied post
-aliasing (see argument \code{dict}). Example: you have the following variables: \code{month1} to \code{month6},
+aliasing (see argument \code{dict}). Use the argument \code{order_raw} for the same effect before aliasing.
+
+Example: you have the following variables: \code{month1} to \code{month6},
+then \code{x1} to \code{x5}, then \code{year1} to \code{year6}. If you want to display first the x's, then the
+years, then the months you could use: \code{order = c("x", "year")}. If the first character is an
+exclamation mark, the effect is reversed (e.g. order = "!Constant" means: every variable that
+does not contain \dQuote{Constant} goes first).  See details.}
+
+\item{keep_raw}{Character vector. This element is used to display only a subset of variables.
+This should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}} help for more info). Each
+variable satisfying any of the regular expressions will be kept. This argument is applied before
+aliasing (see argument \code{dict}).
+Use the argument \code{keep} for the same effect after aliasing.
+
+Example: you have the variable \code{x1} to \code{x55} and want to display
+only \code{x1} to \code{x9}, then you could use \code{keep = "x[[:digit:]]$"}. If the first character is an
+exclamation mark, the effect is reversed (e.g. keep_raw = "!Intercept" means:
+every variable that does not contain \dQuote{Intercept} is kept). See details.}
+
+\item{drop_raw}{Character vector. This element is used if some variables are not to
+be displayed.
+This should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}} help for more info). Each
+variable satisfying any of the regular expressions will be discarded. This argument is applied
+before aliasing (see argument \code{dict}).
+Use the argument \code{drop} for the same effect after aliasing.
+
+Example: you have the variable \code{x1} to \code{x55} and want to
+display only \code{x1} to \code{x9}, then you could use \verb{drop = "x[[:digit:]]\{2\}}". If the first character
+is an exclamation mark, the effect is reversed (e.g. drop_raw = "!Intercept" means:
+every variable that does not contain \dQuote{Intercept} is dropped). See details.}
+
+\item{order_raw}{Character vector. This element is used if the user wants the variables to be
+ordered in a certain way. This should be a vector of regular expressions (see \code{\link[base:regex]{base::regex}}
+help for more info). The variables satisfying the first regular expression will be placed first,
+then the order follows the sequence of regular expressions. This argument is applied post
+aliasing (see argument \code{dict}).
+Use the argument \code{order} for the same effect after aliasing.
+
+Example: you have the following variables: \code{month1} to \code{month6},
 then \code{x1} to \code{x5}, then \code{year1} to \code{year6}. If you want to display first the x's, then the
 years, then the months you could use: \code{order = c("x", "year")}. If the first character is an
 exclamation mark, the effect is reversed (e.g. order = "!Intercept" means: every variable that
@@ -384,6 +441,21 @@ By default, it is equal to \code{getFixest_dict()}, a default dictionary which c
 \code{\link{setFixest_dict}}. You can use \code{dict = FALSE} to disable it. By default \code{dict} modifies the
 entries in the global dictionary, to disable this behavior, use "reset" as the first element
 (ex: \code{dict=c("reset", mpg="Miles per gallon")}).}
+
+\item{coef.sub}{A character vector, default is \code{NULL}. Modifications to be applied to the
+final coefficient names (after the dictionary is applied). It only affect the coefficients
+and not the fixed-effects (use \code{dict} for that).
+Each element of this vector
+should be of the form "pat => new" or "pat". If "pat => new", this means that the
+regular expression pattern "pat" will be replaced with "new". If "pat", this means that the
+regex pattern "pat" will be removed. You can apply
+\href{https://lrberge.github.io/stringmagic/articles/ref_regex_flags.html}{stringmagic flags} at
+the beginning of the patterns, e.g. "i/pat" ignores the case.
+
+This internal function applying the changes is \code{\link[stringmagic:string_clean]{string_clean}}.
+Ex: say you have two coefficients named "genderF" and "oldTRUE". Then using
+\code{coef.sub=c("gender => Gender = ", "TRUE")} renames the coefficients into
+"Gender = F" and "old".}
 
 \item{file}{A character scalar. If provided, the Latex (or data frame) table will be saved in a
 file whose path is \code{file}. If you provide this argument, then a Latex table will be exported, to
@@ -409,12 +481,20 @@ default). To suppress the significance codes, use \code{signif.code=NA} or \code
 also be equal to \code{"letters"}, then the default becomes \code{c("a"=0.01, "b"=0.05, "c"=0.10)}.}
 
 \item{headers}{Character vector or list. Adds one or more header lines in the table. A header
-line can be represented by a character vector or a named list of numbers where the names are the
-cell values and the numbers are the span. Example: \code{headers=list("M"=2, "F"=3)} will create a
+line can be represented by a character vector or a named list.
+This argument can be many things, \strong{please have a look at the dedicated help section};
+a simplified description follows.
+If a named list, each element of the list represents a line, the names of the list are
+the row names and the values are the content of the cells.
+A line can be represented by: i) a character vector, ii) a list of the form
+\code{list("value1" = nb1, "value2" = nb2, etc)}. In the list form, numeric numbers
+represent spans and integers represent absolute positions.
+Example: \code{headers=lits(Gender = list("M"=2, "F"=3))} will create a
 row with 2 times "M" and three time "F" (this is identical to
-\code{headers=rep(c("M", "F"), c(2, 3))}). You can stack header lines within a list, in that case the
+\code{headers=list(Gender = c("M", "M", "F", "F", "F"))}).
+You can stack header lines within a list, in that case the
 list names will be displayed in the leftmost cell.
-Example: \verb{headers=list(Gender=list("M"=2, "F"=3), Country="US"} will create two header lines.
+Example: \code{headers=list(Gender=list("M"=2, "F"=3), Country="US")} will create two header lines.
 When \code{tex = TRUE}, you can add a rule to separate groups by using \code{":_:"} somewhere in the row
 name (ex: \code{headers=list(":_:Gender"=list("M"=2, "F"=3))}. You can monitor the placement by
 inserting a special character in the row name: "^" means at the top, "-" means in the middle
@@ -483,8 +563,8 @@ the coefficients section. For details, see the dedicated section.}
 
 \item{extralines}{A vector, a list or a one sided formula. The list elements should be either a
 vector representing the value of each cell, a list of the form
-\verb{list("item1" = #item1, "item2" = #item2, etc)}, or a function.
-This argument can be many things, please have a look at the dedicated help section;
+\code{list("item1" = nb1, "item2" = nb2, etc)}, or a function.
+This argument can be many things, \strong{please have a look at the dedicated help section};
 a simplified description follows. For each elements of this list: A new line in the table is
 created, the list name being the row name and the vector being the content of the cells.
 Example: \code{extralines=list("Sub-sample"=c("<20 yo", "all", ">50 yo"))} will create an new line
@@ -826,12 +906,17 @@ You can use the special character "!" (exclamation mark) to reverse the effect
 of the regular expression (this feature is specific to this function).
 For example \code{drop = "!Wind"} would drop any variable that does not contain "Wind".
 
-You can use the special character "\%" (percentage) to make reference to the
-original variable name instead of the aliased name. For example, you have a
-variable named \code{"Month6"}, and use a dictionary \code{dict = c(Month6="June")}.
+By default, the regular expressions are checked against the variables after
+they have been renamed with the dictionary (argument \code{dict}).
+You can use the \verb{*_raw} versions of drop/keep/order to apply the regular
+expressions on the original variable names.
+Note that alternatively you can use the special character "\%" (percentage) at the
+beginning of drop/keep/order's regular expressions to refer to the original variable name.
+For example, you have a variable named \code{"Month6"},
+and use a dictionary \code{dict = c(Month6="June")}.
 Thus the variable will be displayed as \code{"June"}.
-If you want to delete that variable, you can use either \code{drop="June"},
-or \code{drop="\%Month6"} (which makes reference to its original name).
+If you want to delete that variable, you can use either \code{drop="June"}, \code{drop_raw="Month6"},
+or \code{drop="\%Month6"}.
 
 The argument \code{order} takes in a vector of regular expressions, the order will follow the
 elements of this vector. The vector gives a list of priorities,
@@ -844,6 +929,43 @@ If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you
 would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
 }
 
+\section{The argument \code{headers}}{
+
+
+Use the argument \code{headers} to add one or more lines in the header (top part of the table).
+It accepts a list where each element of the list is a line, the names of the list
+(if provided) are the row name.
+
+The content (not the row name) of each line can be defined in two ways:
+\enumerate{
+\item a character vector, or 2) a list.
+\item If a vector, it should represent the values taken by each cell. Note that if the
+length of the vector is smaller than the number of models, its values are
+recycled across models, but the length of the vector is required to be a
+divisor of the number of models.
+\item If a list, it should be of the form \code{list("item1" = nb1, "item2" = nb2, etc)}.
+Numbers given as integers represent column positions.
+For exemple: \code{list("A" = 2L, "B" = 3L)} leads
+to \code{c("", "A", "B")}.
+}
+
+Numbers in 'double' format (the default number format in \code{R}) represent spans.
+For example: \code{list("A"=2, "B"=3)} leads to \code{c("A", "A", "B", "B", "B")}.
+Note that if the number of items is 1, you don't need to add \verb{= 1}.
+For example: \code{list("A"=2, "B")} is valid and leads to \code{c("A", "A", "B")}.
+The spans can be larger than the number of models (to fill all columns).
+
+The resolution of spans or column positions is done from left to right.
+The spans always start at the rightmost unfilled column on the right.
+For example: \code{list("A" = 2L, "B" = 2)} lead to \code{c("", "A", "B", "B")}.
+Another example: \code{list("B" = 3, "A" = 2L)} leads to \code{c("B", "A", "B")}.
+
+Note that contrary to the vector (see point \verb{1)}) the values provided are
+not recycled, instead the right side is filled with empty columns.
+The only exception is when multiple VCOVs in the \code{vcov} argument leads to the repetition
+of models, and in that case the values are recycled accordingly (if that does make sense).
+}
+
 \section{The argument \code{extralines}}{
 
 
@@ -851,27 +973,42 @@ The argument \code{extralines} adds well... extra lines to the table.
 It accepts either a list, or a one-sided formula.
 
 For each line, you can define the values taken by each cell using 4 different ways:
-a) a vector, b) a list, c) a function, and d) a formula.
-
-If a vector, it should represent the values taken by each cell. Note that if the
+\enumerate{
+\item a vector, 2) a list, 3) a function, and 4) a formula.
+\item If a vector, it should represent the values taken by each cell. Note that if the
 length of the vector is smaller than the number of models, its values are
 recycled across models, but the length of the vector is required to be a
 divisor of the number of models.
+\item If a list, it should be of the form \code{list("item1" = nb1, "item2" = nb2, etc)}.
+Numbers given as integers represent column positions.
+For exemple: \code{list("A" = 2L, "B" = 3L)} leads
+to \code{c("", "A", "B")}.
+}
 
-If a list, it should be of the form \verb{list("item1" = #item1, "item2" = #item2, etc)}.
-For example \code{list("A"=2, "B"=3)} leads to \code{c("A", "A", "B", "B", "B")}.
+Numbers in 'double' format (the default number format in \code{R}) represent spans.
+For example: \code{list("A"=2, "B"=3)} leads to \code{c("A", "A", "B", "B", "B")}.
 Note that if the number of items is 1, you don't need to add \verb{= 1}.
-For example \code{list("A"=2, "B")} is valid and leads to
-\verb{c("A", "A", "B"}. As for the vector the values are recycled if necessary.
+For example: \code{list("A"=2, "B")} is valid and leads to \code{c("A", "A", "B")}.
+The spans can be larger than the number of models (to fill all columns).
 
-If a function, it will be applied to each model and should return a scalar (\code{NA} values
+The resolution of spans or column positions is done from left to right.
+The spans always start at the rightmost unfilled column on the right.
+For example: \code{list("A" = 2L, "B" = 2)} lead to \code{c("", "A", "B", "B")}.
+Another example: \code{list("B" = 3, "A" = 2L)} leads to \code{c("B", "A", "B")}.
+
+Note that contrary to the vector (see point 1)) the values provided are
+not recycled, instead the right side is filled with empty columns.
+The only exception is when multiple VCOVs in the \code{vcov} argument leads to the repetition
+of models, and in that case the values are recycled accordingly (if that does make sense).
+\enumerate{
+\item If a function, it will be applied to each model and should return a scalar (\code{NA} values
 returned are accepted).
-
-If a formula, it must be one-sided and the elements in the formula must represent either
+\item If a formula, it must be one-sided and the elements in the formula must represent either
 \code{extralines} macros, either fit statistics (i.e. valid types of
 the function \code{\link{fitstat}}).
 One new line will be added for each element of the formula.
 To register \code{extralines} macros, you must first register them in \code{\link{extralines_register}}.
+}
 
 Finally, you can combine as many lines as wished by nesting them in a list.
 The names of the nesting list are the row titles (values in the leftmost cell).
@@ -949,7 +1086,7 @@ The markup can be escaped by using an backslash first. For example \code{"***Thi
 
 \examples{
 
-
+# Two similar estimations: one with the other without fixed-effects
 est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = airquality)
 est2 = feols(Ozone ~ i(Month, Wind) + Temp | Month, data = airquality)
 
@@ -959,7 +1096,7 @@ etable(est1, est2)
 # keep/drop: keeping only interactions
 etable(est1, est2, keep = " x ")
 # or using drop  (see regexp help):
-etable(est1, est2, drop = "^(Month|Temp|\\\\()")
+etable(est1, est2, drop = "^(Month|Temp|Cons)")
 
 # keep/drop: dropping interactions
 etable(est1, est2, drop = " x ")
@@ -967,7 +1104,7 @@ etable(est1, est2, drop = " x ")
 etable(est1, est2, keep = "! x ")
 
 # order: Wind variable first, intercept last (note the "!" to reverse the effect)
-etable(est1, est2, order = c("Wind", "!Inter"))
+etable(est1, est2, order = c("Wind", "!Const"))
 # Month, then interactions, then the rest
 etable(est1, est2, order = c("^Month", " x "))
 
@@ -988,9 +1125,20 @@ dict = c("Month::5"="May", "Month::6"="Jun", "Month::7"="Jul",
 
 # We would like to keep only the Months, but now the names are all changed...
 # How to do?
-# We can use the special character '\%' to make reference to the original names.
+# We can use the argument keep_raw to make reference to the original names.
 
+etable(est1, est2, dict = dict, keep_raw = "Month")
+
+# Alternatively, we can use the special character '\%' to make reference to the original names
 etable(est1, est2, dict = dict, keep = "\%Month")
+
+#
+# coef.sub
+#
+
+# Let's use a regular expression to add parentheses around Month, in its product with Wind
+# [NOTA: this is a complex example just to illustrate how to use a regex with coef.sub]
+etable(est1, est2, coef.sub =  "x M(.+)$ => x (M\\\\1)")
 
 #
 # signif.code

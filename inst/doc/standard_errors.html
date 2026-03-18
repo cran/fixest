@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge" />
 
-<meta name="date" content="2025-09-05" />
+<meta name="date" content="2026-03-17" />
 
 <title>On standard-errors</title>
 
@@ -432,7 +432,7 @@ display: none;
 
 <h1 class="title toc-ignore">On standard-errors</h1>
 <h4 class="author">Laurent Berge</h4>
-<h4 class="date">2025-09-05</h4>
+<h4 class="date">2026-03-17</h4>
 
 </div>
 
@@ -460,7 +460,7 @@ excellent paper by <a href="https://cran.r-project.org/package=sandwich/vignette
 Koll and Graham (2020)</a>. The second part illustrates how to replicate
 some standard-errors obtained from other estimation methods with
 <code>fixest</code>.</p>
-<p>This document applies to <code>fixest</code> version 0.10.0 or
+<p>This document applies to <code>fixest</code> version 0.14.0 or
 higher.</p>
 <div id="how-standard-errors-are-computed-in-fixest" class="section level2">
 <h2>How standard-errors are computed in <code>fixest</code></h2>
@@ -527,8 +527,8 @@ correlation of the errors.</p>
 <p>The type of small sample correction applied is defined by the
 argument <code>ssc</code> which accepts only objects produced by the
 function <code>ssc</code>. The main arguments of this function are
-<code>K.adj</code>, <code>K.fixef</code> and <code>G.adj</code>. I
-detail each of them below.</p>
+<code>K.adj</code>, <code>K.fixef</code> and <code>G.adj</code>. Each of
+them is detailed below.</p>
 <p>Say you have <span class="math inline">\(\tilde{V}\)</span> the
 variance-covariance matrix (henceforth VCOV) before any small sample
 adjustment. Argument <code>K.adj</code> can be equal to
@@ -549,18 +549,19 @@ is:</p>
 <code>cluster</code>; e.g. <code>id</code> could represent US counties
 and <code>cluster</code> US states).</p>
 <p>The argument <code>K.fixef</code> can be equal to either
-<code>&quot;none&quot;</code>, <code>&quot;nested&quot;</code> or <code>&quot;full&quot;</code>. Then
-<span class="math inline">\(K\)</span> will be computed as follows:</p>
+<code>&quot;none&quot;</code>, <code>&quot;nonnested&quot;</code> or <code>&quot;full&quot;</code>.
+Then <span class="math inline">\(K\)</span> will be computed as
+follows:</p>
 <p><img role="img" src="data:image/png;base64,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" /></p>
 <p>Where <span class="math inline">\(K_{vars}\)</span> is the number of
 estimated coefficients associated to the variables.
 <code>K.fixef=&quot;none&quot;</code> discards all fixed-effects coefficients.
-<code>K.fixef=&quot;nested&quot;</code> discards all coefficients that are nested
-(here the 5 coefficients from <code>id</code>). Finally
+<code>K.fixef=&quot;nonnested&quot;</code> discards all coefficients that are
+nested (here the 5 coefficients from <code>id</code>). Finally
 <code>K.fixef=&quot;full&quot;</code> accounts for all fixed-effects coefficients
 (here 6: equal to 5 from <code>id</code>, plus 2 from <code>time</code>,
 minus one used as a reference [otherwise collinearity arise]). Note that
-if <code>K.fixef=&quot;nested&quot;</code> and the standard-errors are
+if <code>K.fixef=&quot;nonnested&quot;</code> and the standard-errors are
 <em>not</em> clustered, this is equivalent to using
 <code>K.fixef=&quot;full&quot;.</code></p>
 <p>The last argument of <code>ssc</code> is <code>G.adj</code>. This
@@ -633,30 +634,32 @@ observations minus the number of estimated coefficients.</p>
 <p>This section illustrates how the results from <code>fixest</code>
 compares with the ones from other methods. It also shows how to
 replicate the latter from <code>fixest</code>.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">:</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co"># Evaluation of the next chunks requires the package &#39;plm&#39; which is not installed.</span></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co"># The code output is not reported.</span></span></code></pre></div>
 <div id="the-data-set-and-heteroskedasticity-robust-ses" class="section level4">
 <h4>The data set and heteroskedasticity-robust SEs</h4>
 <p>Using the Grunfeld data set from the <code>plm</code> package, here
 are some comparisons when the estimation doesn’t contain
 fixed-effects.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">library</span>(sandwich)</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">library</span>(plm)</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">data</span>(Grunfeld)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co"># Estimations</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>res_lm    <span class="ot">=</span> <span class="fu">lm</span>(inv <span class="sc">~</span> capital, Grunfeld)</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>res_feols <span class="ot">=</span> <span class="fu">feols</span>(inv <span class="sc">~</span> capital, Grunfeld)</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co"># Same standard-errors</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(res_lm), <span class="fu">se</span>(res_feols))</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co"># Heteroskedasticity-robust covariance</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>se_lm_hc    <span class="ot">=</span> <span class="fu">sqrt</span>(<span class="fu">diag</span>(<span class="fu">vcovHC</span>(res_lm, <span class="at">type =</span> <span class="st">&quot;HC1&quot;</span>)))</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>se_feols_hc <span class="ot">=</span> <span class="fu">se</span>(res_feols, <span class="at">vcov =</span> <span class="st">&quot;hetero&quot;</span>)</span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_hc, se_feols_hc)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">library</span>(sandwich)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">library</span>(plm)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">data</span>(Grunfeld)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># Estimations</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>res_lm    <span class="ot">=</span> <span class="fu">lm</span>(inv <span class="sc">~</span> capital, Grunfeld)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>res_feols <span class="ot">=</span> <span class="fu">feols</span>(inv <span class="sc">~</span> capital, Grunfeld)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co"># Same standard-errors</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(res_lm), <span class="fu">se</span>(res_feols))</span></code></pre></div>
+<pre><code>#&gt;      (Intercept)   capital
+#&gt; [1,]    15.63927 0.0383394
+#&gt; [2,]    15.63927 0.0383394</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Heteroskedasticity-robust covariance</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>se_lm_hc    <span class="ot">=</span> <span class="fu">sqrt</span>(<span class="fu">diag</span>(<span class="fu">vcovHC</span>(res_lm, <span class="at">type =</span> <span class="st">&quot;HC1&quot;</span>)))</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>se_feols_hc <span class="ot">=</span> <span class="fu">se</span>(res_feols, <span class="at">vcov =</span> <span class="st">&quot;hetero&quot;</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_hc, se_feols_hc)</span></code></pre></div>
+<pre><code>#&gt;             (Intercept)    capital
+#&gt; se_lm_hc       17.05558 0.06633144
+#&gt; se_feols_hc    17.05558 0.06633144</code></pre>
 <p>Note that Stata’s <code>reg inv capital, robust</code> also leads to
 similar results (same SEs, same p-values).</p>
 </div>
@@ -665,35 +668,47 @@ similar results (same SEs, same p-values).</p>
 <p>The most important differences arise in the presence of
 fixed-effects. Let’s first compare “iid” standard-errors between
 <code>lm</code> and <code>plm</code>.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Estimations</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>est_lm    <span class="ot">=</span> <span class="fu">lm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">as.factor</span>(firm) <span class="sc">+</span> <span class="fu">as.factor</span>(year), Grunfeld)</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>est_plm   <span class="ot">=</span> <span class="fu">plm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">as.factor</span>(year), Grunfeld, </span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>                <span class="at">index =</span> <span class="fu">c</span>(<span class="st">&quot;firm&quot;</span>, <span class="st">&quot;year&quot;</span>), <span class="at">model =</span> <span class="st">&quot;within&quot;</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co"># we use panel.id so that panel VCOVs can be applied directly</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>est_feols <span class="ot">=</span> <span class="fu">feols</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year, Grunfeld, <span class="at">panel.id =</span> <span class="sc">~</span>firm <span class="sc">+</span> year)</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co"># &quot;iid&quot; standard-errors</span></span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#  so we need to ask for iid SEs explicitly.</span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(est_lm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">se</span>(est_plm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">se</span>(est_feols))</span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a></span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co"># p-values:</span></span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">pvalue</span>(est_lm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">pvalue</span>(est_plm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">pvalue</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;iid&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Estimations</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>est_lm    <span class="ot">=</span> <span class="fu">lm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">as.factor</span>(firm) <span class="sc">+</span> <span class="fu">as.factor</span>(year), Grunfeld)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>est_plm   <span class="ot">=</span> <span class="fu">plm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">as.factor</span>(year), Grunfeld, </span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>                <span class="at">index =</span> <span class="fu">c</span>(<span class="st">&quot;firm&quot;</span>, <span class="st">&quot;year&quot;</span>), <span class="at">model =</span> <span class="st">&quot;within&quot;</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># we use panel.id so that panel VCOVs can be applied directly</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>est_feols <span class="ot">=</span> <span class="fu">feols</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year, Grunfeld, <span class="at">panel.id =</span> <span class="sc">~</span>firm <span class="sc">+</span> year)</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co"># &quot;iid&quot; standard-errors</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co">#  so we need to ask for iid SEs explicitly.</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(est_lm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">se</span>(est_plm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">se</span>(est_feols))</span></code></pre></div>
+<pre><code>#&gt;         capital
+#&gt; [1,] 0.02597821
+#&gt; [2,] 0.02597821
+#&gt; [3,] 0.02597821</code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># p-values:</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">pvalue</span>(est_lm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">pvalue</span>(est_plm)[<span class="st">&quot;capital&quot;</span>], <span class="fu">pvalue</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;iid&quot;</span>))</span></code></pre></div>
+<pre><code>#&gt;           capital
+#&gt; [1,] 1.519204e-35
+#&gt; [2,] 1.519204e-35
+#&gt; [3,] 1.519204e-35</code></pre>
 <p>The standard-errors and p-values are identical, note that this is
 also the case for Stata’s <code>xtreg</code>.</p>
 </div>
 <div id="clustered-ses" class="section level4">
 <h4>Clustered SEs</h4>
 <p>Now for clustered SEs:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Clustered by firm</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>se_lm_firm    <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovCL</span>(est_lm, <span class="at">cluster =</span> <span class="sc">~</span>firm, <span class="at">type =</span> <span class="st">&quot;HC1&quot;</span>))[<span class="st">&quot;capital&quot;</span>]</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>se_plm_firm   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovHC</span>(est_plm, <span class="at">cluster =</span> <span class="st">&quot;group&quot;</span>))[<span class="st">&quot;capital&quot;</span>]</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>se_stata_firm <span class="ot">=</span> <span class="fl">0.06328129</span>    <span class="co"># vce(cluster firm)</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>se_feols_firm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;cluster&quot;</span>)</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_firm, se_plm_firm, se_stata_firm, se_feols_firm)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Clustered by firm</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>se_lm_firm    <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovCL</span>(est_lm, <span class="at">cluster =</span> <span class="sc">~</span>firm, <span class="at">type =</span> <span class="st">&quot;HC1&quot;</span>))[<span class="st">&quot;capital&quot;</span>]</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>se_plm_firm   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovHC</span>(est_plm, <span class="at">cluster =</span> <span class="st">&quot;group&quot;</span>))[<span class="st">&quot;capital&quot;</span>]</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>se_stata_firm <span class="ot">=</span> <span class="fl">0.06328129</span>    <span class="co"># vce(cluster firm)</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>se_feols_firm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="sc">~</span>firm)</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_firm, se_plm_firm, se_stata_firm, se_feols_firm)</span></code></pre></div>
+<pre><code>#&gt;                  capital
+#&gt; se_lm_firm    0.06493478
+#&gt; se_plm_firm   0.05693726
+#&gt; se_stata_firm 0.06328129
+#&gt; se_feols_firm 0.06328129</code></pre>
 <p>As we can see, there are three different versions of the
 standard-errors, <code>feols</code> being identical to Stata’s
 <code>xtreg</code> clustered SEs. By default, the <em>p-value</em> is
@@ -701,43 +716,57 @@ also identical to the one from Stata (from <code>fixest</code> version
 0.7.0 onwards).</p>
 <p>Now let’s see how to replicate the standard-errors from
 <code>lm</code> and <code>plm</code>:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># How to get the lm version</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>se_feols_firm_lm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.fixef =</span> <span class="st">&quot;full&quot;</span>))</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_firm, se_feols_firm_lm)</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># How to get the plm version</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>se_feols_firm_plm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.fixef =</span> <span class="st">&quot;none&quot;</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>))</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_firm, se_feols_firm_plm)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># How to get the lm version</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>se_feols_firm_lm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="sc">~</span>firm, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.fixef =</span> <span class="st">&quot;full&quot;</span>))</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="fu">rbind</span>(se_lm_firm, se_feols_firm_lm)</span></code></pre></div>
+<pre><code>#&gt;                     capital
+#&gt; se_lm_firm       0.06493478
+#&gt; se_feols_firm_lm 0.06493478</code></pre>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># How to get the plm version</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>se_feols_firm_plm <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="sc">~</span>firm, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.fixef =</span> <span class="st">&quot;none&quot;</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_firm, se_feols_firm_plm)</span></code></pre></div>
+<pre><code>#&gt;                      capital
+#&gt; se_plm_firm       0.05693726
+#&gt; se_feols_firm_plm 0.05693726</code></pre>
 </div>
 <div id="hac-ses" class="section level4">
 <h4>HAC SEs</h4>
 <p>And finally let’s look at Newey-West and Driscoll-Kray
 standard-errors:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co"># Newey-west</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>se_plm_NW   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovNW</span>(est_plm))[<span class="st">&quot;capital&quot;</span>]</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>se_feols_NW <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;NW&quot;</span>)</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_NW, se_feols_NW)</span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co"># we can replicate plm&#39;s by changing the type of SSC:</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_NW, </span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>      <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> NW <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>)))</span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a></span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co"># Driscoll-Kraay</span></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a></span>
-<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>se_plm_DK   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovSCC</span>(est_plm))[<span class="st">&quot;capital&quot;</span>]</span>
-<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>se_feols_DK <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;DK&quot;</span>)</span>
-<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a></span>
-<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_DK, se_feols_DK)</span>
-<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a></span>
-<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a><span class="co"># Replicating plm&#39;s</span></span>
-<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_DK, </span>
-<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a>      <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> DK <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>)))</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co"># Newey-west</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>se_plm_NW   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovNW</span>(est_plm))[<span class="st">&quot;capital&quot;</span>]</span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>se_feols_NW <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;NW&quot;</span>)</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a></span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_NW, se_feols_NW)</span></code></pre></div>
+<pre><code>#&gt;                capital
+#&gt; se_plm_NW   0.08390222
+#&gt; se_feols_NW 0.09313517</code></pre>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># we can replicate plm&#39;s by changing the type of SSC:</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_NW, </span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>      <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> NW <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>)))</span></code></pre></div>
+<pre><code>#&gt;              capital
+#&gt; se_plm_NW 0.08390222
+#&gt;           0.08390222</code></pre>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="co"># Driscoll-Kraay</span></span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a></span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>se_plm_DK   <span class="ot">=</span> <span class="fu">se</span>(<span class="fu">vcovSCC</span>(est_plm))[<span class="st">&quot;capital&quot;</span>]</span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>se_feols_DK <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;DK&quot;</span>)</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a></span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_DK, se_feols_DK)</span></code></pre></div>
+<pre><code>#&gt;                capital
+#&gt; se_plm_DK   0.08359734
+#&gt; se_feols_DK 0.09279674</code></pre>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="co"># Replicating plm&#39;s</span></span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="fu">rbind</span>(se_plm_DK, </span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>      <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> DK <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>, <span class="at">G.adj =</span> <span class="cn">FALSE</span>)))</span></code></pre></div>
+<pre><code>#&gt;              capital
+#&gt; se_plm_DK 0.08359734
+#&gt;           0.08359734</code></pre>
 <p>As we can see, the type of small sample correction we choose can have
 a non-negligible impact on the standard-error.</p>
 </div>
@@ -751,38 +780,50 @@ and p-values are computed similarly to <code>reghdfe</code>, for both
 clustered and multiway clustered standard errors. So the comparison here
 focuses on <code>lfe</code>.</p>
 <p>Here are the differences and similarities with <code>lfe</code>:</p>
-<pre><code>#&gt; The evaluation of the next chunks of code requires the package &#39;plm&#39; (for the data set) which is not installed. 
-#&gt; The code output is not reported.</code></pre>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">library</span>(lfe)</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co"># lfe: clustered by firm</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>est_lfe <span class="ot">=</span> <span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm, Grunfeld)</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>se_lfe_firm <span class="ot">=</span> <span class="fu">se</span>(est_lfe)</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co"># The two are different, and it cannot be directly replicated by feols</span></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_firm, se_feols_firm)</span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co"># You have to provide a custom VCOV to replicate lfe&#39;s VCOV</span></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>my_vcov <span class="ot">=</span> <span class="fu">vcov</span>(est_feols, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>))</span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="fu">se</span>(est_feols, <span class="at">vcov =</span> my_vcov <span class="sc">*</span> <span class="dv">199</span><span class="sc">/</span><span class="dv">198</span>) <span class="co"># Note that there are 200 observations</span></span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a></span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a><span class="co"># Differently from feols, the SEs in lfe are different if year is not a FE:</span></span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="co"># =&gt; now SEs are identical.</span></span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(<span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">|</span> firm <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm, Grunfeld))[<span class="st">&quot;capital&quot;</span>],</span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>      <span class="fu">se</span>(<span class="fu">feols</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">|</span> firm, Grunfeld))[<span class="st">&quot;capital&quot;</span>])</span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a></span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="co"># Now with two-way clustered standard-errors</span></span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>est_lfe_2way  <span class="ot">=</span> <span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm <span class="sc">+</span> year, Grunfeld)</span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>se_lfe_2way   <span class="ot">=</span> <span class="fu">se</span>(est_lfe_2way)</span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>se_feols_2way <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;twoway&quot;</span>)</span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_2way, se_feols_2way)</span>
-<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a></span>
-<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a><span class="co"># To obtain the same SEs, use G.df = &quot;conventional&quot;</span></span>
-<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>sum_feols_2way_conv <span class="ot">=</span> <span class="fu">summary</span>(est_feols, <span class="at">vcov =</span> twoway <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">G.df =</span> <span class="st">&quot;conv&quot;</span>))</span>
-<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_2way, <span class="fu">se</span>(sum_feols_2way_conv))</span>
-<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a></span>
-<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a><span class="co"># We also obtain the same p-values</span></span>
-<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">pvalue</span>(est_lfe_2way), <span class="fu">pvalue</span>(sum_feols_2way_conv))</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="fu">library</span>(lfe)</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a></span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a><span class="co"># lfe: clustered by firm</span></span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>est_lfe <span class="ot">=</span> <span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm, Grunfeld)</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>se_lfe_firm <span class="ot">=</span> <span class="fu">se</span>(est_lfe)</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a><span class="co"># The two are different, and it cannot be directly replicated by feols</span></span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_firm, se_feols_firm)</span></code></pre></div>
+<pre><code>#&gt;                  capital
+#&gt; se_lfe_firm   0.06016851
+#&gt; se_feols_firm 0.06328129</code></pre>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># You have to provide a custom VCOV to replicate lfe&#39;s VCOV</span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>my_vcov <span class="ot">=</span> <span class="fu">vcov</span>(est_feols, <span class="at">vcov =</span> <span class="sc">~</span>firm, <span class="at">ssc =</span> <span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a><span class="fu">se</span>(est_feols, <span class="at">vcov =</span> my_vcov <span class="sc">*</span> <span class="dv">199</span><span class="sc">/</span><span class="dv">198</span>) <span class="co"># Note that there are 200 observations</span></span></code></pre></div>
+<pre><code>#&gt;    capital 
+#&gt; 0.06016851 
+#&gt; attr(,&quot;vcov_type&quot;)
+#&gt; [1] &quot;Custom&quot;</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="co"># Differently from feols, the SEs in lfe are different if year is not a FE:</span></span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="co"># =&gt; now SEs are identical.</span></span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">se</span>(<span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">|</span> firm <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm, Grunfeld))[<span class="st">&quot;capital&quot;</span>],</span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>      <span class="fu">se</span>(<span class="fu">feols</span>(inv <span class="sc">~</span> capital <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">|</span> firm, Grunfeld), <span class="at">vcov =</span> <span class="sc">~</span>firm)[<span class="st">&quot;capital&quot;</span>])</span></code></pre></div>
+<pre><code>#&gt;         capital
+#&gt; [1,] 0.06328129
+#&gt; [2,] 0.06328129</code></pre>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="co"># Now with two-way clustered standard-errors</span></span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>est_lfe_2way  <span class="ot">=</span> <span class="fu">felm</span>(inv <span class="sc">~</span> capital <span class="sc">|</span> firm <span class="sc">+</span> year <span class="sc">|</span> <span class="dv">0</span> <span class="sc">|</span> firm <span class="sc">+</span> year, Grunfeld)</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>se_lfe_2way   <span class="ot">=</span> <span class="fu">se</span>(est_lfe_2way)</span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>se_feols_2way <span class="ot">=</span> <span class="fu">se</span>(est_feols, <span class="at">vcov =</span> <span class="st">&quot;twoway&quot;</span>)</span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_2way, se_feols_2way)</span></code></pre></div>
+<pre><code>#&gt;                  capital
+#&gt; se_lfe_2way   0.06213837
+#&gt; se_feols_2way 0.06041290</code></pre>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a><span class="co"># To obtain the same SEs, use G.df = &quot;conventional&quot;</span></span>
+<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a>sum_feols_2way_conv <span class="ot">=</span> <span class="fu">summary</span>(est_feols, <span class="at">vcov =</span> twoway <span class="sc">~</span> <span class="fu">ssc</span>(<span class="at">G.df =</span> <span class="st">&quot;conv&quot;</span>))</span>
+<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a><span class="fu">rbind</span>(se_lfe_2way, <span class="fu">se</span>(sum_feols_2way_conv))</span></code></pre></div>
+<pre><code>#&gt;                capital
+#&gt; se_lfe_2way 0.06213837
+#&gt;             0.06213837</code></pre>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="co"># We also obtain the same p-values</span></span>
+<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a><span class="fu">rbind</span>(<span class="fu">pvalue</span>(est_lfe_2way), <span class="fu">pvalue</span>(sum_feols_2way_conv))</span></code></pre></div>
+<pre><code>#&gt;           capital
+#&gt; [1,] 9.273982e-05
+#&gt; [2,] 9.273982e-05</code></pre>
 <p>As we can see, there is only slight differences with <code>lfe</code>
 when computing clustered standard-errors. For multiway clustered
 standard-errors, it is easy to replicate the way <code>lfe</code>
@@ -793,13 +834,13 @@ computes them.</p>
 <p>Once you’ve found the preferred way to compute the standard-errors
 for your current project, you can set it permanently using the functions
 <code>setFixest_ssc()</code> and <code>setFixest_vcov()</code>.</p>
-<p>For example, if you want to remove the small sample adjustment, just
-use:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">setFixest_ssc</span>(<span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
+<p>For example, if you want to remove the small sample adjustment for
+the clustered standard-errors, use:</p>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a><span class="fu">setFixest_ssc</span>(<span class="fu">ssc</span>(<span class="at">K.adj =</span> <span class="cn">FALSE</span>), <span class="st">&quot;cluster&quot;</span>)</span></code></pre></div>
 <p>By default, the standard-errors are the standard ones (IID). You can
 change this behavior with, e.g.:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">setFixest_vcov</span>(<span class="at">no_FE =</span> <span class="st">&quot;iid&quot;</span>, <span class="at">one_FE =</span> <span class="st">&quot;cluster&quot;</span>, </span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>               <span class="at">two_FE =</span> <span class="st">&quot;hetero&quot;</span>, <span class="at">panel =</span> <span class="st">&quot;driscoll_kraay&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="fu">setFixest_vcov</span>(<span class="at">no_FE =</span> <span class="st">&quot;iid&quot;</span>, <span class="at">one_FE =</span> <span class="st">&quot;cluster&quot;</span>, </span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>               <span class="at">two_FE =</span> <span class="st">&quot;hetero&quot;</span>, <span class="at">panel =</span> <span class="st">&quot;driscoll_kraay&quot;</span>)</span></code></pre></div>
 <p>which changes the way the default standard-errors are computed when
 the estimation contains no fixed-effects, one fixed-effect, two or more
 fixed-effects, or is a panel.</p>
@@ -808,6 +849,13 @@ fixed-effects, or is a panel.</p>
 <div id="changelog" class="section level2">
 <h2>Changelog</h2>
 <ul>
+<li><p>Version 0.14.0:</p>
+<ul>
+<li>The function <code>setFixest_ssc</code> becomes VCOV specific
+(before it was applied to all VCOVS). You can pass the names of the
+VCOVs to which it should apply using its second argument
+<code>vcov_names</code>.</li>
+</ul></li>
 <li><p>Version 0.13.0:</p>
 <ul>
 <li><p>The arguments of the function <code>ssc</code> have been renamed:

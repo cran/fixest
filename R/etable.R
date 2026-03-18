@@ -65,22 +65,63 @@
 #' @param keep Character vector. This element is used to display only a subset of variables. This 
 #' should be a vector of regular expressions (see [`base::regex`] help for more info). Each 
 #' variable satisfying any of the regular expressions will be kept. This argument is applied post 
-#' aliasing (see argument `dict`). Example: you have the variable `x1` to `x55` and want to display 
+#' aliasing (see argument `dict`). 
+#' Use the argument `keep_raw` for the same effect before aliasing.
+#' 
+#' Example: you have the variable `x1` to `x55` and want to display 
 #' only `x1` to `x9`, then you could use `keep = "x[[:digit:]]$"`. If the first character is an 
-#' exclamation mark, the effect is reversed (e.g. keep = "!Intercept" means: every variable that 
-#' does not contain \dQuote{Intercept} is kept). See details.
+#' exclamation mark, the effect is reversed (e.g. keep = "!Constant" means: every variable that 
+#' does not contain \dQuote{Constant} is kept). See details.
 #' @param drop Character vector. This element is used if some variables are not to be displayed. 
 #' This should be a vector of regular expressions (see [`base::regex`] help for more info). Each 
 #' variable satisfying any of the regular expressions will be discarded. This argument is applied 
-#' post aliasing (see argument `dict`). Example: you have the variable `x1` to `x55` and want to 
+#' post aliasing (see argument `dict`). 
+#' Use the argument `drop_raw` for the same effect before aliasing.
+#' 
+#' Example: you have the variable `x1` to `x55` and want to 
 #' display only `x1` to `x9`, then you could use `drop = "x[[:digit:]]{2}`". If the first character 
-#' is an exclamation mark, the effect is reversed (e.g. drop = "!Intercept" means: every variable 
-#' that does not contain \dQuote{Intercept} is dropped). See details.
+#' is an exclamation mark, the effect is reversed (e.g. drop = "!Constant" means: every variable 
+#' that does not contain \dQuote{Constant} is dropped). See details.
 #' @param order Character vector. This element is used if the user wants the variables to be 
 #' ordered in a certain way. This should be a vector of regular expressions (see [`base::regex`] 
 #' help for more info). The variables satisfying the first regular expression will be placed first, 
 #' then the order follows the sequence of regular expressions. This argument is applied post 
-#' aliasing (see argument `dict`). Example: you have the following variables: `month1` to `month6`, 
+#' aliasing (see argument `dict`). Use the argument `order_raw` for the same effect before aliasing.
+#' 
+#' Example: you have the following variables: `month1` to `month6`, 
+#' then `x1` to `x5`, then `year1` to `year6`. If you want to display first the x's, then the 
+#' years, then the months you could use: `order = c("x", "year")`. If the first character is an 
+#' exclamation mark, the effect is reversed (e.g. order = "!Constant" means: every variable that 
+#' does not contain \dQuote{Constant} goes first).  See details.
+#' @param keep_raw Character vector. This element is used to display only a subset of variables.
+#' This should be a vector of regular expressions (see [`base::regex`] help for more info). Each 
+#' variable satisfying any of the regular expressions will be kept. This argument is applied before 
+#' aliasing (see argument `dict`). 
+#' Use the argument `keep` for the same effect after aliasing.
+#' 
+#' Example: you have the variable `x1` to `x55` and want to display 
+#' only `x1` to `x9`, then you could use `keep = "x[[:digit:]]$"`. If the first character is an 
+#' exclamation mark, the effect is reversed (e.g. keep_raw = "!Intercept" means: 
+#' every variable that does not contain \dQuote{Intercept} is kept). See details.
+#' @param drop_raw Character vector. This element is used if some variables are not to 
+#' be displayed. 
+#' This should be a vector of regular expressions (see [`base::regex`] help for more info). Each 
+#' variable satisfying any of the regular expressions will be discarded. This argument is applied 
+#' before aliasing (see argument `dict`). 
+#' Use the argument `drop` for the same effect after aliasing.
+#' 
+#' Example: you have the variable `x1` to `x55` and want to 
+#' display only `x1` to `x9`, then you could use `drop = "x[[:digit:]]{2}`". If the first character 
+#' is an exclamation mark, the effect is reversed (e.g. drop_raw = "!Intercept" means: 
+#' every variable that does not contain \dQuote{Intercept} is dropped). See details.
+#' @param order_raw Character vector. This element is used if the user wants the variables to be 
+#' ordered in a certain way. This should be a vector of regular expressions (see [`base::regex`] 
+#' help for more info). The variables satisfying the first regular expression will be placed first, 
+#' then the order follows the sequence of regular expressions. This argument is applied post 
+#' aliasing (see argument `dict`). 
+#' Use the argument `order` for the same effect after aliasing.
+#' 
+#' Example: you have the following variables: `month1` to `month6`, 
 #' then `x1` to `x5`, then `year1` to `year6`. If you want to display first the x's, then the 
 #' years, then the months you could use: `order = c("x", "year")`. If the first character is an 
 #' exclamation mark, the effect is reversed (e.g. order = "!Intercept" means: every variable that 
@@ -92,6 +133,20 @@
 #' [`setFixest_dict`]. You can use `dict = FALSE` to disable it. By default `dict` modifies the 
 #' entries in the global dictionary, to disable this behavior, use "reset" as the first element 
 #' (ex: `dict=c("reset", mpg="Miles per gallon")`).
+#' @param coef.sub A character vector, default is `NULL`. Modifications to be applied to the 
+#' final coefficient names (after the dictionary is applied). It only affect the coefficients
+#' and not the fixed-effects (use `dict` for that).
+#' Each element of this vector 
+#' should be of the form "pat => new" or "pat". If "pat => new", this means that the 
+#' regular expression pattern "pat" will be replaced with "new". If "pat", this means that the 
+#' regex pattern "pat" will be removed. You can apply 
+#' [stringmagic flags](https://lrberge.github.io/stringmagic/articles/ref_regex_flags.html) at 
+#' the beginning of the patterns, e.g. "i/pat" ignores the case.
+#' 
+#' This internal function applying the changes is [`string_clean`][stringmagic::string_clean].
+#' Ex: say you have two coefficients named "genderF" and "oldTRUE". Then using 
+#' `coef.sub=c("gender => Gender = ", "TRUE")` renames the coefficients into 
+#' "Gender = F" and "old".
 #' @param file A character scalar. If provided, the Latex (or data frame) table will be saved in a 
 #' file whose path is `file`. If you provide this argument, then a Latex table will be exported, to 
 #' export a regular `data.frame`, use argument `tex = FALSE`.
@@ -112,12 +167,20 @@
 #' also be equal to `"letters"`, then the default becomes `c("a"=0.01, "b"=0.05, "c"=0.10)`.
 #' @param label (Tex only.) Character scalar. The label of the Latex table.
 #' @param headers Character vector or list. Adds one or more header lines in the table. A header 
-#' line can be represented by a character vector or a named list of numbers where the names are the 
-#' cell values and the numbers are the span. Example: `headers=list("M"=2, "F"=3)` will create a 
+#' line can be represented by a character vector or a named list. 
+#' This argument can be many things, **please have a look at the dedicated help section**;
+#' a simplified description follows.
+#' If a named list, each element of the list represents a line, the names of the list are 
+#' the row names and the values are the content of the cells.
+#' A line can be represented by: i) a character vector, ii) a list of the form 
+#' `list("value1" = nb1, "value2" = nb2, etc)`. In the list form, numeric numbers 
+#' represent spans and integers represent absolute positions. 
+#' Example: `headers=lits(Gender = list("M"=2, "F"=3))` will create a 
 #' row with 2 times "M" and three time "F" (this is identical to 
-#' `headers=rep(c("M", "F"), c(2, 3))`). You can stack header lines within a list, in that case the 
+#' `headers=list(Gender = c("M", "M", "F", "F", "F"))`). 
+#' You can stack header lines within a list, in that case the 
 #' list names will be displayed in the leftmost cell. 
-#' Example: `headers=list(Gender=list("M"=2, "F"=3), Country="US"` will create two header lines. 
+#' Example: `headers=list(Gender=list("M"=2, "F"=3), Country="US")` will create two header lines. 
 #' When `tex = TRUE`, you can add a rule to separate groups by using `":_:"` somewhere in the row 
 #' name (ex: `headers=list(":_:Gender"=list("M"=2, "F"=3))`. You can monitor the placement by 
 #' inserting a special character in the row name: "^" means at the top, "-" means in the middle 
@@ -188,8 +251,8 @@
 #' the coefficients section. For details, see the dedicated section.
 #' @param extralines A vector, a list or a one sided formula. The list elements should be either a 
 #' vector representing the value of each cell, a list of the form 
-#' `list("item1" = #item1, "item2" = #item2, etc)`, or a function. 
-#' This argument can be many things, please have a look at the dedicated help section; 
+#' `list("item1" = nb1, "item2" = nb2, etc)`, or a function. 
+#' This argument can be many things, **please have a look at the dedicated help section**; 
 #' a simplified description follows. For each elements of this list: A new line in the table is 
 #' created, the list name being the row name and the vector being the content of the cells. 
 #' Example: `extralines=list("Sub-sample"=c("<20 yo", "all", ">50 yo"))` will create an new line 
@@ -447,12 +510,17 @@
 #' of the regular expression (this feature is specific to this function). 
 #' For example `drop = "!Wind"` would drop any variable that does not contain "Wind".
 #'
-#' You can use the special character "%" (percentage) to make reference to the 
-#' original variable name instead of the aliased name. For example, you have a 
-#' variable named `"Month6"`, and use a dictionary `dict = c(Month6="June")`. 
+#' By default, the regular expressions are checked against the variables after
+#' they have been renamed with the dictionary (argument `dict`).
+#' You can use the `*_raw` versions of drop/keep/order to apply the regular
+#' expressions on the original variable names.
+#' Note that alternatively you can use the special character "%" (percentage) at the 
+#' beginning of drop/keep/order's regular expressions to refer to the original variable name. 
+#' For example, you have a variable named `"Month6"`, 
+#' and use a dictionary `dict = c(Month6="June")`. 
 #' Thus the variable will be displayed as `"June"`. 
-#' If you want to delete that variable, you can use either `drop="June"`, 
-#' or `drop="%Month6"` (which makes reference to its original name).
+#' If you want to delete that variable, you can use either `drop="June"`, `drop_raw="Month6"`,
+#' or `drop="%Month6"`.
 #'
 #' The argument `order` takes in a vector of regular expressions, the order will follow the 
 #' elements of this vector. The vector gives a list of priorities, 
@@ -463,6 +531,42 @@
 #' with lowest priority, the variables not containing "Temp". 
 #' If you had the following variables: (Intercept), Temp:Wind, Wind, Temp you 
 #' would end up with the following order: Wind, Temp:Wind, Temp, (Intercept).
+#' 
+#' @section The argument `headers`:
+#' 
+#' Use the argument `headers` to add one or more lines in the header (top part of the table).
+#' It accepts a list where each element of the list is a line, the names of the list 
+#' (if provided) are the row name.
+#' 
+#' The content (not the row name) of each line can be defined in two ways: 
+#' 1) a character vector, or 2) a list.
+#' 
+#' 1) If a vector, it should represent the values taken by each cell. Note that if the 
+#' length of the vector is smaller than the number of models, its values are 
+#' recycled across models, but the length of the vector is required to be a 
+#' divisor of the number of models.
+#'
+#' 2) If a list, it should be of the form `list("item1" = nb1, "item2" = nb2, etc)`. 
+#' Numbers given as integers represent column positions.
+#' For exemple: `list("A" = 2L, "B" = 3L)` leads
+#' to `c("", "A", "B")`.
+#' 
+#' Numbers in 'double' format (the default number format in `R`) represent spans.
+#' For example: `list("A"=2, "B"=3)` leads to `c("A", "A", "B", "B", "B")`. 
+#' Note that if the number of items is 1, you don't need to add `= 1`. 
+#' For example: `list("A"=2, "B")` is valid and leads to `c("A", "A", "B")`. 
+#' The spans can be larger than the number of models (to fill all columns).
+#' 
+#' The resolution of spans or column positions is done from left to right.
+#' The spans always start at the rightmost unfilled column on the right.
+#' For example: `list("A" = 2L, "B" = 2)` lead to `c("", "A", "B", "B")`.
+#' Another example: `list("B" = 3, "A" = 2L)` leads to `c("B", "A", "B")`.
+#' 
+#' Note that contrary to the vector (see point `1)`) the values provided are
+#' not recycled, instead the right side is filled with empty columns. 
+#' The only exception is when multiple VCOVs in the `vcov` argument leads to the repetition
+#' of models, and in that case the values are recycled accordingly (if that does make sense).
+#' 
 #'
 #' @section The argument `extralines`:
 #'
@@ -470,23 +574,38 @@
 #' It accepts either a list, or a one-sided formula.
 #'
 #' For each line, you can define the values taken by each cell using 4 different ways: 
-#' a) a vector, b) a list, c) a function, and d) a formula.
+#' 1) a vector, 2) a list, 3) a function, and 4) a formula.
 #'
-#' If a vector, it should represent the values taken by each cell. Note that if the 
+#' 1) If a vector, it should represent the values taken by each cell. Note that if the 
 #' length of the vector is smaller than the number of models, its values are 
 #' recycled across models, but the length of the vector is required to be a 
 #' divisor of the number of models.
 #'
-#' If a list, it should be of the form `list("item1" = #item1, "item2" = #item2, etc)`. 
-#' For example `list("A"=2, "B"=3)` leads to `c("A", "A", "B", "B", "B")`. 
+#' 2) If a list, it should be of the form `list("item1" = nb1, "item2" = nb2, etc)`. 
+#' Numbers given as integers represent column positions.
+#' For exemple: `list("A" = 2L, "B" = 3L)` leads
+#' to `c("", "A", "B")`.
+#' 
+#' Numbers in 'double' format (the default number format in `R`) represent spans.
+#' For example: `list("A"=2, "B"=3)` leads to `c("A", "A", "B", "B", "B")`. 
 #' Note that if the number of items is 1, you don't need to add `= 1`. 
-#' For example `list("A"=2, "B")` is valid and leads to 
-#' `c("A", "A", "B"`. As for the vector the values are recycled if necessary.
+#' For example: `list("A"=2, "B")` is valid and leads to `c("A", "A", "B")`. 
+#' The spans can be larger than the number of models (to fill all columns).
+#' 
+#' The resolution of spans or column positions is done from left to right.
+#' The spans always start at the rightmost unfilled column on the right.
+#' For example: `list("A" = 2L, "B" = 2)` lead to `c("", "A", "B", "B")`.
+#' Another example: `list("B" = 3, "A" = 2L)` leads to `c("B", "A", "B")`.
+#' 
+#' Note that contrary to the vector (see point 1)) the values provided are
+#' not recycled, instead the right side is filled with empty columns. 
+#' The only exception is when multiple VCOVs in the `vcov` argument leads to the repetition
+#' of models, and in that case the values are recycled accordingly (if that does make sense).
 #'
-#' If a function, it will be applied to each model and should return a scalar (`NA` values 
+#' 3) If a function, it will be applied to each model and should return a scalar (`NA` values 
 #' returned are accepted).
 #'
-#' If a formula, it must be one-sided and the elements in the formula must represent either 
+#' 4) If a formula, it must be one-sided and the elements in the formula must represent either 
 #' `extralines` macros, either fit statistics (i.e. valid types of 
 #' the function [`fitstat`]). 
 #' One new line will be added for each element of the formula. 
@@ -581,7 +700,7 @@
 #'
 #' @examples
 #'
-#'
+#' # Two similar estimations: one with the other without fixed-effects
 #' est1 = feols(Ozone ~ i(Month) / Wind + Temp, data = airquality)
 #' est2 = feols(Ozone ~ i(Month, Wind) + Temp | Month, data = airquality)
 #'
@@ -591,7 +710,7 @@
 #' # keep/drop: keeping only interactions
 #' etable(est1, est2, keep = " x ")
 #' # or using drop  (see regexp help):
-#' etable(est1, est2, drop = "^(Month|Temp|\\()")
+#' etable(est1, est2, drop = "^(Month|Temp|Cons)")
 #'
 #' # keep/drop: dropping interactions
 #' etable(est1, est2, drop = " x ")
@@ -599,7 +718,7 @@
 #' etable(est1, est2, keep = "! x ")
 #'
 #' # order: Wind variable first, intercept last (note the "!" to reverse the effect)
-#' etable(est1, est2, order = c("Wind", "!Inter"))
+#' etable(est1, est2, order = c("Wind", "!Const"))
 #' # Month, then interactions, then the rest
 #' etable(est1, est2, order = c("^Month", " x "))
 #'
@@ -620,9 +739,20 @@
 #'
 #' # We would like to keep only the Months, but now the names are all changed...
 #' # How to do?
-#' # We can use the special character '%' to make reference to the original names.
+#' # We can use the argument keep_raw to make reference to the original names.
 #'
+#' etable(est1, est2, dict = dict, keep_raw = "Month")
+#' 
+#' # Alternatively, we can use the special character '%' to make reference to the original names
 #' etable(est1, est2, dict = dict, keep = "%Month")
+#' 
+#' #
+#' # coef.sub
+#' #
+#' 
+#' # Let's use a regular expression to add parentheses around Month, in its product with Wind
+#' # [NOTA: this is a complex example just to illustrate how to use a regex with coef.sub]
+#' etable(est1, est2, coef.sub =  "x M(.+)$ => x (M\\1)")
 #'
 #' #
 #' # signif.code
@@ -875,7 +1005,8 @@ etable = function(..., vcov = NULL, stage = 2, agg = NULL,
                   fitstat = NULL, caption = NULL, coefstat = "se", ci = 0.95,
                   se.row = NULL, se.below = NULL,
                   keep = NULL, drop = NULL, order = NULL,
-                  dict = TRUE, file = NULL, replace = TRUE, 
+                  keep_raw = NULL, drop_raw = NULL, order_raw = NULL,
+                  dict = TRUE, coef.sub = NULL, file = NULL, replace = TRUE, 
                   create_dirs = FALSE, convergence = NULL,
                   signif.code = NULL, label = NULL, float = NULL,
                   headers = list("auto"), fixef_sizes = FALSE,
@@ -1143,10 +1274,14 @@ etable = function(..., vcov = NULL, stage = 2, agg = NULL,
       signif.code = signif.code, coefstat = coefstat,
       ci = ci, caption = caption, float = float, headers = headers,
       keepFactors = keepFactors, tex = TEX, useSummary = useSummary,
-      dots_call = dots_call, powerBelow = powerBelow, dict = dict,
+      dots_call = dots_call, powerBelow = powerBelow, 
+      dict = dict, coef.sub = coef.sub,
       interaction.combine = interaction.combine, interaction.order = interaction.order,
       i.equal = i.equal, convergence = convergence,
-      family = family, keep = keep, drop = drop, file = file, order = order,
+      family = family, 
+      keep = keep, drop = drop, order = order,
+      keep_raw = keep_raw, drop_raw = drop_raw, order_raw = order_raw,
+      file = file, 
       label = label, fixef_sizes = fixef_sizes,
       fixef_sizes.simplify = fixef_sizes.simplify,
       depvar = depvar, style.tex = style.tex, style.df = style.df,
@@ -1407,17 +1542,19 @@ gen_etable_aliases = function(){
   update_file("./R/alias_etable.R", text)
 }
 
-results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage = 2,
+results2formattedList = function(dots, vcov = NULL, ssc = NULL, stage = 2,
                                  agg = NULL, .vcov_args = NULL, digits = 4,
                                  digits.stats = 5, fitstat_all, se.row = NULL, 
-                                 se.below = NULL, dict,
+                                 se.below = NULL, 
+                                 dict, coef.sub,
                                  signif.code = c("***"=0.01, "**"=0.05, "*"=0.10),
                                  coefstat = "se", ci = 0.95, label, headers, caption,
                                  float = FALSE, replace = TRUE, keepFactors = FALSE,
                                  tex = FALSE, useSummary, dots_call, powerBelow = -5,
                                  interaction.combine, interaction.order, i.equal,
-                                 convergence, family, drop, order,
-                                 keep, file, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
+                                 convergence, family, 
+                                 keep, drop, order, keep_raw, drop_raw, order_raw,
+                                 file, fixef_sizes = FALSE, fixef_sizes.simplify = TRUE,
                                  depvar = FALSE, style.tex = NULL, style.df=NULL,
                                  notes = NULL, group = NULL, extralines=NULL,
                                  fixef.group = NULL, placement = "htbp", drop.section = NULL,
@@ -1575,8 +1712,24 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     show_depvar = depvar
   }
 
-  check_arg(keep, drop, order, "character vector no na NULL",
+  check_arg(keep, drop, order, keep_raw, drop_raw, order_raw, 
+            "character vector no na NULL",
             .message = "The arg. '__ARG__' must be a vector of regular expressions (see help(regex)).")
+  
+  # we assign *_raw to the regular ones using the % markup
+  if(length(keep_raw) > 0){
+    keep = c(keep, paste0("%", keep_raw))
+  }
+  
+  if(length(drop_raw) > 0){
+    drop = c(drop, paste0("%", drop_raw))
+  }
+  
+  if(length(order_raw) > 0){
+    order = c(order, paste0("%", order_raw))
+  }
+  
+  check_arg(coef.sub, "character vector no na NULL")
 
   check_arg(file, label, interaction.combine, i.equal, "NULL character scalar")
 
@@ -1832,59 +1985,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
   # default values for dict
   dict = setup_dict(dict)
-
-  # headers => must be a list
-  # We get the automatic headers, if split is used
-  AUTO_HEADERS = FALSE
-  i_auto_headers = 1
-  if(is.list(headers)){
-    if(length(headers) > 0){
-      qui = sapply(headers, function(x) identical(x, "auto"))
-      if(any(qui)){
-        i_auto_headers = which(qui)[1]
-        headers = headers[!qui]
-        AUTO_HEADERS = TRUE
-      }
-
-      # We expand the headers if needed
-      if(length(headers) > 0){
-        # ex: headers = list(Gender = list("M"=2, "F"=2))
-
-        if(length(headers[[1]]) == 1){
-          # ex: headers = list("M"=2, "F"=2)
-          # or list("M", "F" = 2)
-          if(is.numeric(headers[[1]]) || # case list("M" = 2, "F" = 3)
-             (!is.null(names(headers)) && nchar(names(headers)[1]) == 0 && is.character(headers[[1]]))){ # case list("M", "F" = 2)
-            headers = list(headers)
-          }
-        }
-
-        for(i in seq_along(headers)){
-          # expand_list_vector: list("A"=2, "B") => c("A", "A", "B")
-          headers[[i]] = expand_list_vector(headers[[i]])
-        }
-
-        # We ensure headers have names
-        if(is.null(names(headers))){
-          names(headers) = character(length(headers))
-        }
-
-      }
-    }
-  } else if(anyNA(headers)){
-    headers = list()
-  } else {
-    # It's a character vector
-    if(identical(headers, "auto")){
-      headers = list()
-      AUTO_HEADERS = TRUE
-    } else {
-      # we need names
-      headers = list(headers)
-      names(headers) = ""
-    }
-  }
-
+  
   # formatting the names of the models
   dots_names = names(dots_call)
   if(!is.null(dots_names)){
@@ -1909,7 +2010,63 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
   if(length(all_models) == 0) stop_up("Not any 'fixest' model as argument!")
 
-  n_models = length(all_models)
+  n_models = n_models_origin = length(all_models)
+  
+  # auto headers => we quickly scan the headers to see if the user asked for auto headers
+  # we also prepare the format of the headers variables
+  # only when we know the real number of models we expand the headers
+  # We get the automatic headers, if split is used
+  AUTO_HEADERS = FALSE
+  i_auto_headers = 1
+  if(is.list(headers)){
+    if(length(headers) > 0){
+      qui = sapply(headers, function(x) identical(x, "auto"))
+      if(any(qui)){
+        i_auto_headers = which(qui)[1]
+        headers = headers[!qui]
+        AUTO_HEADERS = TRUE
+      }
+
+      # We expand the headers if needed
+      if(length(headers) > 0){
+        # ex: headers = list(Gender = list("M"=2, "F"=2))
+
+        if(length(headers[[1]]) == 1){
+          # ex: headers = list("M"=2, "F"=2)
+          # or list("M", "F" = 2)
+          if(is.numeric(headers[[1]]) || # case list("M" = 2, "F" = 3)
+             (!is.null(names(headers)) && nchar(names(headers)[1]) == 0 && 
+              is.character(headers[[1]]))){ 
+            # CASE 1: list("M", "F" = 2), only one row
+            # CASE 2: list("sample" = "all", "control" = TRUE), two rows
+            if(!is.null(names(headers)) && all(nchar(names(headers)) > 0)){
+              # CASE 2: no nesting
+            } else {
+              headers = list(headers)
+            }
+          }
+        }
+
+        # We ensure headers have names
+        if(is.null(names(headers))){
+          names(headers) = character(length(headers))
+        }
+
+      }
+    }
+  } else if(anyNA(headers)){
+    headers = list()
+  } else {
+    # It's a character vector
+    if(identical(headers, "auto")){
+      headers = list()
+      AUTO_HEADERS = TRUE
+    } else {
+      # we need names
+      headers = list(headers)
+      names(headers) = ""
+    }
+  }
 
   auto_headers = list()
   if(AUTO_HEADERS){
@@ -1917,7 +2074,6 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     # SAMPLE (ie split)
     sample_info = lapply(all_models, function(x) x$model_info$sample)
     sample_info_ok = which(lengths(sample_info) > 0)
-
 
     for(i in sample_info_ok){
       my_headers = list()
@@ -2023,7 +2179,18 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
                   .message = "If 'vcov' is a list, it must be of the same length as the number of models, or you should add the 'each' or 'times' keyword as the first element of the list.")
     }
   }
-
+  
+  # headers => we have a garantee that it is a named list (see preparation above) w/t auto headers
+  # => we expand the header elements now that we know the number of models
+  if(length(headers) > 0){
+    for(i in seq_along(headers)){
+      # expand_list_vector: list("A"=2, "B") => c("A", "A", "B")
+      headers[[i]] = expand_list_vector(headers[[i]], n_models, n_models_origin, 
+                                        "headers", IS_EACH)
+    }
+  }
+  
+  # we add the auto headers
   auto_headers_clean = list()
   if(length(auto_headers) > 0){
     # We reconstruct the headers properly
@@ -2079,7 +2246,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
   # If vcov is provided, we use summary
   # if is_mult, we'll have to unroll the results
-  check_mult = any(qui_iv <- sapply(all_models, function(x) isTRUE(x$iv)))
+  check_mult = any(qui_iv <- sapply(all_models, function(x) isTRUE(x$is_iv)))
   is_mult = FALSE
   if(check_mult){
     stage = unique(stage)
@@ -2123,7 +2290,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
     if(is_mult){
 
-      if("fixest_multi" %in% class(x)){
+      if(inherits(x, "fixest_multi")){
         for(i in seq_along(x)){
           all_models_bis[[length(all_models_bis) + 1]] = x[[i]]
         }
@@ -2250,11 +2417,15 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     extralines = list(extralines)
 
   } else if(length(extralines) > 0 && all(lengths(extralines) == 1) &&
-        !inherits(extralines[[1]], "formula") && !is.function(extralines[[1]])){
-    # list("A" = 2, "B")
-    extralines = list(extralines)
+            !inherits(extralines[[1]], "formula") && !is.function(extralines[[1]])){
+    # CASE 1: list("A" = 2, "B") => list(list("A" = 2, "B")), only one row
+    # CASE 2: list(subsample = "All", other_info = "none") => no list nesting, two rows
+    if(!is.null(names(extralines)) && all(nchar(names(extralines)) > 0)){
+      # CASE 2: no nesting
+    } else {
+      extralines = list(extralines)
+    }
   }
-
 
   el_new = list() # I need it to cope with list(~f+ivf+macro, "my vars" = TRUE)
   # => the first command will create several lines
@@ -2269,7 +2440,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
                 .value = n_models)
 
     el = extralines[[i]]
-    if("formula" %in% class(el)){
+    if(inherits(el, "formula")){
       el_tmp = extralines_extractor(el, el_names[i], tex = isTex)
       for(k in seq_along(el_tmp)){
         el_new[[names(el_tmp)[k]]] = el_tmp[[k]]
@@ -2278,9 +2449,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
       if(!is.function(el)){
 
-        if(is.list(el)){
-          el = expand_list_vector(el)
-        }
+        el = expand_list_vector(el, n_models, n_models_origin, "extralines", IS_EACH)
 
         if(length(el) < n_models){
           # we extend
@@ -2370,7 +2539,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     fitstat_all = NULL
     drop.section = c(drop.section, "stats")
 
-  } else if("formula" %in% class(fitstat_all)){
+  } else if(inherits(fitstat_all, "formula")){
     check_arg(fitstat_all, "os formula", 
               .message = "Argument 'fitstat' must be a one sided formula (or a character vector) containing valid types from the function fitstat (see details in ?fitstat).")
 
@@ -2480,7 +2649,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     if(isTRUE(x$onlyFixef)){
       se_type_list[[m]] = "NONE_FIXEF_ONLY"
     } else {
-      se_type_list[[m]] = attr(x$se, "type")
+      se_type_list[[m]] = attr(x$se, "vcov_type")
     }
 
     # family
@@ -2640,9 +2809,8 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
     #
     # Now we rename the variables
     #
-
-    # on enleve les espaces dans les noms de variables
-    var = var_origin = c(gsub(" ", "", row.names(a)))
+    
+    var = var_origin = row.names(a)
     # renaming
     if(TRUE){
       # Now I clean white spaces in dict_apply
@@ -3164,11 +3332,13 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
              family_list = family_list, fitstat_list = fitstat_list, headers = headers,
              isHeaders = isHeaders, caption = caption, convergence = convergence, 
              family = family,
-             keep = keep, drop = drop, order = order, file = file, label = label, 
+             keep = keep, drop = drop, order = order, 
+             file = file, label = label, 
              se.below = se.below,
              signif.code = signif.code, fixef_sizes = fixef_sizes, 
              fixef_sizes.simplify = fixef_sizes.simplify,
-             depvar = depvar, useSummary = useSummary, dict = dict, yesNo = yesNo, 
+             depvar = depvar, useSummary = useSummary, dict = dict, 
+             coef.sub = coef.sub, yesNo = yesNo, 
              add_signif = add_signif,
              float = float, coefstat = coefstat, ci = ci, style = style, 
              notes = notes, group = group,
@@ -3185,7 +3355,7 @@ results2formattedList = function(dots, vcov = NULL, ssc = getFixest_ssc(), stage
 
 etable_internal_latex = function(info){
   # Internal function to display the latex table
-
+  
   n_models = length(info$depvar_list)
   # Getting the information
   se_type_list = info$se_type_list
@@ -3219,6 +3389,7 @@ etable_internal_latex = function(info){
   fixef_sizes = info$fixef_sizes
   fixef_sizes.simplify = info$fixef_sizes.simplify
   dict = info$dict
+  coef.sub = info$coef.sub
   yesNo = info$yesNo
   add_signif = info$add_signif
   float = info$float
@@ -3335,7 +3506,7 @@ etable_internal_latex = function(info){
     tabular_end = "\\end{tabular*}\n"
   } else if(tabular == "X"){
 
-    all_cols = .dsb("l *.[n_models]{>{\\centering\\arraybackslash}X}")
+    all_cols = .dsb("l *{.[n_models]}{>{\\centering\\arraybackslash}X}")
 
     tabular_begin = paste0("\\begin{tabularx}{\\textwidth}{",
                            space, all_cols, space, "}\n", style$line.top)
@@ -3467,12 +3638,12 @@ etable_internal_latex = function(info){
     if((!is.null(keep) || !is.null(drop)) && length(group) == 0){
       if(!is.null(keep) && !any(grepl("^%", keep))){
         msg = paste0(" In particular, to 'keep' variables using their original names ", 
-                     "(before dict is applied), use the special character '%' first. ",
-                     "E.g. keep = \"%", keep[1], "\"")
+                     "(before dict is applied), use use the argument `keep_raw`. ",
+                     "E.g. keep_raw = {Q ? keep[1]}")
       } else if(!is.null(drop) && !any(grepl("^%", drop))){
         msg = paste0(" In particular, to 'drop' variables using their original names ",
-                     "(before dict is applied), use the special character '%' first. ", 
-                     "E.g. drop = \"%", drop[1], "\"")
+                     "(before dict is applied), use the argument `drop_raw`. ", 
+                     "E.g. drop_raw = {Q ? drop[1]}")
       } else {
         msg = ""
       }
@@ -3504,7 +3675,18 @@ etable_internal_latex = function(info){
 
     # we have coefficients to display
     # The names are set in results2formattedList
-    coef_names = escape_latex(all_vars)
+    coef_names = all_vars
+    if(length(coef.sub) > 0){
+      coef_names = try(string_clean(coef_names, coef.sub))
+      if(is_error(coef_names)){
+        err = as.character(coef_names)
+        stop_up("In `coef.sub` the expression led to the following error:\n{err}\n",
+                "Note that the format should be, e.g. coef.sub=c(\"pat1 => new1\", \"pat2\") ",
+                "where the pattern `pat1` is replaced with `new1` and `pat2` is simply removed. ",
+                "You can add flags, e.g. to ignore case \"i/pat\", see ?stringmagic::string_clean.")
+      }
+    }
+    coef_names = escape_latex(coef_names)
     names(coef_names) = all_vars
 
     if(se.below){
@@ -4143,6 +4325,7 @@ etable_internal_df = function(info){
   model_names = info$model_names
   coefstat = info$coefstat
   dict = info$dict
+  coef.sub = info$coef.sub
   group = info$group
   extralines = info$extralines
   style = info$style
@@ -4193,13 +4376,13 @@ etable_internal_df = function(info){
 
     if((!is.null(keep) || !is.null(drop)) && length(group) == 0){
       if(!is.null(keep) && !any(grepl("^%", keep))){
-        msg = sma(" In particular, to 'keep' variables using their original names ", 
-                  "(before dict is applied), use the special character '%' first. ", 
-                  "E.g. keep = \"%", keep[1], "\"")
+        msg = paste0(" In particular, to 'keep' variables using their original names ", 
+                     "(before dict is applied), use use the argument `keep_raw`. ",
+                     "E.g. keep_raw = {Q ? keep[1]}")
       } else if(!is.null(drop) && !any(grepl("^%", drop))){
-        msg = sma(" In particular, to 'drop' variables using their original names ", 
-                  "(before dict is applied), use the special character '%' first. ", 
-                  "E.g. drop = \"%", drop[1], "\"")
+        msg = paste0(" In particular, to 'drop' variables using their original names ",
+                     "(before dict is applied), use the argument `drop_raw`. ", 
+                     "E.g. drop_raw = {Q ? drop[1]}")
       } else {
         msg = ""
       }
@@ -4216,6 +4399,20 @@ etable_internal_df = function(info){
     res = NULL
 
   } else {
+    
+    # coefficient names
+    coef_names = all_vars
+    if(length(coef.sub) > 0){
+      coef_names = try(string_clean(coef_names, coef.sub))
+      if(is_error(coef_names)){
+        err = as.character(coef_names)
+        stop_up("In `coef.sub` the expression led to the following error:\n{err}\n",
+                "Note that the format should be, e.g. coef.sub=c(\"pat1 => new1\", \"pat2\") ",
+                "where the pattern `pat1` is replaced with `new1` and `pat2` is simply removed. ",
+                "You can add flags, e.g. to ignore case \"i/pat\", see ?stringmagic::string_clean.")
+      }
+    }
+    
     se.below = info$se.below
     if(se.below){
       coef_below = info$coef_below
@@ -4236,11 +4433,11 @@ etable_internal_df = function(info){
 
       n_vars = length(all_vars)
       my_names = character(2 * n_vars)
-      my_names[1 + 2 * 0:(n_vars - 1)] = all_vars
+      my_names[1 + 2 * 0:(n_vars - 1)] = coef_names
 
       coef_mat = cbind(my_names, coef_se_mat)
     } else {
-      coef_mat = all_vars
+      coef_mat = coef_names
       for(m in 1:n_models) coef_mat = cbind(coef_mat, coef_list[[m]][all_vars])
       coef_mat[is.na(coef_mat)] = "  "
     }
@@ -4267,7 +4464,7 @@ etable_internal_df = function(info){
 
     res = coef_mat
   }
-
+  
   #
   # Group
   #
@@ -5752,9 +5949,9 @@ check_set_path = function(x, type = "", create_dirs = TRUE, up = 0){
   x_dp = deparse(substitute(x))
 
   path = try(normalizePath(x, "/", mustWork = FALSE))
-  if("try-error" %in% class(path)){
+  if(inherits(path, "try-error")){
     path = try(normalizePath(paste0("./", x), "/", mustWork = FALSE))
-    if("try-error" %in% class(path)){
+    if(inherits(path, "try-error")){
       stop_up("The path ", x, " is not valid, please revise.")
     }
   }
@@ -6936,33 +7133,118 @@ insert = function(x, y, i){
 
 
 is_fixest_model = function(x){
-  any(c("fixest", "fixest_list", "fixest_multi") %in% class(x))
+  inherits(x, c("fixest", "fixest_list", "fixest_multi"))
 }
 
 
-expand_list_vector = function(x){
+expand_list_vector = function(x, n_models, n_models_origin, argname, is_each = FALSE){
   # we transform list("A" = 2, "B", "C" = 3) into c("A", "A", "B", "C", "C", "C")
 
   x_names = names(x)
+  
+  if(is.atomic(x)){
+    # c("a", "a", "c") => recycled
+    x_new = x
+    n_x = length(x)
+    
+    if(n_x > n_models){
+      row = capture.output(dput(x))
+      stop_up("The argument {bq ? argname} represents rows. Currently, there are {n ? n_models} columns.\n",
+              "Problem: the input below contains {n_x} elements (> {n ? n_models}):\n",
+              "{row}")
+    }
+    
+    if(n_x < n_models){
+      
+      if(n_models %% n_x != 0){
+        row = capture.output(dput(x))
+        stop_up("In {bq ? argname}, the number of elements must be a divisor of the number of models.\n",
+                "Problem: in the vector below, we have {n_x} elements for {n_models} models")
+      }
 
-  if(is.null(x_names)){
-    # either list("m", "f") or c("a", "a", "c")
+      if(is_each){
+        x_new = rep(x, each = n_models/n_x)
+      } else {
+        x_new = rep(x, n_models/n_x)
+      }
+      
+    }
+    
+  } else if(is.null(x_names)){
+    # list("m", "f") => not recycled
     x_new = unlist(x)
+    
+    n_x_new = length(x_new)
+    
+    if(n_x_new > n_models){
+      row = capture.output(dput(x))
+      stop_up("The argument {bq ? argname} represents rows. Currently, there are {n ? n_models} columns.\n",
+              "Problem: the input below contains {n_x_new} elements (> {n ? n_models}):\n",
+              "{row}")
+    }
+    
+    if(n_x_new < n_models_origin){
+      x_new = c(x_new, rep(NA_character_, n_models_origin - length(x_new)))
+    }
+    
   } else {
     # ex: list("M", "F"=2)
+    
     x_new = c()
     for(j in seq_along(x)){
 
       if(nchar(x_names[j]) == 0){
-        x_new = c(x_new, x[j])
+        x_new = c(x_new, x[[j]])
+        
       } else {
-        x_new = c(x_new, rep(x_names[j], x[j]))
+        
+        n = x[[j]]
+        
+        if(!is.numeric(n)){
+          row = capture.output(dput(x))
+          stop_up("The argument {bq ?argname} is a list of rows. A row can be of the form:\n",
+                  " - `c(\"value1\", \"value2\")`, one element per column\n",
+                  " - `list(\"value1\" = 2, \"value2\")`, numeric numbers represent column spans\n",
+                  " - `list(\"value1\" = 2L, \"value2\" = 4L)`, integers represent column position\n",
+                  "Problem, the current row below is not of the form above:\n",
+                  "{row}")
+        }
+        
+        if(is.integer(n)){
+          x_new[n] = x_names[j]
+          
+        } else {
+          n_adj = max(min(n, n_models - length(x_new)), 0)
+          x_new = c(x_new, rep(x_names[j], n_adj))
+        }
+        
       }
     }
+    
+    if(length(x_new) < n_models_origin){
+      x_new = c(x_new, rep(NA_character_, n_models_origin - length(x_new)))
+    }
+    
   }
   
   if(is.list(x_new)){
     x_new = as.character(x_new)
+  }
+  
+  x_new[is.na(x_new)] = ""
+  
+  n_x_new = length(x_new)
+  if(n_x_new < n_models){
+    
+    if(n_x_new == n_models_origin){
+      # we recycle
+      if(is_each){
+        x_new = rep(x, each = n_models/n_x_new)
+      } else {
+        x_new = rep(x, n_models/n_x_new)
+      }
+    }
+    
   }
 
   return(x_new)
