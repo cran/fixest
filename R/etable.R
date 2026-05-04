@@ -26,7 +26,7 @@
 #' Finally it accepts functions to compute the covariances. 
 #' See the vcov documentation in the vignette.
 #' You can pass several VCOVs (as above) if you nest them into a list. 
-#' If the number of VCOVs equals the number of models, eahc VCOV is mapped to the appropriate model.
+#' If the number of VCOVs equals the number of models, each VCOV is mapped to the appropriate model.
 #' If there is one model and several VCOVs, or if the first element of the list is equal to
 #' `"each"` or `"times"`, then the estimations will be replicated and the results
 #' for each estimation and each VCOV will be reported.
@@ -153,7 +153,7 @@
 #' @param replace Logical, default is `FALSE`. Only used if option `file` is used. Should the 
 #' exported table be written in a new file that replaces any existing file?
 #' @param create_dirs Logical, default is `FALSE`. Only used if when some file needs to be 
-#' created (e;g. when `file` or `export` is used). By default, i.e. when `FALSE`, 
+#' created (e.g. when `file` or `export` is used). By default, i.e. when `FALSE`, 
 #' if the parent directory does not exist, the containing folders are created 
 #' up to the grand parent. 
 #' If `TRUE`, all containing folders are recursively created.
@@ -462,7 +462,7 @@
 #' \\usepackage{amsmath}
 #' \\usepackage{amssymb}
 #' 
-#' \% optionnal, dependent on context
+#' \% optional, dependent on context
 #' \\usepackage{makecell}
 #' \\usepackage{tabularx}
 #' \\usepackage[flushleft]{threeparttable}
@@ -6306,7 +6306,7 @@ highlight_apply = function(highlight, coef_mat, coef_names){
               " element (equal to {q?hl_name}) is ill formed. ",
               "It should be a comma separated list of options, which include: ",
               "'rowcol', 'square', 'thickd' (with d from 0 to 6), 'sepd' (d: 0-9), ",
-              "'se', and 'color!alpha' with 'color' a valid R color and, optionnaly, ",
+              "'se', and 'color!alpha' with 'color' a valid R color and, optionally, ",
               "'alpha' in 0-100.")
     }
 

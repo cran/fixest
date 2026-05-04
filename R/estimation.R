@@ -23,7 +23,7 @@
 #' Note that it should always be the last element, see details. Multiple estimations can be 
 #' performed at once: for multiple dep. vars, wrap them in `c()`: ex `c(y1, y2)`. 
 #' For multiple indep. vars, use the stepwise functions: ex `x1 + csw(x2, x3)`. 
-#' The formula `fml = c(y1, y2) ~ x1 + cw0(x2, x3)` leads to 6 estimation, see details. 
+#' The formula `fml = c(y1, y2) ~ x1 + csw0(x2, x3)` leads to 6 estimation, see details. 
 #' Square brackets starting with a dot can be used to call global variables: 
 #' `y.[i] ~ x.[1:2]` will lead to `y3 ~ x1 + x2` if `i` is equal 
 #' to 3 in the current environment (see details in [`xpd`]).
@@ -226,7 +226,7 @@
 #' Note that if the dependent variable is also on the right-hand-side, it is automatically 
 #' removed from the set of explanatory variable. 
 #' For example, feols(y ~ y + x, base) works as feols(y ~ x, base). 
-#' This is particulary useful to batch multiple estimations with multiple left hand sides.
+#' This is particularly useful to batch multiple estimations with multiple left hand sides.
 #' 
 #' @section Argument sliding:
 #'
@@ -2199,7 +2199,10 @@ ols_fit = function(y, X, w, correct_0w = FALSE, collin.tol, nthreads, xwx = NULL
   
   if(!is.null(info_inv$all_removed)){
     # Means all variables are collinear! => can happen when using FEs
-    return(list(all_removed = TRUE))
+    # if no regressor: resid = y
+    # (=> this info is useful in IVs)
+    
+    return(list(all_removed = TRUE, residuals = y))
   }
 
   xwx_inv = info_inv$XtX_inv
@@ -2596,7 +2599,7 @@ feglm = function(fml, data, family = "gaussian", vcov, offset, weights, subset, 
                          panel.id = panel.id, panel.time.step = panel.time.step,
                          panel.duplicate.method = panel.duplicate.method, 
                          linear.start = start,
-                         etastart=etastart, mustart = mustart, fixef = fixef,
+                         etastart = etastart, mustart = mustart, fixef = fixef,
                          fixef.rm = fixef.rm, fixef.tol = fixef.tol,
                          fixef.iter = fixef.iter, fixef.algo = fixef.algo,
                          collin.tol = collin.tol,
@@ -3467,7 +3470,7 @@ feglm.fit = function(y, X, fixef_df, family = "gaussian", vcov, offset, split,
 #' `fml = z~x+y|fixef_1+fixef_2`. Multiple estimations can be performed at once: 
 #' for multiple dep. vars, wrap them in `c()`: ex `c(y1, y2)`. For multiple indep. 
 #' vars, use the stepwise functions: ex `x1 + csw(x2, x3)`. 
-#' The formula `fml = c(y1, y2) ~ x1 + cw0(x2, x3)` leads to 6 estimation, see details. 
+#' The formula `fml = c(y1, y2) ~ x1 + csw0(x2, x3)` leads to 6 estimation, see details. 
 #' Square brackets starting with a dot can be used to call global variables: 
 #' `y.[i] ~ x.[1:2]` will lead to `y3 ~ x1 + x2` if `i` is equal to 3 in 
 #' the current environment (see details in [`xpd`]).
@@ -3652,7 +3655,7 @@ femlm = function(fml, data, family = c("poisson", "negbin", "logit", "gaussian")
                    env = env, ...), silent = TRUE)
 
   if(inherits(res, "try-error")){
-    err_msg = format_error_msg(env, "femlm")
+    err_msg = format_error_msg(res, "femlm")
     stopi("{err_msg}")
   }
 
@@ -3694,7 +3697,7 @@ fenegbin = function(fml, data, vcov, theta.init, start = 0, fixef, fixef.rm = "p
                    call_env_bis = call_env_bis, env = env, ...), silent = TRUE)
 
   if(inherits(res, "try-error")){
-    err_msg = format_error_msg(env, "fenegbin")
+    err_msg = format_error_msg(res, "fenegbin")
     stopi("{err_msg}")
   }
 
@@ -3740,7 +3743,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit,
                   call_env_bis = call_env_bis, env = env, ...), silent = TRUE)
 
   if(inherits(res, "try-error")){
-    err_msg = format_error_msg(env, "fepois")
+    err_msg = format_error_msg(res, "fepois")
     stopi("{err_msg}")
   }
 
@@ -3774,7 +3777,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit,
 #' you must use the argment `NL.fml`. Multiple estimations can be performed at once: 
 #' for multiple dep. vars, wrap them in `c()`: ex `c(y1, y2)`. For multiple indep. 
 #' vars, use the stepwise functions: ex `x1 + csw(x2, x3)`. This leads to 6 estimation 
-#' `fml = c(y1, y2) ~ x1 + cw0(x2, x3)`. See details. Square brackets starting with a 
+#' `fml = c(y1, y2) ~ x1 + csw0(x2, x3)`. See details. Square brackets starting with a 
 #' dot can be used to call global variables: `y.[i] ~ x.[1:2]` will lead to 
 #' `y3 ~ x1 + x2` if `i` is equal to 3 in the current environment (see details in [`xpd`]).
 #' @param start Starting values for the coefficients in the linear part (for the non-linear 
@@ -3899,7 +3902,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit,
 #' 
 #' If "none": no observation is removed.
 #' 
-#' Note that whathever the value of this options: the coefficient estimates 
+#' Note that whatever the value of this options: the coefficient estimates 
 #' will remain the same. It only affects inference (the standard-errors).
 #' 
 #' The algorithm is recursive, meaning that, e.g. in the presence of several fixed-effects (FEs),
@@ -3964,7 +3967,7 @@ fepois = function(fml, data, vcov, offset, weights, subset, split, fsplit,
 #' time periods is used (typically if the time variable represents years, it will be 1). 
 #' This method can apply only to integer (or convertible to integer) variables. 
 #' If `"consecutive"`, then the time variable can be of any type: two successive 
-#' time periods represent a lag of 1. If `"witihn.consecutive"` then **within a given id**, 
+#' time periods represent a lag of 1. If `"within.consecutive"` then **within a given id**, 
 #' two successive time periods represent a lag of 1. Finally, if the time variable is numeric, 
 #' you can provide your own numeric time step.
 #' @param panel.duplicate.method If several observations have the same id and time values, 

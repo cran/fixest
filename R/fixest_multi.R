@@ -620,7 +620,7 @@ summary.fixest_multi = function(object, type = "etable", vcov = NULL, se = NULL,
 #'
 #' @seealso
 #' The main fixest estimation functions: [`feols`], [`fepois`][fixest::feglm], 
-#' [`fenegbin`][fixest::femlm], [`feglm`], [`feNmlm`]. Tools for mutliple fixest 
+#' [`fenegbin`][fixest::femlm], [`feglm`], [`feNmlm`]. Tools for multiple fixest
 #' estimations: [`summary.fixest_multi`], [`print.fixest_multi`], [`as.list.fixest_multi`], 
 #' \code{\link[fixest]{sub-sub-.fixest_multi}}, \code{\link[fixest]{sub-.fixest_multi}}.
 #'

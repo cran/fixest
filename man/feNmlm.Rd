@@ -60,7 +60,7 @@ fixed-effects variables, insert them in this formula using a pipe
 you must use the argment \code{NL.fml}. Multiple estimations can be performed at once:
 for multiple dep. vars, wrap them in \code{c()}: ex \code{c(y1, y2)}. For multiple indep.
 vars, use the stepwise functions: ex \code{x1 + csw(x2, x3)}. This leads to 6 estimation
-\code{fml = c(y1, y2) ~ x1 + cw0(x2, x3)}. See details. Square brackets starting with a
+\code{fml = c(y1, y2) ~ x1 + csw0(x2, x3)}. See details. Square brackets starting with a
 dot can be used to call global variables: \code{y.[i] ~ x.[1:2]} will lead to
 \code{y3 ~ x1 + x2} if \code{i} is equal to 3 in the current environment (see details in \code{\link{xpd}}).}
 
@@ -114,7 +114,7 @@ That means all observations that are perfectly explained by the FEs are removed.
 
 If "none": no observation is removed.
 
-Note that whathever the value of this options: the coefficient estimates
+Note that whatever the value of this options: the coefficient estimates
 will remain the same. It only affects inference (the standard-errors).
 
 The algorithm is recursive, meaning that, e.g. in the presence of several fixed-effects (FEs),
@@ -226,7 +226,7 @@ or to a number. If \code{"unitary"}, then the largest common divisor between con
 time periods is used (typically if the time variable represents years, it will be 1).
 This method can apply only to integer (or convertible to integer) variables.
 If \code{"consecutive"}, then the time variable can be of any type: two successive
-time periods represent a lag of 1. If \code{"witihn.consecutive"} then \strong{within a given id},
+time periods represent a lag of 1. If \code{"within.consecutive"} then \strong{within a given id},
 two successive time periods represent a lag of 1. Finally, if the time variable is numeric,
 you can provide your own numeric time step.}
 
@@ -578,7 +578,7 @@ special feature unique to the \emph{left-hand-side} of \code{fixest} estimations
 Note that if the dependent variable is also on the right-hand-side, it is automatically
 removed from the set of explanatory variable.
 For example, feols(y ~ y + x, base) works as feols(y ~ x, base).
-This is particulary useful to batch multiple estimations with multiple left hand sides.
+This is particularly useful to batch multiple estimations with multiple left hand sides.
 }
 
 \section{Dot square bracket operator in formulas}{

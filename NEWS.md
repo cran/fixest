@@ -1,4 +1,24 @@
 
+# fixest 0.14.1
+
+## Bug fixes
+
+- fix bug in IV estimation when all exogenous regressors are removed from the estimation in the presence of fixed-effects. Reported by @adamaltmejd, #638
+
+- fix various typos in the documentation
+
+- fix bug in the error reporting for `femlm`/`fenegbin`/`fepois`. Thanks to @RobinDenz1 for reporting (fixes #646).
+
+## New features
+
+- `fitstat` gains the argument `htest` which formats the tests according to the htest class from the `stats` package
+
+## Other changes
+
+- improve the print method for TSLS
+
+- the documentation of `fitstat` is improved
+
 # fixest 0.14.0
 
 ## Bug fixes
@@ -211,7 +231,7 @@ feols(c(Ozone, Temp) ~ regex("!Day"), airquality)
 
 - add new method `formula.fixest_multi`
 
-- complete rewrite of the internal algorithm turning the fixed-effects into indexes, it is now: i) faster (much faster when combining mutliple fixed effects), ii) more consistent for character vectors
+- complete rewrite of the internal algorithm turning the fixed-effects into indexes, it is now: i) faster (much faster when combining multiple fixed effects), ii) more consistent for character vectors
 
 - new algorithm removing the fixed-effects from the estimation due to singletons or perfect fits: now the algorithm is recursive
 

@@ -584,7 +584,7 @@ collinearity = function(x, verbose){
 #' @param diff.inv Logical, default to `FALSE`. Whether to inverse the difference.
 #'
 #' @details
-#' By default, when the user tries to apply this function to nun-numeric variables, an error is raised. The exception is when the all variables are selected with the dot (like in `. ~ treat`. In this case, non-numeric variables are automatically omitted (with a message).
+#' By default, when the user tries to apply this function to non-numeric variables, an error is raised. The exception is when the all variables are selected with the dot (like in `. ~ treat`. In this case, non-numeric variables are automatically omitted (with a message).
 #'
 #' NAs are removed automatically: if the data contains NAs an information message will be prompted. First all observations containing NAs relating to the treatment or post variables are removed. Then if there are still NAs for the variables, they are excluded separately for each variable, and a new message detailing the NA breakup is prompted.
 #'
@@ -3378,7 +3378,7 @@ fixest_data = function(x, sample = "original"){
 #' a) demeaning over the first two largest FEs only, until convergence, then 
 #' b) demeaning over all FEs until convergence. 
 #' To skip the demeaning over 2 FEs, use a very high value of `iter_warmup`. To go directly
-#' to the demeaning over 2 FEs, se `iter_warmup` to a value lower than or equal to 0.
+#' to the demeaning over 2 FEs, set `iter_warmup` to a value lower than or equal to 0.
 #' @param iter_projAfterAcc Integer scalar, default is 40. After `iter_projAfterAcc` iterations
 #' of the standard algorithm, a simple projection is performed right after 
 #' the acceleration step. Use very high values to skip this step, or low values to apply this 
@@ -3390,7 +3390,7 @@ fixest_data = function(x, sample = "original"){
 #' `k` is the value of `iter_grandAcc` and `f^2(X)` is defined as `f(f(X))` 
 #' (i.e. the function `f` applied `k` times). By default, an additional acceleration 
 #' is performed for `h(X) = f^4(X)` every 8 iterations (2 times 4, equivalent to 
-#' the iterationsthe time to gather `h(X)` and `h(h(X))`).
+#' the iterations the time to gather `h(X)` and `h(h(X))`).
 #' @param internal Logical scalar, default is `FALSE`. If `TRUE`, no check on the arguments 
 #' is performed and the returned object is a plain list. For internal use only.
 #' 
@@ -3432,7 +3432,7 @@ fixest_data = function(x, sample = "original"){
 #' In cases of the absence of quick convergence, applying a first demeaning over the first
 #' two largest FEs before applying the demeaning over all FEs can improve convergence speed.
 #' This is controlled with the argument `iter_warmup` which gives the number of iterations
-#' over all the FEs to run before going to the 2 FEs demeaning. By default, the deameaning 
+#' over all the FEs to run before going to the 2 FEs demeaning. By default, the demeaning
 #' over all FEs is run for 15 iterations before switching to the 2 FEs case.  
 #' 
 #' The above defaults are the outcome of extended empirical applications, and try to strike a 
@@ -7207,7 +7207,7 @@ getFixest_nthreads = function(){
 #' definition must be a colon followed with a single space (i.e. ": "). You can stack definitions 
 #' within a single line by making use of a semi colon: `"var1: def; var2: def"`. White spaces on 
 #' the left and right are ignored. You can add commented lines with a `"#"`. Non-empty, 
-#' non-commented lines that don't have the proper format witll raise an error.
+#' non-commented lines that don't have the proper format will raise an error.
 #'
 #' @details
 #' This function is mostly used in combination with [`setFixest_dict`] to set the dictionary to be 

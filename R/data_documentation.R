@@ -108,7 +108,7 @@
 #' * id: panel identifier.
 #' * year: from 1 to 10.
 #' * year_treated: the period at which the individual is treated.
-#' * time_to_treatment: different between the year and the treatment year.
+#' * time_to_treatment: difference between the year and the treatment year.
 #' * treated: indicator taking value 1 if the individual is treated, 0 otherwise.
 #' * treatment_effect_true: true effect of the treatment.
 #' * x1: explanatory variable, correlated with the period.

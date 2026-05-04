@@ -1,7 +1,7 @@
 Package: fixest
 Type: Package
 Title: Fast Fixed-Effects Estimations
-Version: 0.14.0
+Version: 0.14.1
 Authors@R: 
     c(person(given = "Laurent",
              family = "Berge",
@@ -42,7 +42,7 @@ LazyData: true
 RoxygenNote: 7.3.2.9000
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2026-03-17 15:13:27 UTC; berge028
+Packaged: 2026-04-30 14:41:35 UTC; berge028
 Author: Laurent Berge [aut, cre],
   Sebastian Krantz [ctb],
   Grant McDermott [ctb] (ORCID: <https://orcid.org/0000-0001-7883-8573>),
@@ -50,4 +50,4 @@ Author: Laurent Berge [aut, cre],
   Kyle Butts [ctb]
 Maintainer: Laurent Berge <laurent.berge@u-bordeaux.fr>
 Repository: CRAN
-Date/Publication: 2026-03-18 07:22:04 UTC
+Date/Publication: 2026-05-04 05:40:50 UTC

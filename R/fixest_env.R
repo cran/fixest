@@ -283,7 +283,7 @@ fixest_env = function(fml, data, family = c("poisson", "negbin", "logit", "gauss
 
     assign("family_funs", family_funs, env)
   }
-
+  
   check_arg("logical scalar", demeaned, notes, warn, mem.clean, only.coef, data.save)
   
   if(origin_type %in% c("feols", "feglm")){

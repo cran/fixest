@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Berge and Grant McDermott" />
 
-<meta name="date" content="2026-03-17" />
+<meta name="date" content="2026-04-30" />
 
 <title>Fast Fixed-Effects Estimation: Short Introduction</title>
 
@@ -1562,7 +1562,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">Fast Fixed-Effects Estimation: Short
 Introduction</h1>
 <h4 class="author">Laurent Berge and Grant McDermott</h4>
-<h4 class="date">2026-03-17</h4>
+<h4 class="date">2026-04-30</h4>
 
 </div>
 
@@ -2655,25 +2655,23 @@ estimate the demand elasticity.</p>
 <span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a></span>
 <span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>est_iv <span class="ot">=</span> <span class="fu">feols</span>(qty <span class="sc">~</span> t <span class="sc">|</span> price <span class="sc">~</span> speed2 <span class="sc">+</span> wave2, fulton)</span>
 <span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a>est_iv</span>
-<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a><span class="co">#&gt; TSLS estimation</span></span>
+<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a><span class="co">#&gt; TSLS estimation: Second stage</span></span>
 <span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a><span class="co">#&gt; |- D.V.   : qty</span></span>
 <span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a><span class="co">#&gt; |- Endo.  : price</span></span>
 <span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a><span class="co">#&gt; |- Instr. : speed2, wave2</span></span>
-<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co">#&gt; |</span></span>
-<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a><span class="co">#&gt; |=&gt; Second Stage</span></span>
-<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a><span class="co">#&gt; |   Dep. Var.: qty</span></span>
-<span id="cb36-12"><a href="#cb36-12" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
-<span id="cb36-13"><a href="#cb36-13" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
-<span id="cb36-14"><a href="#cb36-14" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
-<span id="cb36-15"><a href="#cb36-15" tabindex="-1"></a><span class="co">#&gt; (Intercept)  7158.76801  1705.0985  4.198448 6.1008e-05 ***</span></span>
-<span id="cb36-16"><a href="#cb36-16" tabindex="-1"></a><span class="co">#&gt; fit_price   -3206.36184  1586.9124 -2.020503 4.6176e-02 *  </span></span>
-<span id="cb36-17"><a href="#cb36-17" tabindex="-1"></a><span class="co">#&gt; t              -6.41882    10.8445 -0.591897 5.5534e-01    </span></span>
-<span id="cb36-18"><a href="#cb36-18" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb36-19"><a href="#cb36-19" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
-<span id="cb36-20"><a href="#cb36-20" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,506.1   Adj. R2: 0.022745</span></span>
-<span id="cb36-21"><a href="#cb36-21" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.31791, p = 1.777e-6, on 2 and 93 DoF.</span></span>
-<span id="cb36-22"><a href="#cb36-22" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.41207, p = 0.522502, on 1 and 93 DoF.</span></span>
-<span id="cb36-23"><a href="#cb36-23" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.66746, p = 0.196599, on 1 DoF.</span></span></code></pre></div>
+<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a><span class="co">#&gt; Dep. Var.: qty</span></span>
+<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
+<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
+<span id="cb36-12"><a href="#cb36-12" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
+<span id="cb36-13"><a href="#cb36-13" tabindex="-1"></a><span class="co">#&gt; (Intercept)  7158.76801  1705.0985  4.198448 6.1008e-05 ***</span></span>
+<span id="cb36-14"><a href="#cb36-14" tabindex="-1"></a><span class="co">#&gt; fit_price   -3206.36184  1586.9124 -2.020503 4.6176e-02 *  </span></span>
+<span id="cb36-15"><a href="#cb36-15" tabindex="-1"></a><span class="co">#&gt; t              -6.41882    10.8445 -0.591897 5.5534e-01    </span></span>
+<span id="cb36-16"><a href="#cb36-16" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb36-17"><a href="#cb36-17" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb36-18"><a href="#cb36-18" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,506.1   Adj. R2: 0.022745</span></span>
+<span id="cb36-19"><a href="#cb36-19" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.31791, p = 1.777e-6, on 2 and 93 DoF.</span></span>
+<span id="cb36-20"><a href="#cb36-20" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.41207, p = 0.522502, on 1 and 93 DoF.</span></span>
+<span id="cb36-21"><a href="#cb36-21" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.66746, p = 0.196599, on 1 DoF.</span></span></code></pre></div>
 <p>So we’ve just performed a two stage least squares estimation. The
 formula coming after the pipe, <code>price ~ speed2 + wave2</code>,
 describes the endogenous variables (on the left) and the instruments (on
@@ -2698,26 +2696,24 @@ VCOV matrix is desired.</p>
 by changing the default print values:</p>
 <div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a><span class="fu">setFixest_print</span>(<span class="at">fitstat =</span> <span class="sc">~</span> . <span class="sc">+</span> ivwald2)</span>
 <span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a>est_iv</span>
-<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a><span class="co">#&gt; TSLS estimation</span></span>
+<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a><span class="co">#&gt; TSLS estimation: Second stage</span></span>
 <span id="cb38-4"><a href="#cb38-4" tabindex="-1"></a><span class="co">#&gt; |- D.V.   : qty</span></span>
 <span id="cb38-5"><a href="#cb38-5" tabindex="-1"></a><span class="co">#&gt; |- Endo.  : price</span></span>
 <span id="cb38-6"><a href="#cb38-6" tabindex="-1"></a><span class="co">#&gt; |- Instr. : speed2, wave2</span></span>
-<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a><span class="co">#&gt; |</span></span>
-<span id="cb38-8"><a href="#cb38-8" tabindex="-1"></a><span class="co">#&gt; |=&gt; Second Stage</span></span>
-<span id="cb38-9"><a href="#cb38-9" tabindex="-1"></a><span class="co">#&gt; |   Dep. Var.: qty</span></span>
-<span id="cb38-10"><a href="#cb38-10" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
-<span id="cb38-11"><a href="#cb38-11" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
-<span id="cb38-12"><a href="#cb38-12" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
-<span id="cb38-13"><a href="#cb38-13" tabindex="-1"></a><span class="co">#&gt; (Intercept)  7158.76801  1705.0985  4.198448 6.1008e-05 ***</span></span>
-<span id="cb38-14"><a href="#cb38-14" tabindex="-1"></a><span class="co">#&gt; fit_price   -3206.36184  1586.9124 -2.020503 4.6176e-02 *  </span></span>
-<span id="cb38-15"><a href="#cb38-15" tabindex="-1"></a><span class="co">#&gt; t              -6.41882    10.8445 -0.591897 5.5534e-01    </span></span>
-<span id="cb38-16"><a href="#cb38-16" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb38-17"><a href="#cb38-17" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
-<span id="cb38-18"><a href="#cb38-18" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,506.1   Adj. R2: 0.022745</span></span>
-<span id="cb38-19"><a href="#cb38-19" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.31791, p = 1.777e-6, on 2 and 93 DoF.</span></span>
-<span id="cb38-20"><a href="#cb38-20" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.41207, p = 0.522502, on 1 and 93 DoF.</span></span>
-<span id="cb38-21"><a href="#cb38-21" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.66746, p = 0.196599, on 1 DoF.</span></span>
-<span id="cb38-22"><a href="#cb38-22" tabindex="-1"></a><span class="co">#&gt;          Wald (2nd stage): stat =  4.08243, p = 0.046176, on 1 and 94 DoF, VCOV: IID.</span></span></code></pre></div>
+<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a><span class="co">#&gt; Dep. Var.: qty</span></span>
+<span id="cb38-8"><a href="#cb38-8" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
+<span id="cb38-9"><a href="#cb38-9" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
+<span id="cb38-10"><a href="#cb38-10" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
+<span id="cb38-11"><a href="#cb38-11" tabindex="-1"></a><span class="co">#&gt; (Intercept)  7158.76801  1705.0985  4.198448 6.1008e-05 ***</span></span>
+<span id="cb38-12"><a href="#cb38-12" tabindex="-1"></a><span class="co">#&gt; fit_price   -3206.36184  1586.9124 -2.020503 4.6176e-02 *  </span></span>
+<span id="cb38-13"><a href="#cb38-13" tabindex="-1"></a><span class="co">#&gt; t              -6.41882    10.8445 -0.591897 5.5534e-01    </span></span>
+<span id="cb38-14"><a href="#cb38-14" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb38-15"><a href="#cb38-15" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb38-16"><a href="#cb38-16" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,506.1   Adj. R2: 0.022745</span></span>
+<span id="cb38-17"><a href="#cb38-17" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.31791, p = 1.777e-6, on 2 and 93 DoF.</span></span>
+<span id="cb38-18"><a href="#cb38-18" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.41207, p = 0.522502, on 1 and 93 DoF.</span></span>
+<span id="cb38-19"><a href="#cb38-19" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.66746, p = 0.196599, on 1 DoF.</span></span>
+<span id="cb38-20"><a href="#cb38-20" tabindex="-1"></a><span class="co">#&gt;          Wald (2nd stage): stat =  4.08243, p = 0.046176, on 1 and 94 DoF, VCOV: IID.</span></span></code></pre></div>
 <p>In the previous code, <code>fitstat = ~ . + ivwald2</code> means that
 we want to add the second stage Wald test to the existing printed
 statistics (represented here by the point).</p>
@@ -2725,48 +2721,44 @@ statistics (represented here by the point).</p>
 you need to add them after the first right-hand-side, as follows:</p>
 <div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a>est_iv_fe <span class="ot">=</span> <span class="fu">feols</span>(qty <span class="sc">~</span> t <span class="sc">|</span> day <span class="sc">|</span> price <span class="sc">~</span> speed2 <span class="sc">+</span> wave2, fulton)</span>
 <span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a>est_iv_fe</span>
-<span id="cb39-3"><a href="#cb39-3" tabindex="-1"></a><span class="co">#&gt; TSLS estimation</span></span>
+<span id="cb39-3"><a href="#cb39-3" tabindex="-1"></a><span class="co">#&gt; TSLS estimation: Second stage</span></span>
 <span id="cb39-4"><a href="#cb39-4" tabindex="-1"></a><span class="co">#&gt; |- D.V.   : qty</span></span>
 <span id="cb39-5"><a href="#cb39-5" tabindex="-1"></a><span class="co">#&gt; |- Endo.  : price</span></span>
 <span id="cb39-6"><a href="#cb39-6" tabindex="-1"></a><span class="co">#&gt; |- Instr. : speed2, wave2</span></span>
-<span id="cb39-7"><a href="#cb39-7" tabindex="-1"></a><span class="co">#&gt; |</span></span>
-<span id="cb39-8"><a href="#cb39-8" tabindex="-1"></a><span class="co">#&gt; |=&gt; Second Stage</span></span>
-<span id="cb39-9"><a href="#cb39-9" tabindex="-1"></a><span class="co">#&gt; |   Dep. Var.: qty</span></span>
-<span id="cb39-10"><a href="#cb39-10" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
-<span id="cb39-11"><a href="#cb39-11" tabindex="-1"></a><span class="co">#&gt; Fixed-effects: day: 5</span></span>
-<span id="cb39-12"><a href="#cb39-12" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
-<span id="cb39-13"><a href="#cb39-13" tabindex="-1"></a><span class="co">#&gt;              Estimate Std. Error   t value Pr(&gt;|t|)    </span></span>
-<span id="cb39-14"><a href="#cb39-14" tabindex="-1"></a><span class="co">#&gt; fit_price -3400.91737  1459.9898 -2.329412 0.022075 *  </span></span>
-<span id="cb39-15"><a href="#cb39-15" tabindex="-1"></a><span class="co">#&gt; t            -7.56521    10.2108 -0.740907 0.460679    </span></span>
-<span id="cb39-16"><a href="#cb39-16" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb39-17"><a href="#cb39-17" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
-<span id="cb39-18"><a href="#cb39-18" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,313.9     Adj. R2: 0.12154 </span></span>
-<span id="cb39-19"><a href="#cb39-19" tabindex="-1"></a><span class="co">#&gt;                 Within R2: 0.057342</span></span>
-<span id="cb39-20"><a href="#cb39-20" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.85533, p = 1.289e-6, on 2 and 89 DoF.</span></span>
-<span id="cb39-21"><a href="#cb39-21" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.54041, p = 0.464196, on 1 and 89 DoF.</span></span>
-<span id="cb39-22"><a href="#cb39-22" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.64639, p = 0.199451, on 1 DoF.</span></span>
-<span id="cb39-23"><a href="#cb39-23" tabindex="-1"></a><span class="co">#&gt;          Wald (2nd stage): stat =  5.42616, p = 0.022075, on 1 and 90 DoF, VCOV: IID.</span></span></code></pre></div>
+<span id="cb39-7"><a href="#cb39-7" tabindex="-1"></a><span class="co">#&gt; Dep. Var.: qty</span></span>
+<span id="cb39-8"><a href="#cb39-8" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
+<span id="cb39-9"><a href="#cb39-9" tabindex="-1"></a><span class="co">#&gt; Fixed-effects: day: 5</span></span>
+<span id="cb39-10"><a href="#cb39-10" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
+<span id="cb39-11"><a href="#cb39-11" tabindex="-1"></a><span class="co">#&gt;              Estimate Std. Error   t value Pr(&gt;|t|)    </span></span>
+<span id="cb39-12"><a href="#cb39-12" tabindex="-1"></a><span class="co">#&gt; fit_price -3400.91737  1459.9898 -2.329412 0.022075 *  </span></span>
+<span id="cb39-13"><a href="#cb39-13" tabindex="-1"></a><span class="co">#&gt; t            -7.56521    10.2108 -0.740907 0.460679    </span></span>
+<span id="cb39-14"><a href="#cb39-14" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb39-15"><a href="#cb39-15" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb39-16"><a href="#cb39-16" tabindex="-1"></a><span class="co">#&gt; RMSE: 2,313.9     Adj. R2: 0.12154 </span></span>
+<span id="cb39-17"><a href="#cb39-17" tabindex="-1"></a><span class="co">#&gt;                 Within R2: 0.057342</span></span>
+<span id="cb39-18"><a href="#cb39-18" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage), price: stat = 15.85533, p = 1.289e-6, on 2 and 89 DoF.</span></span>
+<span id="cb39-19"><a href="#cb39-19" tabindex="-1"></a><span class="co">#&gt;                Wu-Hausman: stat =  0.54041, p = 0.464196, on 1 and 89 DoF.</span></span>
+<span id="cb39-20"><a href="#cb39-20" tabindex="-1"></a><span class="co">#&gt;                    Sargan: stat =  1.64639, p = 0.199451, on 1 DoF.</span></span>
+<span id="cb39-21"><a href="#cb39-21" tabindex="-1"></a><span class="co">#&gt;          Wald (2nd stage): stat =  5.42616, p = 0.022075, on 1 and 90 DoF, VCOV: IID.</span></span></code></pre></div>
 <p>To access the first stage(s), you can use the summary method:</p>
 <div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a><span class="fu">summary</span>(est_iv_fe, <span class="at">stage =</span> <span class="dv">1</span>)</span>
-<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a><span class="co">#&gt; TSLS estimation</span></span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a><span class="co">#&gt; TSLS estimation: First stage</span></span>
 <span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a><span class="co">#&gt; |- D.V.   : qty</span></span>
 <span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a><span class="co">#&gt; |- Endo.  : price</span></span>
 <span id="cb40-5"><a href="#cb40-5" tabindex="-1"></a><span class="co">#&gt; |- Instr. : speed2, wave2</span></span>
-<span id="cb40-6"><a href="#cb40-6" tabindex="-1"></a><span class="co">#&gt; |</span></span>
-<span id="cb40-7"><a href="#cb40-7" tabindex="-1"></a><span class="co">#&gt; |=&gt; First Stage</span></span>
-<span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a><span class="co">#&gt; |   Current Dep. Var.: price</span></span>
-<span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
-<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a><span class="co">#&gt; Fixed-effects: day: 5</span></span>
-<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
-<span id="cb40-12"><a href="#cb40-12" tabindex="-1"></a><span class="co">#&gt;         Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
-<span id="cb40-13"><a href="#cb40-13" tabindex="-1"></a><span class="co">#&gt; speed2 -0.005223    0.00932 -0.560383 5.7663e-01    </span></span>
-<span id="cb40-14"><a href="#cb40-14" tabindex="-1"></a><span class="co">#&gt; wave2   0.105058    0.02070  5.075196 2.1031e-06 ***</span></span>
-<span id="cb40-15"><a href="#cb40-15" tabindex="-1"></a><span class="co">#&gt; t      -0.001815    0.00111 -1.634343 1.0572e-01    </span></span>
-<span id="cb40-16"><a href="#cb40-16" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb40-17"><a href="#cb40-17" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
-<span id="cb40-18"><a href="#cb40-18" tabindex="-1"></a><span class="co">#&gt; RMSE: 0.279871     Adj. R2: 0.27883 </span></span>
-<span id="cb40-19"><a href="#cb40-19" tabindex="-1"></a><span class="co">#&gt;                  Within R2: 0.327624</span></span>
-<span id="cb40-20"><a href="#cb40-20" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage): stat = 15.855, p = 1.289e-6, on 2 and 89 DoF.</span></span></code></pre></div>
+<span id="cb40-6"><a href="#cb40-6" tabindex="-1"></a><span class="co">#&gt; Dep. Var.: price</span></span>
+<span id="cb40-7"><a href="#cb40-7" tabindex="-1"></a><span class="co">#&gt; Observations: 97</span></span>
+<span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a><span class="co">#&gt; Fixed-effects: day: 5</span></span>
+<span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a><span class="co">#&gt; Standard-errors: IID </span></span>
+<span id="cb40-10"><a href="#cb40-10" tabindex="-1"></a><span class="co">#&gt;         Estimate Std. Error   t value   Pr(&gt;|t|)    </span></span>
+<span id="cb40-11"><a href="#cb40-11" tabindex="-1"></a><span class="co">#&gt; speed2 -0.005223    0.00932 -0.560383 5.7663e-01    </span></span>
+<span id="cb40-12"><a href="#cb40-12" tabindex="-1"></a><span class="co">#&gt; wave2   0.105058    0.02070  5.075196 2.1031e-06 ***</span></span>
+<span id="cb40-13"><a href="#cb40-13" tabindex="-1"></a><span class="co">#&gt; t      -0.001815    0.00111 -1.634343 1.0572e-01    </span></span>
+<span id="cb40-14"><a href="#cb40-14" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb40-15"><a href="#cb40-15" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb40-16"><a href="#cb40-16" tabindex="-1"></a><span class="co">#&gt; RMSE: 0.279871     Adj. R2: 0.27883 </span></span>
+<span id="cb40-17"><a href="#cb40-17" tabindex="-1"></a><span class="co">#&gt;                  Within R2: 0.327624</span></span>
+<span id="cb40-18"><a href="#cb40-18" tabindex="-1"></a><span class="co">#&gt; F-test (1st stage): stat = 15.855, p = 1.289e-6, on 2 and 89 DoF.</span></span></code></pre></div>
 <p>When <code>summary</code> shall return more than one element, the
 object returned is not a regular <code>fixest</code> object but a
 <code>fixest_multi</code> object. These kind of objects are covered in

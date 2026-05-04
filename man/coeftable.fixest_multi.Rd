@@ -60,7 +60,7 @@ It also accepts covariance matrices computed externally.
 Finally it accepts functions to compute the covariances.
 See the vcov documentation in the vignette.
 You can pass several VCOVs (as above) if you nest them into a list.
-If the number of VCOVs equals the number of models, eahc VCOV is mapped to the appropriate model.
+If the number of VCOVs equals the number of models, each VCOV is mapped to the appropriate model.
 If there is one model and several VCOVs, or if the first element of the list is equal to
 \code{"each"} or \code{"times"}, then the estimations will be replicated and the results
 for each estimation and each VCOV will be reported.}

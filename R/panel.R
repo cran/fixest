@@ -726,7 +726,7 @@ lag_fml = lag.formula
 #' time periods is used (typically if the time variable represents years, it will be 1). 
 #' This method can apply only to integer (or convertible to integer) variables. 
 #' If `"consecutive"`, then the time variable can be of any type: two successive 
-#' time periods represent a lag of 1. If `"witihn.consecutive"` then **within a given id**, 
+#' time periods represent a lag of 1. If `"within.consecutive"` then **within a given id**, 
 #' two successive time periods represent a lag of 1. Finally, if the time variable is numeric, 
 #' you can provide your own numeric time step.
 #' @param duplicate.method If several observations have the same id and time values, 

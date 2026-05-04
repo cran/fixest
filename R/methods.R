@@ -211,21 +211,24 @@ print.fixest = function(x, n, type = "table", fitstat = NULL, ...){
   }
 
   if(isTRUE(x$is_iv)){
-    first_line = sma("TSLS estimation\n",
-                     "|- D.V.   : {x$iv_main_dep_var}\n",
-                     "|- Endo.  : {', 'c ? get_vars(x$iv_endo_fml)}\n",
-                     "|- Instr. : {', 'c ? x$iv_inst_names}\n",
-                     "|\n")
-                     
-    if(x$iv_stage == 1){
-      second_line = sma("|=> First Stage\n",
-                        "|   Current Dep. Var.: ", as.character(x$fml)[[2]], "\n")
-    } else {
-      second_line = sma("|=> Second Stage\n",
-                        "|   Dep. Var.: {x$iv_main_dep_var}\n")
-    }
     
-    catma(first_line, second_line)
+    if(x$iv_stage == 1){
+      catma(
+        "TSLS estimation: First stage\n",
+        "|- D.V.   : {x$iv_main_dep_var}\n",
+        "|- Endo.  : {', 'c, swidth, '\n's, '\n\\|           'c ? get_vars(x$iv_endo_fml)}\n",
+        "|- Instr. : {', 'c, swidth, '\n's, '\n\\|           'c ? x$iv_inst_names}\n",
+        "Dep. Var.: {dp ? x$fml[[2]]}\n"
+      )
+    } else {
+      catma(
+        "TSLS estimation: Second stage\n",
+        "|- D.V.   : {x$iv_main_dep_var}\n",
+        "|- Endo.  : {', 'c, swidth, '\n's, '\n\\|           'c ? get_vars(x$iv_endo_fml)}\n",
+        "|- Instr. : {', 'c, swidth, '\n's, '\n\\|           'c ? x$iv_inst_names}\n",
+        "Dep. Var.: {x$iv_main_dep_var}\n"
+      )
+    }
   } else {
     depvar_name = as.character(x$fml)[[2]]
     sep_value = if(nchar(half_line) + nchar(depvar_name) <= 60) ", " else "\n"
@@ -1983,9 +1986,9 @@ nobs.fixest = function(object, ...){
   object$nobs
 }
 
-#' Aikake's an information criterion
+#' Akaike's an information criterion
 #'
-#' This function computes the AIC (Aikake's, an information criterion) from a `fixest` estimation.
+#' This function computes the AIC (Akaike's, an information criterion) from a `fixest` estimation.
 #'
 #' @inheritParams nobs.fixest
 #'
@@ -2001,11 +2004,11 @@ nobs.fixest = function(object, ...){
 #' You can have more information on this criterion on [`AIC`][stats::AIC].
 #'
 #' @return
-#' It return a numeric vector, with length the same as the number of objects taken as arguments.
+#' It returns a numeric vector, with length the same as the number of objects taken as arguments.
 #'
 #' @seealso
 #' See also the main estimation functions [`femlm`], [`feols`] or [`feglm`]. 
-#' Other statictics methods: [`BIC.fixest`], [`logLik.fixest`], [`nobs.fixest`].
+#' Other statistics methods: [`BIC.fixest`], [`logLik.fixest`], [`nobs.fixest`].
 #'
 #' @author
 #' Laurent Berge
@@ -2059,7 +2062,7 @@ AIC.fixest = function(object, ..., k = 2){
 #' You can have more information on this criterion on [`AIC`][stats::AIC].
 #'
 #' @return
-#' It return a numeric vector, with length the same as the number of objects taken as arguments.
+#' It returns a numeric vector, with length the same as the number of objects taken as arguments.
 #'
 #' @seealso
 #' See also the main estimation functions [`femlm`], [`feols`] or [`feglm`]. Other statistics functions: [`AIC.fixest`], [`logLik.fixest`].

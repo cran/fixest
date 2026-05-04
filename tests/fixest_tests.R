@@ -3069,6 +3069,16 @@ for (i in seq_len(length(est_split))) {
 }
 
 
+# htest
+mult_htest = fitstat(est_iv, c("wald", "f", "r2", "f.p", "ivwald1"), htest = TRUE)
+test(inherits(mult_htest$wald, "htest"), TRUE)
+test(inherits(mult_htest$f, "htest"), TRUE)
+test(inherits(mult_htest$r2, "htest"), FALSE)
+test(inherits(mult_htest$f.p, "htest"), FALSE)
+test(inherits(mult_htest$`ivwald1::x_endo_1`, "htest"), TRUE)
+test(inherits(mult_htest$`ivwald1::x_endo_2`, "htest"), TRUE)
+
+
 ####
 #### confint ####
 ####
