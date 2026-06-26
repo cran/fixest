@@ -11,7 +11,7 @@
 
 <meta name="author" content="Laurent Bergé" />
 
-<meta name="date" content="2026-04-30" />
+<meta name="date" content="2026-06-26" />
 
 <title>On collinearity</title>
 
@@ -1561,7 +1561,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">On collinearity</h1>
 <h4 class="author">Laurent Bergé</h4>
-<h4 class="date">2026-04-30</h4>
+<h4 class="date">2026-06-26</h4>
 
 </div>
 
@@ -1969,13 +1969,9 @@ we apply a translation of <span class="math inline">\(10^7\)</span>. A
 notable difference between the two routines is that there is no explicit
 message from <code>lm</code> (but this is displayed in <code>lm</code>’s
 <code>summary</code>).</p>
-<p><strong>Bottom line.</strong> Collinearity detection and fixing is a
-numerical problem and as such is subject to the ususal pitfall of these,
-in particular precision problems. Always be wary when variables are
-removed: if there is no theoretical reason for removal then there might
-be a data problem. In general, ensuring that the variables have a
-reasonable numerical range is a good idea. Do not hesitate to re-scale
-the variables with a large range.</p>
+<p><strong>Conclusion.</strong> Always keep in mind that collinearity
+detection and fixing is a numerical problem: different algorithms can
+lead to different results.</p>
 </div>
 <div id="subsec_removal_good" class="section level2" number="3.3">
 <h2><span class="header-section-number">3.3</span> When automatic
